@@ -1,4 +1,5 @@
 import { useEffect,useRef, useState } from "react"
+import {Link}  from "react-router-dom"
 import Card from "./Card"
 import backgroundImage from "../images/backgroundImages/backgroundImage.jpg"
 export default function Home(){
@@ -64,13 +65,13 @@ export default function Home(){
                         <div 
                             className="authContainer mt-2 flex gap-20">
                             {
-                                [{text:"Enter as Contender",icon:"fa-solid fa-user-graduate"},{text:"Enter as Navigator",icon:"fas fa-chalkboard-teacher"}].map((user)=>{
-                                    return <button 
+                                [{text:"Enter as Contender",icon:"fa-solid fa-user-graduate",url:"/authentication"},{text:"Enter as Navigator",icon:"fas fa-chalkboard-teacher",url:"/authentication"}].map((user)=>{
+                                    return <Link to={user.url}><button 
                                             type="button" 
                                             className="bg-orange-400 p-2 rounded hover:bg-orange-500 shadow-lg font-bold text-white">
                                                 {user.text}
                                                 <i className={`${user.icon} ms-2 border-l-2 p-2 border-l-white`}></i>
-                                            </button>
+                                            </button></Link>
                                 })
                             }
                         </div>

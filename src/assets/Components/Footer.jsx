@@ -2,7 +2,7 @@ import  FooterCol from "./FooterCol"
 export default function Footer(){
     const footer = [
         {
-            whiteLogo: '../src/assets/images/logo/animatedlogo.gif'
+            whiteLogo: '../src/assets/images/logo/white_logo.png'
         },
         {
             heading: "Quick Links",
@@ -58,15 +58,15 @@ export default function Footer(){
     return (
         <>
             <footer
-                className="border-t-[1px] border-gray-100">
+                className="border-t-[1px] border-gray-100 bg-black text-white">
                 <div 
-                    className="footer w-full min-h-[400px] p-8 flex justify-evenly flex-wrap">
+                    className="footer w-full min-h-[200px] p-4 flex md:flex-row md:gap-0 gap-4 flex-col justify-evenly flex-wrap">
                     {
                         footer.map((data, index) => (
                             <FooterCol key={index} data={data} />
                         ))
                     }
-                    <div className="w-[20%] min-h-[200px] rounded-lg shadow-lg flex flex-col gap-4 p-6 items-center">
+                    <div className="md:w-[20%] w-[100%] min-h-[200px] rounded-lg shadow-lg flex flex-col gap-4 p-3 items-center">
                         <h3 className="text-lg font-bold">Buy Me a Coffee</h3>
                         <div className="w-full flex justify-center">
                             <a 
@@ -79,7 +79,7 @@ export default function Footer(){
                         </div>
                     </div>
                 </div>
-                <div className="text-center mt-4 text-sm text-gray-400">
+                <div className="text-center mt-4 text-sm text-gray-400 py-2">
                     © {new Date().getFullYear()} Exam Recommendation System. All rights reserved.
                 </div>
             </footer>

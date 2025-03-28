@@ -51,7 +51,7 @@ export default function Contact(){
                                                         id="name"
                                                     />
                                                     <label
-                                                        className={`p-2 absolute left-3  -translate-y-1/2  transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-gray-500 peer-focus:top-0 peer-focus:text-orange-500 peer-focus:font-semibold z-[1000] peer-focus:bg-white ${user.name ? "-top-3 text-black font-semibold" : "top-1/2 text-gray-500"}`}
+                                                        className={`p-2 absolute left-3  -translate-y-1/2  transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-gray-500 peer-focus:top-0 peer-focus:text-orange-500 peer-focus:font-semibold z-[10] peer-focus:bg-white ${user.name ? "-top-3 text-black font-semibold" : "top-1/2 text-gray-500"}`}
                                                         htmlFor="name">
                                                         Name
                                                     </label>
@@ -67,7 +67,7 @@ export default function Contact(){
                                                         name="email" 
                                                         id="email" />
                                                     <label 
-                                                        className={`p-2 absolute left-3 -translate-y-1/2  transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-gray-500 peer-focus:top-0 peer-focus:text-orange-500 peer-focus:font-semibold z-[1000] peer-focus:bg-white ${user.email ? "-top-3 text-black font-semibold" : " top-1/2 text-gray-500"}`}
+                                                        className={`p-2 absolute left-3 -translate-y-1/2  transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-gray-500 peer-focus:top-0 peer-focus:text-orange-500 peer-focus:font-semibold z-[10] peer-focus:bg-white ${user.email ? "-top-3 text-black font-semibold" : " top-1/2 text-gray-500"}`}
                                                         htmlFor="email">
                                                         Email
                                                     </label>
@@ -83,7 +83,7 @@ export default function Contact(){
                                                         >
                                                     </textarea>
                                                     <label
-                                                        className={`p-2 absolute left-3 -translate-y-1/2  transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-gray-500 peer-focus:top-0 peer-focus:text-orange-500 peer-focus:font-semibold z-[1000] peer-focus:bg-white ${user.message ? "-top-3 text-black font-semibold" : " top-5 text-gray-500"}`}
+                                                        className={`p-2 absolute left-3 -translate-y-1/2  transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-gray-500 peer-focus:top-0 peer-focus:text-orange-500 peer-focus:font-semibold z-[10] peer-focus:bg-white ${user.message ? "-top-3 text-black font-semibold" : " top-5 text-gray-500"}`}
                                                         htmlFor="message">
                                                         Message
                                                     </label>
