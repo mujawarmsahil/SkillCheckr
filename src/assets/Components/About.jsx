@@ -7,7 +7,7 @@ export default function About(){
             <section 
                 id="about">
                 <div 
-                    className="py-12 about w-full min-h-screen border-2 border-red-500">
+                    className="py-12 about w-full min-h-screen ">
                         <History/>
                         <Values/>
                 </div>
