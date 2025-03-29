@@ -19,7 +19,7 @@ export default function Navbar(){
                     <ul className="flex justify-around w-full">
                     {/* {path:"setExam",text:"Set Exam"},{path:"viewQuestionSet",text:"View Question set"}, */}
                         {
-                            [{path:"",text:"Home"},{path:"about",text:"About"},{path:"service",text:"Service"},{path:"contact",text:"Contact"}].map((link,index)=>{
+                            [{path:"",text:"Home"},{path:"about",text:"About"},{path:"blog",text:"Blog"},{path:"contact",text:"Contact"}].map((link,index)=>{
                                 return <li key={index}>
                                             <NavLink
                                                 

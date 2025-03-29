@@ -40,10 +40,10 @@ export default function Home(){
                     style={{ backgroundImage: `url(${backgroundImage})` }}
                     className={`homeContainer w-full min-h-screen bg-cover bg-no-repeat bg-center flex items-center`}>
                     <div 
-                        className="homeInfo w-[50%] p-2 ms-auto min-h-full flex flex-col gap-2">
+                        className="homeInfo w-full md:w-[50%] p-2 ms-auto min-h-full flex flex-col gap-2">
 
                         <h1
-                            className="font-intel font-bold text-[50px]">
+                            className="font-intel font-bold text-[30px] md:text-[50px] text-center md:text-left">
                             Skill 
                             <span
                                 className="text-orange-400">
@@ -51,35 +51,37 @@ export default function Home(){
                                 </span>
                         </h1>
                         <div 
-                            className="slogan w-[75%] h-[100px] text-wrap relative overflow-hidden" >
+                            className="slogan w-full md:w-[75%] h-[100px] text-wrap relative overflow-hidden" >
                             <p
                                 ref={ref} 
-                                className="overflow-hidden transition-all duration-100 font-bold font-ubuntu text-2xl absolute top-0">
+                                className="overflow-hidden transition-all duration-100 font-bold font-ubuntu text-xl md:text-2xl absolute top-0 text-center md:text-left">
                                 Assess Your Skills, Track Your Progress!
                             </p>
                             <p
-                                className="font-semibold absolute top-1/2 ">
+                                className="font-semibold absolute top-1/2 text-center md:text-left">
                                 "Take personalized quizzes, evaluate your knowledge, and unlock your potential with our Skill Checker App."
                             </p>
                         </div>
                         <div 
-                            className="authContainer mt-2 flex gap-20">
+                            className="authContainer mt-2 flex flex-col md:flex-row gap-4 md:gap-20 items-center">
                             {
-                                [{text:"Enter as Contender",icon:"fa-solid fa-user-graduate",url:"/authentication"},{text:"Enter as Navigator",icon:"fas fa-chalkboard-teacher",url:"/authentication"}].map((user)=>{
-                                    return <Link to={user.url}><button 
+                                [{text:"Enter as Contender",icon:"fa-solid fa-user-graduate",url:"/authentication"},{text:"Enter as Navigator",icon:"fas fa-chalkboard-teacher",url:"/authentication"}].map((user)=>(
+                                    <Link to={user.url} key={user.text}>
+                                        <button 
                                             type="button" 
-                                            className="bg-orange-400 p-2 rounded hover:bg-orange-500 shadow-lg font-bold text-white">
+                                            className="bg-orange-400 p-2 rounded hover:bg-orange-500 shadow-lg font-bold text-white w-full md:w-auto">
                                                 {user.text}
                                                 <i className={`${user.icon} ms-2 border-l-2 p-2 border-l-white`}></i>
-                                            </button></Link>
-                                })
+                                        </button>
+                                    </Link>
+                                ))
                             }
                         </div>
                     </div>
                 </div>
                 <div className="overflow-hidden relative w-full py-10 gap-10 flex flex-col ">
                             <h2
-                                className="font-extrabold text-4xl text-center after:block relative after:absolute after:-bottom-4  after:left-1/2 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] after:w-[100px] after:h-[5px] after:bg-orange-400">
+                                className="font-extrabold text-2xl md:text-4xl text-center after:block relative after:absolute after:-bottom-4  after:left-1/2 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] after:w-[100px] after:h-[5px] after:bg-orange-400">
                                     Testimonials
                             </h2>
                         <Card/>

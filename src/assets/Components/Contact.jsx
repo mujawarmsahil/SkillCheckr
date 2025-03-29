@@ -21,7 +21,7 @@ export default function Contact(){
                     <div 
                         className="contact w-full min-h-screen  flex justify-center items-center ">
                             <div 
-                                className="w-[80%] min-h-[450px] p-5  flex flex-wrap justify-evenly mt-10">
+                                className="w-[80%] min-h-[450px] p-5 md:gap-0 gap-5 flex flex-wrap justify-evenly mt-10">
                                     <div className="w-[100%] p-2 text-center mb-8">
                                     <h1
                                         className="font-intel  inline-block text-4xl relative font-bold text-center after:content[''] after:-bottom-3 after:block after:w-[75px] after:absolute after:left-1/2 after:bg-orange-400  after:-translate-x-1/2 after:h-[5px] ">
@@ -29,19 +29,19 @@ export default function Contact(){
                                     </h1>
                                     </div>
                                 <div 
-                                    className="locationFrame w-[50%] min-h-[300px] rounded overflow-hidden shadow-lg ">
+                                    className="locationFrame md:w-[50%] w-[100%] min-h-[300px] rounded overflow-hidden shadow-lg ">
                                     <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3784.0665343041205!2d73.8028981!3d18.480645199999998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc2bfeb853d4691%3A0x56f1a2e46627167!2sGiri&#39;s%20TECH%20HUB%20Pvt%20Ltd!5e0!3m2!1sen!2sin!4v1742846485204!5m2!1sen!2sin" 
                                     className="w-[100%] h-[100%]" allowFullScreen={true} loading="lazy" referrerPolicy="no-referrer-when-downgrade"></iframe>
                                 </div>
                                 <div
-                                    className="contactContainer w-[50%] p-2 ">
+                                    className="contactContainer md:w-[50%] w-[100%] p-2 ">
                                         <form 
-                                            className="w-[100%]  "
+                                            className="w-[100%] "
                                             action="">
                                             <div 
                                                 className="formContainer flex flex-col gap-8">
                                                 <div 
-                                                    className="inputContainer w-[80%] ms-auto h-[50px] relative rounded font-ubuntu ">
+                                                    className="inputContainer w-[80%] md:ms-auto  mx-auto h-[50px] relative rounded font-ubuntu ">
                                                     <input
                                                         value={user.name}
                                                         onChange={changeUser}
@@ -58,7 +58,7 @@ export default function Contact(){
                                                 </div>
 
                                                 <div 
-                                                    className="inputContainer w-[80%] ms-auto h-[50px]  relative rounded font-ubuntu ">
+                                                    className="inputContainer w-[80%] md:ms-auto mx-auto h-[50px]  relative rounded font-ubuntu ">
                                                     <input
                                                         value={user.email}
                                                         onChange={changeUser}
@@ -73,7 +73,7 @@ export default function Contact(){
                                                     </label>
                                                 </div>
                                                 <div 
-                                                    className="inputContainer w-[80%] ms-auto h-[150px]  relative rounded ">
+                                                    className="inputContainer w-[80%] md:ms-auto mx-auto h-[150px]  relative rounded ">
                                                     <textarea 
                                                         value={user.message}
                                                         onChange={changeUser}
@@ -89,7 +89,7 @@ export default function Contact(){
                                                     </label>
                                                 </div>
                                                 <div
-                                                    className="w-[80%] ms-auto">
+                                                    className="w-[80%] md:ms-auto mx-auto">
                                                     <button 
                                                         className="w-full rounded bg-black p-2 text-white"
                                                         type="submit">
