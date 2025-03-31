@@ -8,6 +8,7 @@ import About from './assets/Components/About.jsx'
 import Blog from './assets/Components/Blog.jsx'
 import Contact from './assets/Components/Contact.jsx'
 import Authentication from './assets/Components/Authentication.jsx'
+import Dashboard from './assets/Components/Dashboard.jsx'
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -19,6 +20,7 @@ const router = createBrowserRouter(
         <Route path="contact" element={<Contact/>}/>
       </Route>
       <Route path="/authentication" element={<Authentication/>}/>
+      <Route path="/user/:role" element={<Dashboard/>}/>
     </>
   )
 )
