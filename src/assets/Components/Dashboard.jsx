@@ -1,8 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams } from "react-router-dom";
+import Welcome from "./Welcome";
 
 export default function Dashboard() {
-    const { role } = useParams(); // Extract role from URL parameters
+    const { role } = useParams(); 
+
+    
+    const [activeContent, setActiveContent] = useState("Welcome to the Dashboard");
 
     const menuItems = {
         admin: [
@@ -25,37 +29,67 @@ export default function Dashboard() {
         ],
     };
 
+    
     const renderMenuItems = (items) =>
         items.map((item, index) => (
             <li
                 key={index}
-                className="flex relative items-center space-x-4 p-2 rounded-md hover:bg-orange-100 transition-colors duration-300"
+                className="flex relative items-center space-x-4 p-2 rounded-md hover:bg-orange-100 transition-colors duration-300 cursor-pointer"
+                onClick={() => setActiveContent(item.text)} // ✅ Update content on click
             >
                 <i className={`${item.icon} text-orange-400 text-lg`}></i>
-                <span
-                    className="absolute left-8 w-40 h-8 flex items-center justify-start text-start  text-gray-800 group-hover:opacity-100 font-medium transition-opacity duration-300"
-                >
+                <span className="absolute left-8 w-40 h-8 flex items-center justify-start text-gray-800 font-medium transition-opacity duration-300">
                     {item.text}
                 </span>
             </li>
         ));
 
+    
+    const renderActiveContent = () => {
+        switch (activeContent) {
+            case "Register Users":
+                return <div>📋 Register Users Component</div>;
+            case "Total Users":
+                return <div>👥 Total Users Component</div>;
+            case "Total Exams":
+                return <div>📑 Total Exams Component</div>;
+            case "Edit Exam":
+                return <div>✏️ Edit Exam Component</div>;
+            case "Accept Exam":
+                return <div>✅ Accept Exam Component</div>;
+            case "Students Registered":
+                return <div>🎓 Students Registered Component</div>;
+            case "Single Exam":
+                return <div>📝 Single Exam Component</div>;
+            case "Add Exam":
+                return <div>➕ Add Exam Component</div>;
+            case "Exams":
+                return <div>📚 Exams Component</div>;
+            case "Results":
+                return <div>📊 Results Component</div>;
+            default:
+                return <Welcome role={role}/>
+        }
+    };
+
     return (
         <div className="flex h-screen bg-gray-100">
-            <div className="group w-16  hover:w-64 transition-all duration-300 ease-in-out bg-white shadow-lg p-4 backdrop-blur-md bg-opacity-70 overflow-hidden flex flex-col">
+            <div className="group w-16 hover:w-64 transition-all duration-300 ease-in-out bg-white shadow-lg p-4 overflow-hidden flex flex-col">
                 <h2 className="text-xl font-bold mb-4 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
                     Menu
                 </h2>
-                <ul className="space-y-3 overflow-hidden">
+                <ul className="space-y-3">
                     {role === "admin" && renderMenuItems(menuItems.admin)}
                     {role === "teacher" && renderMenuItems(menuItems.teacher)}
                     {role === "student" && renderMenuItems(menuItems.student)}
                 </ul>
             </div>
+
+            {/* Main Content */}
             <div className="flex-1 p-6">
-                <h1 className="text-2xl font-bold text-gray-800">Welcome to the Dashboard</h1>
+                <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
                 <p className="text-gray-600 mt-2">Role: {role}</p>
-                {/* Add dynamic content here based on the role */}
+                <div className="mt-4 p-4 bg-white rounded-lg shadow-md">{renderActiveContent()}</div>
             </div>
         </div>
     );
