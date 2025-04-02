@@ -9,6 +9,8 @@ import Blog from './assets/Components/Blog.jsx'
 import Contact from './assets/Components/Contact.jsx'
 import Authentication from './assets/Components/Authentication.jsx'
 import Dashboard from './assets/Components/Dashboard.jsx'
+import { Provider } from 'react-redux'
+import store from './assets/Store/Store.js'
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -27,7 +29,9 @@ const router = createBrowserRouter(
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RouterProvider
-      router={router}/>
+    <Provider store={store}>
+      <RouterProvider
+        router={router}/>
+    </Provider>
   </StrictMode>,
 )

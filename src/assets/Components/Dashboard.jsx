@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import Welcome from "./Welcome";
+import Result from "./Result";
 
 export default function Dashboard() {
     const { role } = useParams(); 
@@ -66,7 +67,7 @@ export default function Dashboard() {
             case "Exams":
                 return <div>📚 Exams Component</div>;
             case "Results":
-                return <div>📊 Results Component</div>;
+                return <><div>📊 Results Component</div><Result/></>;
             default:
                 return <Welcome role={role}/>
         }
