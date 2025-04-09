@@ -8,7 +8,8 @@ import Tota_Exam from "./Total_Exam";
 import AcceptExame from "./AcceptExame";
 import SingleExams from "./SingleExams";
 import AddExams from "./AddExams";
-import StudentExams from "./StudentExams";
+// import StudentExams from "./StudentExams";
+import Exam from "./Exam";
 
 export default function Dashboard() {
   const { role } = useParams();
@@ -63,7 +64,7 @@ export default function Dashboard() {
       case "Add Exam":
         return <AddExams />;
       case "Exams":
-        return <StudentExams />;
+        return <Exam />;
       case "Results":
         return (
           <>
