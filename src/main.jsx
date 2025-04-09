@@ -9,29 +9,27 @@ import Blog from './assets/Components/Blog.jsx'
 import Contact from './assets/Components/Contact.jsx'
 import Authentication from './assets/Components/Authentication.jsx'
 import Dashboard from './assets/Components/Dashboard.jsx'
-import { Provider } from 'react-redux'
-import store from './assets/Store/Store.js'
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-      <Route path="/" element={<App/>}>
-        <Route path="" element={<Home/>}/>
-        <Route path="about" element={<About/>}/>
-        <Route path="blog" element={<Blog/>}/>
-        <Route path="contact" element={<Contact/>}/>
+      <Route path="/" element={<App />}>
+        <Route path="" element={<Home />} />
+        <Route path="about" element={<About />} />
+        <Route path="blog" element={<Blog />} />
+        <Route path="contact" element={<Contact />} />
       </Route>
-      <Route path="/authentication" element={<Authentication/>}/>
-      <Route path="/user/:role" element={<Dashboard/>}/>
+      <Route path="/authentication" element={<Authentication />} />
+      <Route path="/user/:role" element={<Dashboard />} />
+      <Route path="/question" element={<Question />} />
+      <Route path="/createExam" element={<Create_Exams />} />
     </>
   )
-)
+);
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <Provider store={store}>
-      <RouterProvider
-        router={router}/>
-    </Provider>
+    <RouterProvider
+      router={router}/>
   </StrictMode>,
 )

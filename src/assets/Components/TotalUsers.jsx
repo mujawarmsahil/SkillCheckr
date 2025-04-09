@@ -3,8 +3,8 @@ import { PieChart, Pie, Tooltip, Legend, Cell } from "recharts";
 
 const TotalUsers = () => {
   const data = [
-    { name: "Students", value: 900 },
-    { name: "Teachers", value: 300 },
+    { name: "Students", value: 90 },
+    { name: "Teachers", value: 10 },
   ];
 
   const COLORS = ["#ff5722", "#78909c"];
@@ -41,7 +41,15 @@ const TotalUsers = () => {
     // ...other teacher entries
   ]);
 
-  const [effectData, setEffectData] = useState(null); // To track the selected data (students/teachers)
+  const [effectData, setEffectData] = useState("teachers"); // To track the selected data (students/teachers)
+
+  const handlePieClick = (entry) => {
+    if (entry.name === "Teachers") {
+      setEffectData("teachers"); // Show teacher data
+    } else if (entry.name === "Students") {
+      setEffectData("students"); // Show student data
+    }
+  };
 
   // Fetch Students from API
   // useEffect(() => {
@@ -85,14 +93,6 @@ const TotalUsers = () => {
     //   })
     //   .catch((error) => console.error("Error deleting teacher:", error));
     setTeachers(teachers.filter((teacher) => teacher.id !== id));
-  };
-
-  const handlePieClick = (entry) => {
-    if (entry.name === "Teachers") {
-      setEffectData("teachers"); // Show teacher data
-    } else if (entry.name === "Students") {
-      setEffectData("students"); // Show student data
-    }
   };
 
   return (
