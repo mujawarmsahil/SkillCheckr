@@ -8,7 +8,7 @@ import Tota_Exam from "./Total_Exam";
 import AcceptExame from "./AcceptExame";
 import SingleExams from "./SingleExams";
 import AddExams from "./AddExams";
-// import StudentExams from "./StudentExams";
+
 import Exam from "./Exam";
 
 export default function Dashboard() {

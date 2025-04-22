@@ -16,6 +16,7 @@ import Authentication from "./assets/Components/Authentication.jsx";
 import Dashboard from "./assets/Components/Dashboard.jsx";
 import Question from "./assets/Components/Question.jsx";
 import Create_Exams from "./assets/Components/Create_Exams.jsx";
+import ExamsQueOption from "./assets/Components/ExamsQueOpetion.jsx";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -29,8 +30,8 @@ const router = createBrowserRouter(
       <Route path="/authentication" element={<Authentication />} />
       <Route path="/user/:role" element={<Dashboard />} />
       <Route path="/question" element={<Question />} />
-
       <Route path="/createExam" element={<Create_Exams />} />
+      <Route path="/studentExams" element={<ExamsQueOption />} />
     </>
   )
 );
