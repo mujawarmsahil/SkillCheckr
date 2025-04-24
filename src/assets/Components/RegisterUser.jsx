@@ -77,8 +77,28 @@ export default function RegisterUser() {
     }
   };
 
-  const deleteUser = (id) => {
-    setUsers(Regiuser.filter((user) => user.request_id !== id));
+  const deleteUser = async (id) => {
+    try {
+      const response = await axios.delete(
+        `http://localhost:8080/api/requests/deleteById/${id}`
+      );
+      if (response.status === 200) {
+        alert("user Delete Succefully");
+        // setUsers(
+        //   RegisterUser,
+        //   filter((user) => user.request_id !== id)
+        // );
+        const updateUsers = Regiuser.filter((user) => user.request_id !== id);
+        setUsers(updateUsers);
+      } else {
+        alert("Failed to delete user.");
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      alert("Something went wrong while deleting the user.");
+    }
+
+    // setUsers(Regiuser.filter((user) => user.request_id !== id));
   };
 
   return (

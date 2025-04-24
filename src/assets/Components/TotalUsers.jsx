@@ -14,14 +14,7 @@ const TotalUsers = () => {
     { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
     { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
     { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
-    { id: 0, name: "Ganesh Rathod", email: "GaneshDada.com" },
-    { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
-    { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
-    { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
-    { id: 0, name: "Ganesh Rathod", email: "GaneshDada.com" },
-    { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
-    { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
-    { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
+
     // ...other student entries
   ]);
 
@@ -30,14 +23,7 @@ const TotalUsers = () => {
     { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
     { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
     { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
-    { id: 0, name: "Ganesh Rathod", email: "GaneshDada.com" },
-    { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
-    { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
-    { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
-    { id: 0, name: "Ganesh Rathod", email: "GaneshDada.com" },
-    { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
-    { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
-    { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
+
     // ...other teacher entries
   ]);
 
@@ -51,47 +37,11 @@ const TotalUsers = () => {
     }
   };
 
-  // Fetch Students from API
-  // useEffect(() => {
-  //   fetch("http://localhost:5000/students")
-  //     .then((response) => response.json())
-  //     .then((data) => setStudents(data))
-  //     .catch((error) => console.error("Error fetching students:", error));
-  // }, []);
-
   const handleDeleteStudent = (id) => {
-    // API DELETE request
-    // fetch(`http://localhost:5000/students/${id}`, {
-    //   method: "DELETE",
-    // })
-    //   .then((response) => {
-    //     if (response.ok) {
-    //       setStudents(students.filter((student) => student.id !== id));
-    //     }
-    //   })
-    //   .catch((error) => console.error("Error deleting student:", error));
     setStudents(students.filter((student) => student.id !== id));
   };
 
-  // Fetch Teachers from API
-  // useEffect(() => {
-  //   fetch("http://localhost:5000/teachers")
-  //     .then((response) => response.json())
-  //     .then((data) => setTeachers(data))
-  //     .catch((error) => console.error("Error fetching teachers:", error));
-  // }, []);
-
   const handleDeleteTeacher = (id) => {
-    // API DELETE request
-    // fetch(`http://localhost:5000/teachers/${id}`, {
-    //   method: "DELETE",
-    // })
-    //   .then((response) => {
-    //     if (response.ok) {
-    //       setTeachers(teachers.filter((teacher) => teacher.id !== id));
-    //     }
-    //   })
-    //   .catch((error) => console.error("Error deleting teacher:", error));
     setTeachers(teachers.filter((teacher) => teacher.id !== id));
   };
 
