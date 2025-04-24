@@ -1,17 +1,17 @@
 import React from "react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
 import axios from "axios";
+// import { BarRectangle } from "recharts/types/util/BarUtils";
 
 // import TsLogo from "../images/logo/Teacher.png";
 // import StLogo from "../images/logo/Student.png";
 // import { useParams } from "react-router-dom";
 
 export default function RegisterUser() {
-  const [Regiuser, setUsers] = useState([
-    // { id: 1, name: "Sahil Mujawar", role: "" },
-    // { id: 2, name: "Mangesh Wagh", role: "" },
-    // { id: 3, name: "Ganesh Rathod", role: "" },
-  ]);
+  const [Regiuser, setUsers] = useState([]);
+  const navigate = useNavigate(); // initialize navigation
 
   useEffect(() => {
     fetchRequests();
@@ -30,13 +30,55 @@ export default function RegisterUser() {
       alert("Failed to load registered users.");
     }
   };
-  const updateRole = (id, role) => {
-    setUsers(
-      Regiuser.map((user) => (user.id === id ? { ...user, role } : user))
-    );
+
+  const updateRole = async (user, role) => {
+    if (user.status === "Approve") {
+      alert("Data already added.");
+      return;
+    }
+
+    if (user.requested_role !== role) {
+      alert(
+        `${user.name} requested for ${user.requested_role} role, not ${role}.`
+      );
+      return;
+    }
+
+    try {
+      let apiUrl = "";
+      if (role === "Teacher") {
+        apiUrl = `http://localhost:8080/api/Admin/addTeacher/${user.request_id}`;
+      } else if (role === "Student") {
+        apiUrl = `http://localhost:8080/api/Admin/addStudent/${user.request_id}`;
+      }
+
+      const response = await axios.post(apiUrl);
+      if (response.data === false) {
+        alert("data alredy Added");
+        return;
+      }
+
+      if (response.status === 200) {
+        setUsers(
+          Regiuser.map((u) =>
+            u.request_id === user.request_id ? { ...u, status: "Approve" } : u
+          )
+        );
+        alert(`${role} added successfully`);
+        if (role === "Teacher") navigate("/addTeacher");
+        else if (role === "Student") navigate("/addStudent");
+      }
+    } catch (error) {
+      alert(
+        "Something went wrong while updating the user role." +
+          error +
+          " Data Already added yaar "
+      );
+    }
   };
+
   const deleteUser = (id) => {
-    setUsers(Regiuser.filter((user) => user.id !== id));
+    setUsers(Regiuser.filter((user) => user.request_id !== id));
   };
 
   return (
@@ -89,20 +131,22 @@ export default function RegisterUser() {
                   <td className="border-2 px-4 py-2 ">{user.status}</td>
                   <td className="border-2 px-4 py-2 ">
                     <button
-                      className="bg-slate-800 shadow-xl mr-10 m-1 hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded text-xs "
-                      onClick={() => updateRole(user.id, "Approve")}
+                      className="bg-slate-800 shadow-xl mr-10 m-1 hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded text-xs"
+                      onClick={() => updateRole(user, "Teacher")}
                     >
                       Add Teacher
                     </button>
+
                     <button
-                      className="bg-slate-800 shadow-xl mr-10 m-1 hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded  text-xs"
-                      onClick={() => updateRole(user.id, "Student")}
+                      className="bg-slate-800 shadow-xl mr-10 m-1 hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded text-xs"
+                      onClick={() => updateRole(user, "Student")}
                     >
                       Add Student
                     </button>
+
                     <button
                       className="bg-slate-800 shadow-xl hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded text-xs"
-                      onClick={() => deleteUser(user.id)}
+                      onClick={() => deleteUser(user.request_id)}
                     >
                       Delete
                     </button>
