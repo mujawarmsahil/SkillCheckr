@@ -1,33 +1,37 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { PieChart, Pie, Tooltip, Legend, Cell } from "recharts";
+import axios from "axios";
+import { error } from "jquery";
 
 const TotalUsers = () => {
-  const data = [
-    { name: "Students", value: 90 },
-    { name: "Teachers", value: 10 },
-  ];
+  const [students, setStudents] = useState([]);
 
-  const COLORS = ["#ff5722", "#78909c"];
+  const [teachers, setTeachers] = useState([]);
 
-  const [students, setStudents] = useState([
-    { id: 0, name: "Ganesh Rathod", email: "GaneshDada.com" },
-    { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
-    { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
-    { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
+  const [effectData, setEffectData] = useState("teachers"); //  which will the first show the pia chart To track the selected data (students/teachers)
+  useEffect(() => {
+    axios
+      .get("http://localhost:8080/api/Admin/viewAllTeacher")
+      .then((response) => {
+        console.log("Teacher data:", response.data);
+        setTeachers(response.data);
+      })
+      .catch((error) => {
+        console.error("error fetching teachers: ", error);
+      });
+  }, []);
 
-    // ...other student entries
-  ]);
-
-  const [teachers, setTeachers] = useState([
-    { id: 0, name: "Ganesh Rathod", email: "GaneshDada.com" },
-    { id: 1, name: "Sahil Mujawar", email: "Mujawar.com" },
-    { id: 2, name: "Mangesh Wagh", email: "mangeshwagh65@gmail.com" },
-    { id: 3, name: "Veronika Patil", email: "Veropatil34.com" },
-
-    // ...other teacher entries
-  ]);
-
-  const [effectData, setEffectData] = useState("teachers"); // To track the selected data (students/teachers)
+  useEffect(() => {
+    axios
+      .get("http://localhost:8080/api/Admin/viewAllStudent")
+      .then((response) => {
+        console.log("Student data:", response.data);
+        setStudents(response.data);
+      })
+      .catch((error) => {
+        console.error("error fetching teachers: ", error);
+      });
+  }, []);
 
   const handlePieClick = (entry) => {
     if (entry.name === "Teachers") {
@@ -44,6 +48,11 @@ const TotalUsers = () => {
   const handleDeleteTeacher = (id) => {
     setTeachers(teachers.filter((teacher) => teacher.id !== id));
   };
+  const data = [
+    { name: "Students", value: students.length },
+    { name: "Teachers", value: teachers.length },
+  ];
+  const COLORS = ["#ff5722", "#78909c"];
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center bg-slate-50 py-10">
@@ -94,11 +103,17 @@ const TotalUsers = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((student) => (
-                      <tr key={student.id}>
-                        <td className="border-2 px-4 py-2">{student.id}</td>
-                        <td className="border-2 px-4 py-2">{student.name}</td>
-                        <td className="border-2 px-4 py-2">{student.email}</td>
+                    {students.map((student, index) => (
+                      <tr key={student.id || index}>
+                        <td className="border-2 px-4 py-2">
+                          {student.student_id}
+                        </td>
+                        <td className="border-2 px-4 py-2">
+                          {student.student_name}
+                        </td>
+                        <td className="border-2 px-4 py-2">
+                          {student.student_email}
+                        </td>
                         <td className="border-2 px-4 py-2">
                           <button
                             onClick={() => handleDeleteStudent(student.id)}
@@ -132,11 +147,22 @@ const TotalUsers = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {teachers.map((teacher) => (
-                      <tr key={teacher.id}>
-                        <td className="border-2 px-4 py-2">{teacher.id}</td>
+                    {teachers.map((teacher, index) => (
+                      <tr key={teacher.id || index}>
+                        {/* <td className="border-2 px-4 py-2">{teacher.id}</td>
                         <td className="border-2 px-4 py-2">{teacher.name}</td>
-                        <td className="border-2 px-4 py-2">{teacher.email}</td>
+                        <td className="border-2 px-4 py-2">{teacher.email}</td> */}
+
+                        <td className="border-2 px-4 py-2">
+                          {teacher.teacher_id}
+                        </td>
+                        <td className="border-2 px-4 py-2">
+                          {teacher.teacher_name}
+                        </td>
+                        <td className="border-2 px-4 py-2">
+                          {teacher.teacher_email}
+                        </td>
+
                         <td className="border-2 px-4 py-2">
                           <button
                             onClick={() => handleDeleteTeacher(teacher.id)}
