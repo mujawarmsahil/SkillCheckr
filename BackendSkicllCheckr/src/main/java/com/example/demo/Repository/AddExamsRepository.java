@@ -1,0 +1,11 @@
+package com.example.demo.Repository;
+
+import com.example.demo.Model.Exams;
+
+public interface AddExamsRepository {
+	
+	
+	public boolean saveAllExams(Exams exam);
+
+	
+}
