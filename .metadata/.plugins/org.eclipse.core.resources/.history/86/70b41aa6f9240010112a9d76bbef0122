@@ -1,0 +1,21 @@
+package com.example.demo.Service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.example.demo.Model.User;
+import com.example.demo.Repository.AuthRepository;
+
+public class AuthServiceImpl  implements AuthService{
+
+	
+	@Autowired
+	private  AuthRepository authRepository;
+	
+	@Override
+	public User login(String username, String password) {
+		// TODO Auto-generated method stub
+		
+		return authRepository.login(username, password);
+	}
+
+}

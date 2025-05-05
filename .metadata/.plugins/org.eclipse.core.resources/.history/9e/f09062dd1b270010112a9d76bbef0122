@@ -1,0 +1,73 @@
+package com.example.demo.Repository;
+
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import javax.sql.DataSource;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import com.example.demo.Model.Exams;
+
+@Repository
+public class AddExamsRepositoryImpl implements AddExamsRepository {
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    public JdbcTemplate jdbcTemplate;
+
+    @Override
+    public boolean saveAllExams(Exams exam) {
+        try {
+            // Step 1: Check if subject_code already exists
+            String subjectCode = exam.getSubject().getSubjectCode();
+            int subjectId;
+
+            String checkSubjectQuery = "SELECT COUNT(*) FROM subject WHERE subject_code = ?";
+            int count = jdbcTemplate.queryForObject(checkSubjectQuery, new Object[]{subjectCode}, Integer.class);
+
+            if (count > 0) {
+                // Subject exists → fetch subject_id
+                String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ?";
+                subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, new Object[]{subjectCode}, Integer.class);
+            } else {
+                // Subject not exists → insert and get subject_id
+                String insertSubjectQuery = "INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)";
+                jdbcTemplate.update(insertSubjectQuery,
+                        exam.getSubject().getSubjectName(),
+                        subjectCode);
+
+                String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ?";
+                subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, new Object[]{subjectCode}, Integer.class);
+            }
+
+            // Step 2: Insert Exam
+            String insertExamQuery = "INSERT INTO exam (subject_id, teacher_id, exam_name, exam_date, duration_minutes, total_marks, pass_marks, status) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+            // Convert String to Timestamp (Assuming date is like "2025-05-01T10:00:00")
+            Timestamp timestamp = Timestamp.valueOf(LocalDateTime.parse(exam.getDate()));
+
+            jdbcTemplate.update(insertExamQuery,
+                    subjectId,
+                    exam.getTeacher_id(),
+                    exam.getExam_name(),
+                    timestamp,
+                    exam.getDuration_minuets(),
+                    exam.getTotal_marks(),
+                    exam.getPassing_marks(),
+                    exam.getStatus());
+
+            return true;
+
+        } catch (Exception e) {
+            e.printStackTrace();  // log it
+            return false;
+        }
+    }
+}

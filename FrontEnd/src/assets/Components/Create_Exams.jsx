@@ -12,7 +12,6 @@ export default function Create_Exams() {
   });
 
 
-  // resdux we want the use it...
   const [examName, setExamName] = useState("");
   const [allQuestions, setAllQuestions] = useState([]);
 

@@ -1,0 +1,49 @@
+package com.example.demo.Repository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import com.example.demo.Model.User;
+
+public class AuthRepositoryImpl implements AuthRepository   {
+	
+	
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+
+	@Override
+	public User login(String username, String password) {
+		// TODO Auto-generated method stub
+		
+		String sql = "SELECT *FROM user WHERE username = ? AND password = ? ";
+		 return jdbcTemplate.queryForObject(sql, new Object [] {username, password},(rs,rowNum)->{
+			 User u  = new User();
+			 u.setUser_id(rs.getInt("user_id"));
+			 u.setUsername(rs.getString("usernamer"));
+			 u.setPassword(rs.getString("password"));
+			 return u;
+			 
+		 });
+//		return null;
+	}
+
+	@Override
+	public int getStudentIdByUserId(int userId) {
+		// TODO Auto-generated method stub
+		String sql = "SELECT student_id FROM student WHERE user_id = ?";
+        return jdbcTemplate.queryForObject(sql, new Object[]{userId}, Integer.class);
+	}
+
+	@Override
+	public int getTeacherIdByUserId(int userId) {
+		// TODO Auto-generated method stub
+		String sql = "SELECT teacher_id FROM student WHERE user_id = ? ";
+		return jdbcTemplate.queryForObject(sql,new Object[] {userId}, Integer.class);
+//		return 0;
+	}
+	
+	
+	
+	
+
+}

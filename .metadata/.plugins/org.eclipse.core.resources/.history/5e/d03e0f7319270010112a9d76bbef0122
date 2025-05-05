@@ -1,0 +1,21 @@
+package com.example.demo.Model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class Exams {
+
+    private int exame_id;  // Keep it consistent or rename to examId
+    private int teacher_id;
+    private Subject subject; // Should point to your own Subject class
+    private String exam_name;
+    private String date;
+    private int duration_minuets;
+    private int total_marks;
+    private int passing_marks;
+    private String status;
+}

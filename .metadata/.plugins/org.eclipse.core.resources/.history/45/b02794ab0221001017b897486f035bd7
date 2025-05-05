@@ -1,0 +1,227 @@
+package com.example.demo.Repository;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
+
+//import 
+import javax.sql.DataSource;
+
+//import com.example.demo.Model.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+
+import com.example.demo.Model.*;
+
+@Repository
+public class AdminRepositoryImpl implements AdminRepository {
+
+	@Autowired
+	private DataSource dataSource;
+
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+
+	@Override
+	public boolean addTeacherFromRequest(int requestId) {
+		try (Connection conn = dataSource.getConnection()) {
+			String selectsql = "SELECT *FROM request WHERE request_id=?";
+
+			PreparedStatement psSelect = conn.prepareStatement(selectsql);
+			psSelect.setInt(1, requestId);
+			ResultSet rs = psSelect.executeQuery();
+			if (!rs.next())
+				return false;
+			String username = rs.getString("username");
+			String password = rs.getString("password");
+			String role = rs.getString("requested_role");
+			String name = rs.getString("name");
+			String contact = rs.getString("contact");
+			String email = rs.getString("email");
+			
+			
+
+			String checkUserSql = " SELECT *FROM user WHERE username =?";
+			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
+			psCheck.setString(1,username);
+			ResultSet checkResult = psCheck.executeQuery();
+			if(checkResult.next()) {
+				System.out.print("username alredy exits: "+username);
+				return false;// or new RuntimeException 
+			}
+			
+			
+			
+			
+			String insertUser = "INSERT INTO user (username, password, user_role) VALUES(?,?,?)";
+			PreparedStatement psUser = conn.prepareStatement(insertUser, PreparedStatement.RETURN_GENERATED_KEYS);
+			psUser.setString(1, username);
+			psUser.setString(2, password);
+			psUser.setString(3, role);
+			psUser.executeUpdate();
+			ResultSet genKeys = psUser.getGeneratedKeys();
+			if (!genKeys.next())
+				return false;
+
+			int userId = genKeys.getInt(1);
+
+			String insertTeacher = "INSERT INTO teacher(user_id, name, contact, email) VALUES(?,?,?,?)";
+			PreparedStatement psTeacher = conn.prepareStatement(insertTeacher);
+
+			psTeacher.setInt(1, userId);
+			psTeacher.setString(2, name);
+			psTeacher.setString(3, contact);
+			psTeacher.setString(4, email);
+			psTeacher.executeUpdate();
+
+			// update the Status
+			String updateRequest = "UPDATE request SET status = 'Approved' WHERE request_id = ?";
+
+			PreparedStatement psUpdate = conn.prepareStatement(updateRequest);
+			psUpdate.setInt(1, requestId);
+			psUpdate.executeUpdate();
+
+			return true;
+		} catch (Exception e) {
+			System.out.println("Error: " + e.getMessage());
+			return false;
+		}
+	}
+	
+	
+	
+
+	@Override
+	public boolean addStudentFromRequest(int requestId) {
+		
+		
+		try (Connection conn = dataSource.getConnection()) {
+			String selectsql = "SELECT *FROM request WHERE request_id=?";
+			PreparedStatement psSelect = conn.prepareStatement(selectsql);
+			psSelect.setInt(1, requestId);
+			ResultSet rs = psSelect.executeQuery();
+			if (!rs.next()) return false;
+			String username = rs.getString("username");
+			String password = rs.getString("password");
+			String role = rs.getString("requested_role");
+			String name = rs.getString("name");
+			String contact = rs.getString("contact");
+			String email = rs.getString("email");
+			
+			
+			String checkUserSql = " SELECT *FROM user WHERE username =?";
+			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
+			psCheck.setString(1,username);
+			ResultSet checkResult = psCheck.executeQuery();
+			if(checkResult.next()) {
+				System.out.print("username alredy exits: "+username);
+				return false;// or new RuntimeException 
+			}
+			
+			String insertUser = "INSERT INTO user (username, password, user_role) VALUES(?,?,?)";
+			PreparedStatement psUser = conn.prepareStatement(insertUser, PreparedStatement.RETURN_GENERATED_KEYS);
+			psUser.setString(1, username);
+			psUser.setString(2, password);
+			psUser.setString(3, role);
+			psUser.executeUpdate();
+			ResultSet genKeys = psUser.getGeneratedKeys();
+			if (!genKeys.next())
+				return false;
+			int userId = genKeys.getInt(1);
+			String insertStudent = "INSERT INTO student (user_id, name, contact, email) VALUES(?,?,?,?)";
+			PreparedStatement psStudent = conn.prepareStatement(insertStudent);
+
+			psStudent.setInt(1, userId);
+			psStudent.setString(2, name);
+			psStudent.setString(3, contact);
+			psStudent.setString(4, email);
+			psStudent.executeUpdate();
+
+			String updateRequest = "UPDATE request SET status = 'Approved' WHERE request_id = ?";
+			PreparedStatement psUpdate = conn.prepareStatement(updateRequest);
+			psUpdate.setInt(1, requestId);
+			psUpdate.executeUpdate();
+			return true;
+
+		} catch (Exception e) {
+			System.out.println(" Errror While adding Student  " + e.getMessage());
+
+			return false;
+		}
+
+	}
+
+
+	@Override
+	public boolean changeExamStatus(int examId, String status) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+
+
+
+	@Override
+	public boolean isUsernameExist(String username) {
+		// TODO Auto-generated method stub
+		try(Connection conn = dataSource.getConnection()){
+			String sql = "SELECT COUNT(*) FROM user WHERE username = ? ";
+			PreparedStatement ps = conn.prepareStatement(sql);
+			ps.setString(1,username);
+			ResultSet rs = ps.executeQuery();
+			if(rs.next()) {
+				return rs.getInt(1)>0;
+			}return false;
+		}catch(Exception e) {
+			System.out.println("Error is "+e.getMessage());
+		}
+		return false;
+	}
+
+
+
+
+	@Override
+	public List<Teacher> getAllTeacher() {
+		// TODO Auto-generated method stub
+		List<Teacher> list = jdbcTemplate.query("SELECT *FROM teacher", new RowMapper<Teacher>() {
+
+			@Override
+			public Teacher mapRow(ResultSet rs, int rowNum) throws SQLException {
+				// TODO Auto-generated method stub
+				Teacher rqm = new Teacher();
+				rqm.setTeacher_id(rs.getInt("teacher_id"));
+				rqm.setTeacher_name(rs.getString("name"));
+				rqm.setTeacher_email(rs.getString("email"));
+				return rqm;
+			}
+			
+		} );
+		return list;
+	}
+	
+	@Override
+	public List<Student> getAllStudent() {
+		// TODO Auto-generated method stub
+		List<Student> list = jdbcTemplate.query("SELECT *FROM student", new RowMapper<Student>() {
+
+			@Override
+			public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
+				// TODO Auto-generated method stub
+				Student rqm = new Student();
+				rqm.setStudent_id(rs.getInt("teacher_id"));
+				rqm.setStudent_name(rs.getString("name"));
+				rqm.setStudent_email(rs.getString("email"));
+				return rqm;
+			}
+			
+		} );
+		return list;
+	}
+
+}

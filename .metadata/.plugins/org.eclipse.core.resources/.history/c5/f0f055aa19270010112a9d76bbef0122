@@ -1,0 +1,66 @@
+package com.example.demo.Repository;
+
+import java.util.List;
+
+import javax.sql.DataSource;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+//import com.example.demo.Model.Exams;
+import com.example.demo.Model.Exams;
+
+public class AddExamsRepositoryImpl implements AddExamsRepository {
+
+	List<Exams> list;
+	 @Autowired
+	    private DataSource dataSource;
+	    
+	    
+	@Autowired
+	public JdbcTemplate jdbcTemplate;
+
+
+	@Override
+	public boolean saveAllExams(Exams exam) {
+		// TODO Auto-generated method stub
+	String subjectCode = exam.getSubjec().getSubjectCode();
+	int subjectId;
+	String checkSubjectQuery = "SELECT COUNT(*) FROM subject WHERE subject_code = ?";
+	int count = jdbcTemplate.queryForObject(checkSubjectQuery, new Object[]{subjectCode}, Integer.class);
+	
+	
+	if(count>0)
+	{// Subject Alredy Exits; fetch Subject_id;
+		 String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ?";
+	        subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, new Object[]{subjectCode}, Integer.class);
+	}
+	else {
+
+		String insertSubjectQuery = "INSERT INTO subject (subject_name, subject_code) VALUES (?,?)";
+
+		jdbcTemplate.update(insertSubjectQuery,exam.getSubjec().getSubjectName(),subjectCode);
+		
+		String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ?";
+        subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, new Object[]{subjectCode}, Integer.class);
+		 
+	}
+	 // Step 2: Insert Exam
+    String insertExamQuery = "INSERT INTO exam (subject_id, teacher_id, exam_name, exam_date, duration_minutes, total_marks, pass_marks, status) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+    
+    jdbcTemplate.update(insertExamQuery,
+            subjectId,
+            exam.getTeacherId(),
+            exam.getExamName(),
+            Timestamp.valueOf(exam.getExamDate()),
+            exam.getDurationMinutes(),
+            exam.getTotalMarks(),
+            exam.getPassMarks(),
+            exam.getStatus());
+		return false;
+	}
+	
+	
+
+}

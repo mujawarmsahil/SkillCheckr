@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<qualifiedTypeNameHistroy>
+    <fullyQualifiedTypeName name="javax.sql.DataSource"/>
+    <fullyQualifiedTypeName name="org.springframework.context.ApplicationContext"/>
+    <fullyQualifiedTypeName name="com.sun.net.httpserver.Request"/>
+    <fullyQualifiedTypeName name="com.example.demo.Model.Admin"/>
+    <fullyQualifiedTypeName name="com.example.demo.Model.RequestModel"/>
+    <fullyQualifiedTypeName name="com.example.demo.Service.AdminServiceImpl"/>
+    <fullyQualifiedTypeName name="com.example.demo.Repository.AdminRepository"/>
+    <fullyQualifiedTypeName name="com.example.demo.Model.Teacher"/>
+    <fullyQualifiedTypeName name="com.example.demo.Model.Student"/>
+    <fullyQualifiedTypeName name="org.springframework.http.ResponseEntity"/>
+    <fullyQualifiedTypeName name="java.sql.ResultSet"/>
+    <fullyQualifiedTypeName name="java.sql.Connection"/>
+    <fullyQualifiedTypeName name="org.apache.catalina.User"/>
+    <fullyQualifiedTypeName name="com.example.demo.Model.User"/>
+</qualifiedTypeNameHistroy>

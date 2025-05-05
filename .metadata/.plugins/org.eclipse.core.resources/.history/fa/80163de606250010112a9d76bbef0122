@@ -1,0 +1,8 @@
+package com.example.demo.Service;
+
+import com.example.demo.Model.*;
+public interface AuthService {
+
+	
+	 User login(String username, String password);
+}

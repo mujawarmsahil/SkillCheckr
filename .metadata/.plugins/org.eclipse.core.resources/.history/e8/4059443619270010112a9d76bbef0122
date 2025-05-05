@@ -1,0 +1,22 @@
+package com.example.demo.Model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class Subjects {
+	
+	
+	private int Subject_id;
+	private String Subject;
+	private String Subject_code;
+	@Override
+	public String toString() {
+		return "Subjects [Subject_id=" + Subject_id + ", Subject=" + Subject + ", Subject_code=" + Subject_code + "]";
+	}
+	
+
+}

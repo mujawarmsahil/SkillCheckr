@@ -1,0 +1,17 @@
+package com.example.demo.Model;
+
+public class Exams {
+	
+	
+	public int exame_id;
+	 public int subject_id;
+	 public int teacher_id;
+	 public String exam_name;
+	 public String date ;
+	 public int duration_minuets;
+	 public int total_marks;
+	 public int passing_marks;
+	public String status;
+	 
+
+}

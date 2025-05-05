@@ -1,0 +1,44 @@
+package com.example.demo.Repository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import com.example.demo.Model.RequestModel;
+
+@Repository
+public class AdminRepositoryImpl implements AdminRepository {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Override
+    public boolean addTeacher(RequestModel req) {
+        String insertUser = "INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)";
+        jdbcTemplate.update(insertUser, req.getUsername(), req.getPassword(), "Teacher");
+
+        String getUserId = "SELECT user_id FROM user WHERE username = ?";
+        int userId = jdbcTemplate.queryForObject(getUserId, new Object[]{req.getUsername()}, Integer.class);
+
+        String insertTeacher = "INSERT INTO teacher (user_id, name, contact, email) VALUES (?, ?, ?, ?)";
+        return jdbcTemplate.update(insertTeacher, userId, req.getName(), req.getContact(), req.getEmail()) > 0;
+    }
+
+    @Override
+    public boolean addStudent(RequestModel req) {
+        String insertUser = "INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)";
+        jdbcTemplate.update(insertUser, req.getUsername(), req.getPassword(), "Student");
+
+        String getUserId = "SELECT user_id FROM user WHERE username = ?";
+        int userId = jdbcTemplate.queryForObject(getUserId, new Object[]{req.getUsername()}, Integer.class);
+
+        String insertStudent = "INSERT INTO student (user_id, name, contact, email) VALUES (?, ?, ?, ?)";
+        return jdbcTemplate.update(insertStudent, userId, req.getName(), req.getContact(), req.getEmail()) > 0;
+    }
+
+	@Override
+	public boolean changeExamStatus(int examId, String status) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+}

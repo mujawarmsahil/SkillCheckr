@@ -1,0 +1,14 @@
+package com.example.demo.Repository;
+
+//import com.example.demo.Model.Student;
+//import com.example.demo.Model.Teacher;
+
+import com.example.demo.Model.RequestModel;
+public interface AdminRepository {
+	
+	
+	boolean addTeacher(RequestModel req);
+    boolean addStudent(RequestModel req);
+    boolean changeExamStatus(int examId, String status);
+
+}
