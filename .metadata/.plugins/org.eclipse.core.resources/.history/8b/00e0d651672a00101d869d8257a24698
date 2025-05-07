@@ -1,0 +1,14 @@
+package com.example.demo.Repository;
+
+import com.example.demo.Model.QuestionsDT;
+
+public class CreateExamsRepositoryImpl implements CreateExamRepository {
+
+	@Override
+	public void saveAllQuestionsAndAnswers(QuestionsDT dto) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+
+}

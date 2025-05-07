@@ -1,0 +1,11 @@
+package com.example.demo.Repository;
+
+import com.example.demo.Model.QuestionsDT;
+
+public interface CreateExamRepository {
+
+public boolean saveAllQuestionsAndAnswers(QuestionsDT dto)
+{
+	 return null;
+}
+}

@@ -1,6 +1,7 @@
 package com.example.demo.Controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.Model.Exams;
+import com.example.demo.Model.Subject;
 import com.example.demo.Service.AddExamsService;
 
 @RestController
@@ -24,12 +26,13 @@ public class AddExamsConntroller {
 	@PostMapping("/addExams")
 	public ResponseEntity<?> AddExmass(@RequestBody Exams exam){
 		
-		boolean b = addExamsService.saveAllExams(exam);
-		if(b) {
-			 return ResponseEntity.ok("Exams Added Succefully");
+	Subject  subject = addExamsService.saveAllExams(exam);
+		if(subject!=null) {
+			 return ResponseEntity.ok(subject);
 		}
 		else {
-			return ResponseEntity.status(500).body("Exams not Added");
+//			return ResponseEntity.status(500).body("Exams not Added");
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Exams not Added ");
 			 
 		}
 	}

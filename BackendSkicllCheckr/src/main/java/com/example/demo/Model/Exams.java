@@ -1,6 +1,6 @@
 package com.example.demo.Model;
 
-import com.example.demo.Model.*;
+//  import com.example.demo.Model.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

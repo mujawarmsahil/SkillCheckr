@@ -1,0 +1,9 @@
+package com.example.demo.Repository;
+
+public interface CreateExam {
+
+void saveAllQuestionsAndAnswers(QuestionsDT dto)
+{
+	 
+}
+}

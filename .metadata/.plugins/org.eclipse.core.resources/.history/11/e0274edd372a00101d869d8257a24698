@@ -1,0 +1,14 @@
+package com.example.demo.Model;
+
+public class QuestionsDT {
+	
+//	private int Questions_id;
+	
+	private String Question;
+	private String Opetion_1;
+	private String Opetion_2;
+	private String Opetion_3;
+	private String Opetion_4;
+	private int Subject_id;
+
+}

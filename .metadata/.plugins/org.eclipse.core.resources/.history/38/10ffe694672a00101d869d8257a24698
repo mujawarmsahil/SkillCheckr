@@ -1,0 +1,9 @@
+package com.example.demo.Repository;
+
+import com.example.demo.Model.QuestionsDT;
+
+public interface CreateExamRepository {
+	
+	  void saveQuestionWithAnswers(QuestionDTO dto);
+	}
+}

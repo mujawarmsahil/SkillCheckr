@@ -2,7 +2,6 @@ package com.example.demo.Repository;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.List;
 
 import javax.sql.DataSource;
 
@@ -11,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import com.example.demo.Model.Exams;
+import com.example.demo.Model.Subject;
 
 @Repository
 public class AddExamsRepositoryImpl implements AddExamsRepository {
@@ -22,7 +22,7 @@ public class AddExamsRepositoryImpl implements AddExamsRepository {
     public JdbcTemplate jdbcTemplate;
 
     @Override
-    public boolean saveAllExams(Exams exam) {
+    public Subject saveAllExams(Exams exam) {
         try {
             // Step 1: Check if subject_code already exists
             String subjectCode = exam.getSubject().getSubjectCode();
@@ -32,7 +32,7 @@ public class AddExamsRepositoryImpl implements AddExamsRepository {
             int count = jdbcTemplate.queryForObject(checkSubjectQuery, new Object[]{subjectCode}, Integer.class);
 
             if (count > 0) {
-                // Subject exists → fetch subject_id
+              
                 String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ?";
                 subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, new Object[]{subjectCode}, Integer.class);
             } else {
@@ -51,15 +51,18 @@ public class AddExamsRepositoryImpl implements AddExamsRepository {
                 exam.setStatus("Pending");
             }
 
-            // Step 2: Insert Exam
-            String insertExamQuery = "INSERT INTO exam (subject_id, teacher_id, exam_name, exam_date, duration_minutes, total_marks, pass_marks, status) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+       
 
             if (exam.getDate() == null || exam.getDate().isEmpty()) {
                 System.err.println("Error: Exam date is null or empty.");
-                return false;
+                return null;// false
             }
             Timestamp timestamp = Timestamp.valueOf(LocalDateTime.parse(exam.getDate()));
+            
+            
+            // Step 2: Insert Exam
+            String insertExamQuery = "INSERT INTO exam (subject_id, teacher_id, exam_name, exam_date, duration_minutes, total_marks, pass_marks, status) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
             jdbcTemplate.update(insertExamQuery,
                     subjectId,
@@ -71,11 +74,18 @@ public class AddExamsRepositoryImpl implements AddExamsRepository {
                     exam.getPassing_marks(),
                     exam.getStatus());
 
-            return true;
-
+            
+            Subject subject = new Subject();
+//            subject.getSubjectId();
+            subject.setSubjectId(subjectId);  
+            subject.setSubjectName(exam.getSubject().getSubjectName());  
+            subject.setSubjectCode(subjectCode);
+            return subject;
+            
+            
         } catch (Exception e) {
             e.printStackTrace();  // log it
-            return false;
+            return null;
         }
     }
 }

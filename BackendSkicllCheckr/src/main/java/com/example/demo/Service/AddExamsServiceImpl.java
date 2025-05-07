@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.example.demo.Model.Exams;
+import com.example.demo.Model.Subject;
 import com.example.demo.Repository.AddExamsRepository;
 
 
@@ -14,8 +15,7 @@ public class AddExamsServiceImpl implements AddExamsService{
 	public AddExamsRepository addExamsRepo;
 	
 
-	public boolean saveAllExams(Exams exam) {
-		// TODO Auto-generated method stub
+	public Subject saveAllExams(Exams exam) {
 		return addExamsRepo.saveAllExams(exam);
 	}
 

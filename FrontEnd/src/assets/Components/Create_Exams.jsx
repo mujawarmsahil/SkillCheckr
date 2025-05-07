@@ -10,8 +10,6 @@ export default function Create_Exams() {
     option4: "",
     correctOption: "",
   });
-
-
   const [examName, setExamName] = useState("");
   const [allQuestions, setAllQuestions] = useState([]);
 
@@ -83,12 +81,16 @@ export default function Create_Exams() {
         </Link>
       </div>
 
-      {/* Main Content */} 
+      {/* Main Content */}
       <div className="pt-[120px] w-full flex justify-center">
         <div className="w-full md:w-[80%] px-4">
           <form className="space-y-6">
+            {" "}
+            {/* this is The Form We Want The Using the Submit  */}
             <div>
-              <label className="font-medium text-2xl text-orange-500 underline underline-offset-4 ">Question</label>
+              <label className="font-medium text-2xl text-orange-500 underline underline-offset-4 ">
+                Question
+              </label>
               <input
                 type="text"
                 name="Question"
@@ -98,8 +100,8 @@ export default function Create_Exams() {
               />
             </div>
             {[1, 2, 3, 4].map((num) => (
-              <div key={num} className="flex items-center gap-4 ">  
-              {/*  OPetion Div  */}
+              <div key={num} className="flex items-center gap-4 ">
+                {/*  OPetion Div  */}
                 <input
                   type="text"
                   name={`option${num}`}

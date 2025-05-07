@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export default function AddExams() {
-  const [subjects, setSubject] = useState([]);
   const [exams, setExams] = useState({
     examName: "",
     subject: "",
@@ -13,17 +13,44 @@ export default function AddExams() {
     totalMarks: "",
     passingMarks: "",
   });
+  const [subjects, setSubject] = useState([]);
+  const navigate = useNavigate();
+
+  const teacherid = localStorage.getItem("teacher_id"); // Assuming teacher_id is stored after login
+
+  console.log("Teacher ID:", teacherid); // Log the teacher_id for debugging
+  if (!teacherid) {
+    alert("Teacher not logged in or teacher ID not found");
+    navigate("/user/teacher"); // Redirect to login page if teacher_id is not found
+  }
 
   function changeExamsDetails(e) {
     const name = e.target.name;
+
+    // Fetch and log user details from localStorage
+    const teacher_id = localStorage.getItem("teacher_id");
+    const role = localStorage.getItem("role");
+    const user_id = localStorage.getItem("user_id");
+
+    console.log("Logged-in User Details:");
+    console.log("Teacher ID:", teacher_id);
+    console.log("Role:", role);
+    console.log("User ID:", user_id);
     const value = e.target.value;
     let newValue = value;
     if (name == "totalMarks" || name == "passingMarks") {
       newValue = parseInt(value) || 0;
     }
-    // setExams((prev) => ({ ...prev, [name]: newValue }));
 
     if (name === "endTime" && exams.startTime) {
+      const startMinutes = timeToMinutes(exams.startTime);
+      const endMinutes = timeToMinutes(value);
+      console.log("Start Time:", exams.startTime); // Log start time
+      console.log("End Time:", value); // Log end time
+      console.log("Start in minutes:", startMinutes);
+      console.log("End in minutes:", endMinutes);
+      const TotalTime = endMinutes - startMinutes;
+      console.log("Total Time:", TotalTime);
       if (value <= exams.startTime) {
         alert("End Time must be after Start Time");
         return;
@@ -37,13 +64,15 @@ export default function AddExams() {
         return;
       }
     }
-
-    setExams((prev) => ({ ...prev, [name]: value }));
+    setExams((prev) => ({ ...prev, [name]: newValue }));
   }
 
-  const navigate = useNavigate();
+  function timeToMinutes(time) {
+    const [hours, minutes] = time.split(":");
+    return parseInt(hours) * 60 + parseInt(minutes);
+  }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     for (const key in exams) {
       if (exams[key] === "" || exams[key] === null) {
@@ -57,32 +86,80 @@ export default function AddExams() {
       );
       return;
     }
-    localStorage.setItem("examName", exams.examName);
-    navigate("/createExam");
-  }
 
-  /*
-  async function submitExam() {
+    const startMinutes = timeToMinutes(exams.startTime);
+    const endMinutes = timeToMinutes(exams.endTime);
+    const duration = endMinutes - startMinutes;
+    if (duration <= 0) {
+      alert("End Time must be after Start Time");
+      return;
+    }
+    const dateTime = `${exams.startDate}T${exams.startTime}`;
+
+    const formattedExam = {
+      subject: {
+        subjectName: exams.subject,
+        subjectCode: exams.subject_code,
+      },
+      teacher_id: teacherid, // TODO: replace with dynamic teacher_id if needed
+      exam_name: exams.examName,
+      date: dateTime,
+      duration_minuets: duration,
+      total_marks: exams.totalMarks,
+      passing_marks: exams.passingMarks,
+      status: "",
+    };
+
     try {
-      const response = await fetch("https://your-api-endpoint.com/exams", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(exams),
-      });
-  
-      if (response.ok) {
-        alert("Exam created successfully!");
+      const response = await axios.post(
+        // /Backend Connect With FrontEnd
+        // "http://localhost:8080/api/Exams/addExams",///...................API Calling the Backend
+        "http://localhost:8080/api/Exams/addExams", ///...................API Calling the Backend
+        formattedExam,
+        // user,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        // const subject_id = response.data.subject_id;
+        console.log("Backend Response Data:", response.data);
+
+        // const subject_id = response.data.subject.subject_id;
+
+        const subject_id = response.data.subjectId;
+        if (subject_id) {
+          alert("Exams Created Successfully - Subject ID: " + subject_id);
+          localStorage.setItem("subject_id", subject_id);
+          alert("Exams Created Succefull       " + subject_id);
+          navigate("/createExam");
+        } else {
+          alert("Subject ID not found in response.");
+          console.log("Response missing subject_id:", response.data);
+        }
+
+        console.log("Subject ID:", subject_id);
+        // localStorage.setItem("subject_id", subject_id);
+        // navigate("/createExam");
+        // console.log("Exam created successfully:", response.data);
       } else {
-        alert("Failed to create exam.");
+        alert("Failed to Create Exams ");
       }
+
+      // alert("Exam created successfully!");
     } catch (error) {
       console.error("Error creating exam:", error);
       alert("Something went wrong!");
     }
+
+    localStorage.setItem("examName", exams.examName);
+    navigate("/createExam");
   }
-  */
+
+  //   const handleSubjectChange = (e) => {
 
   return (
     <div className="w-full min-h-screen bg-slate-50 p-4">
@@ -156,7 +233,7 @@ export default function AddExams() {
           <input
             id="subject_code"
             name="subject_code"
-            type="number"
+            type="text"
             value={exams.subject_code}
             onChange={changeExamsDetails}
             className={`w-full h-full font-ubuntu px-4 border-2 rounded-md shadow-[inset_0_0_10px_1px_rgba(0,0,0,0.2)] outline-transparent focus:border-orange-400 ${
@@ -251,7 +328,7 @@ export default function AddExams() {
           <input
             id="totalMarks"
             name="totalMarks"
-            type="number"
+            type="text"
             value={exams.totalMarks}
             onChange={changeExamsDetails}
             className={`w-full h-full font-ubuntu px-4 border-2 rounded-md shadow-[inset_0_0_10px_1px_rgba(0,0,0,0.2)] outline-transparent focus:border-orange-400 ${
@@ -275,7 +352,7 @@ export default function AddExams() {
           <input
             id="passingMarks"
             name="passingMarks"
-            type="number"
+            type="text"
             value={exams.passingMarks}
             onChange={changeExamsDetails}
             className={`w-full h-full font-ubuntu px-4 border-2 rounded-md shadow-[inset_0_0_10px_1px_rgba(0,0,0,0.2)] outline-transparent focus:border-orange-400 ${

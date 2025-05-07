@@ -17,8 +17,9 @@ public class BackendSkicllCheckrApplication {
 			 System.out.println(" Database is connected ");
 		}
 		else {
-			 System.out.println("Database is not Connected ");
+			System.out.println("Database is not Connected ");
 		}
+		
 	}
 
 }

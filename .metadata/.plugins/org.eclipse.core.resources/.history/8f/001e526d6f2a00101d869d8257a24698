@@ -1,0 +1,14 @@
+package com.example.demo.Service;
+
+import com.example.demo.Model.QuestionsDT;
+
+public class CreateExamServices implements CreateExamService{
+
+	@Override
+	public void saveAllQuestionsAndAnswers(QuestionsDT dto) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+
+}

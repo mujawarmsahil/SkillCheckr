@@ -58,8 +58,8 @@ public class AdminController {
 	
 	@GetMapping("/viewAllStudent")
 	public ResponseEntity<?> viewAllStudent(){
+
 		List<Student> list = adminService.getAllStudent();
-		 
 		if(list==null||list.isEmpty())
 		{
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No registration requests found.");
@@ -67,6 +67,7 @@ public class AdminController {
 		return ResponseEntity.ok(list);
 	}
 	
+
 	@PostMapping("/addStudent/{request_id}")
 	public ResponseEntity <Object> addStudentWithId(@PathVariable Integer request_id){ 
 		

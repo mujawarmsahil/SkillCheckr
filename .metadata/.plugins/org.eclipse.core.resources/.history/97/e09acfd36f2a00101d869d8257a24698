@@ -1,0 +1,21 @@
+package com.example.demo.Service;
+
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import com.example.demo.Model.QuestionsDT;
+
+@Service
+public class CreateExamServices implements CreateExamService{
+
+	@Override
+	public void saveAllQuestionsAndAnswers(List<QuestionsDT> question) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	
+	
+
+}
