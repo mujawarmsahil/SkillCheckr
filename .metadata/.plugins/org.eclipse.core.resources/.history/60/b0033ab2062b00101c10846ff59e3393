@@ -1,0 +1,12 @@
+package com.example.demo.Repository;
+
+import java.util.List;
+
+import com.example.demo.Model.QuestionsDT;
+
+public interface CreateExamRepository {
+	
+	public void saveQuestionWithAnswers(List<QuestionsDT> questions);
+	
+}
+

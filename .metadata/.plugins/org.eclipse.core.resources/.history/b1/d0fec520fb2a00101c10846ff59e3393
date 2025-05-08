@@ -1,0 +1,19 @@
+package com.example.demo.Model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class QuestionsDT {
+	private String Question;
+	private String Opetion_1;
+	private String Opetion_2;
+	private String Opetion_3;
+	private String Opetion_4;
+	private String CorrectOption;
+	private int Subject_id;// here We using  the Subject_id;
+
+}

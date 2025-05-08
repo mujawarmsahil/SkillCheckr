@@ -108,6 +108,8 @@ export default function AddExams() {
       total_marks: exams.totalMarks,
       passing_marks: exams.passingMarks,
       status: "",
+      start_time: exams.startTime, //new Add start tiem and end time
+      end_time: exams.endTime,
     };
 
     try {

@@ -1,9 +1,10 @@
+import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function Create_Exams() {
   const [questionAns, setQuestionAns] = useState({
-    Question: "",
+    question: "",
     option1: "",
     option2: "",
     option3: "",
@@ -30,7 +31,7 @@ export default function Create_Exams() {
 
   const handleAddQuestion = () => {
     if (
-      questionAns.Question &&
+      questionAns.question &&
       questionAns.option1 &&
       questionAns.option2 &&
       questionAns.option3 &&
@@ -39,7 +40,7 @@ export default function Create_Exams() {
     ) {
       setAllQuestions([...allQuestions, questionAns]);
       setQuestionAns({
-        Question: "",
+        question: "",
         option1: "",
         option2: "",
         option3: "",
@@ -51,9 +52,46 @@ export default function Create_Exams() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (allQuestions.length === 0) {
+      alert("Please add at least one question before submitting.");
+      return;
+    }
+    const subject_Id = localStorage.getItem("subject_id");
+    console.log("Subject ID:", subject_Id);
+
+    const payload = allQuestions.map((q) => ({
+      subjectId: subject_Id,
+      question: q.question,
+      option1: q.option1,
+      option2: q.option2,
+      option3: q.option3,
+      option4: q.option4,
+      correctOption: q.correctOption,
+    }));
+    console.log(
+      "Payload to send  We the Send the Data Backend We Check the First now................... :",
+      payload
+    );
+    try {
+      const response = await axios.post(
+        "http://localhost:8080/api/create/addQues",
+        payload
+      );
+      const subject_id = response.data.subjectId;
+      if (subject_id) {
+        localStorage.setItem("subject_id", subject_id);
+        alert("Exams Created Successfully - Subject ID: " + subject_id);
+      }
+      console.log("Backend Response :", response.data);
+      alert("All Questions Submitted!");
+      setAllQuestions([]);
+    } catch (error) {
+      console.error("Error submitting questions:", error);
+      alert("Failed to submit questions. Please try again.");
+    }
     console.log("Submitted Questions:", allQuestions);
-    alert("All Questions Submitted!");
+    // alert("All Questions Submitted!");
   };
 
   return (
@@ -93,8 +131,8 @@ export default function Create_Exams() {
               </label>
               <input
                 type="text"
-                name="Question"
-                value={questionAns.Question}
+                name="question"
+                value={questionAns.question}
                 onChange={handleChange}
                 className="w-full p-3 border rounded mt-1"
               />

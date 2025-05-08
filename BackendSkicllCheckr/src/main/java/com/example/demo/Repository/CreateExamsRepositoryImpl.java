@@ -27,17 +27,17 @@ public class CreateExamsRepositoryImpl implements CreateExamRepository {
 
             jdbcTemplate.update(connection -> {
                 PreparedStatement ps = connection.prepareStatement(insertQuestionSql, Statement.RETURN_GENERATED_KEYS);
-                ps.setInt(1, dto.getSubject_id());
+                ps.setInt(1, dto.getSubjectId());
                 ps.setString(2, dto.getQuestion());
                 return ps;
             }, keyHolder);
 
             int questionId = keyHolder.getKey().intValue();
 
-            saveOption(dto.getOpetion_1(), dto.getCorrectOption(), questionId);
-            saveOption(dto.getOpetion_2(), dto.getCorrectOption(), questionId);
-            saveOption(dto.getOpetion_3(), dto.getCorrectOption(), questionId);
-            saveOption(dto.getOpetion_4(), dto.getCorrectOption(), questionId);
+            saveOption(dto.getOption1(), dto.getCorrectOption(), questionId);
+            saveOption(dto.getOption2(), dto.getCorrectOption(), questionId);
+            saveOption(dto.getOption3(), dto.getCorrectOption(), questionId);
+            saveOption(dto.getOption4(), dto.getCorrectOption(), questionId);
         }
     }
 

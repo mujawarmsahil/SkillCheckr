@@ -1,9 +1,11 @@
 package com.example.demo.Controller;
+import java.util.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,7 +26,7 @@ public class AddExamsConntroller {
 	
 	
 	@PostMapping("/addExams")
-	public ResponseEntity<?> AddExmass(@RequestBody Exams exam){
+	public ResponseEntity<?> AddExmas(@RequestBody Exams exam){
 		
 	Subject  subject = addExamsService.saveAllExams(exam);
 		if(subject!=null) {
@@ -38,6 +40,20 @@ public class AddExamsConntroller {
 	}
 	
 	
+	@GetMapping("/viewAllExams")
+	public ResponseEntity<?> viewAllExams()
+	{
+		List<Exams> list = addExamsService.viewAllExams() ;
+		if(list==null||list.isEmpty())
+		{
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No registration requests found.");
+		}
+		else {
+			System.out.println("Show the List of the All Exams View  "+list);
+			
+			return ResponseEntity.ok(list);
+		}
+	}
 	
 	
 

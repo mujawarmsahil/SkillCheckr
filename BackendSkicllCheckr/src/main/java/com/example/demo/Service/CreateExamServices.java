@@ -18,10 +18,11 @@ public class CreateExamServices implements CreateExamService{
 	public void saveAllQuestionsAndAnswers(List<QuestionsDT> question) {
 		// TODO Auto-generated method stub
 		
-		for(QuestionsDT questions: question)
-		{
-			 creatExamRepo.saveQuestionWithAnswers(question);
-		}
+//		for(QuestionsDT questions: question)
+//		{
+//			 creatExamRepo.saveQuestionWithAnswers(question);
+//		}
+		creatExamRepo.saveQuestionWithAnswers(question);
 		
 	}
 

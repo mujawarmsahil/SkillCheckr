@@ -2,12 +2,14 @@ package com.example.demo.Repository;
 
 import com.example.demo.Model.Exams;
 import com.example.demo.Model.Subject;
+import java.util.*;
 
 public interface AddExamsRepository {
 	
 	
 //	public boolean saveAllExams(Exams exam);
 	public Subject saveAllExams(Exams exam);
+	public List<Exams> viewAllExams();
 
 
 	

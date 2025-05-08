@@ -1,6 +1,9 @@
 package com.example.demo.Model;
 
-//  import com.example.demo.Model.*;
+import java.time.LocalTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,6 +18,10 @@ public class Exams {
     private Subject subject; 
     private String exam_name;
     private String date;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm")
+    private LocalTime start_time;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm")
+    private LocalTime end_time;
     private int duration_minuets;
     private int total_marks;
     private int passing_marks;

@@ -1,0 +1,30 @@
+package com.example.demo.Model;
+
+import java.time.LocalTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class Exams {
+
+    private int exame_id;  
+    private int teacher_id;
+    private Subject subject; 
+    private String exam_name;
+    private String date;
+    
+    @JsonFormat(pattern = "hh:mm:ss")//AM/PM Format 
+    private LocalTime start_time;
+    @JsonFormat(pattern = "hh:mm:ss")//AM/PM Format
+    private LocalTime end_time;
+    private int duration_minuets;
+    private int total_marks;
+    private int passing_marks;
+    private String status;
+}
