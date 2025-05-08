@@ -144,4 +144,42 @@ public class AddExamsRepositoryImpl implements AddExamsRepository {
 	    return list;
 	}
 
+	@Override
+	public boolean deleteByIdExam(int examId) {
+	    try {
+	        // 1. Get subject_id using exam_id
+	        String getSubjectIdSql = "SELECT subject_id FROM exam WHERE exam_id = ?";
+	        Integer subjectId = jdbcTemplate.queryForObject(getSubjectIdSql, Integer.class, examId);
+
+	        if (subjectId == null) {
+	            return false; // exam not found
+	        }
+
+	        // 2. Get all question_ids for this subject
+	        String getQuestionIdsSql = "SELECT question_id FROM question WHERE subject_id = ?";
+	        List<Integer> questionIds = jdbcTemplate.query(getQuestionIdsSql,
+	                (rs, rowNum) -> rs.getInt("question_id"), subjectId);
+
+	        // 3. Delete answers for each question_id
+	        for (Integer qid : questionIds) {
+	            jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", qid);
+	        }
+
+	        // 4. Delete all questions for the subject
+	        jdbcTemplate.update("DELETE FROM question WHERE subject_id = ?", subjectId);
+
+	        // 5. Delete the subject
+	        jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId);
+
+	        // 6. Finally, delete the exam
+	        jdbcTemplate.update("DELETE FROM exam WHERE exam_id = ?", examId);
+
+	        return true; // successful
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        return false; // if any error occurs
+	    }
+	}
+
+
 }

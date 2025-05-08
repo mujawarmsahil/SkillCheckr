@@ -50,7 +50,6 @@ INDEX VERSION 1.134+C:\Class Project\SkillCheckr\SkillCheckr\.metadata\.plugins\
 1464245383.index
 3178553357.index
 2802949130.index
-1712524992.index
 3006351883.index
 3726741642.index
 3122701625.index

@@ -25,8 +25,23 @@ export default function AcceptExame() {
       )
     );
   };
-  const deleteExams = (id) => {
-    setExamsStatus(actionExam.filter((exams) => exams.id !== id));
+  const deleteExams = async (id) => {
+    try {
+      const response = await axios.delete(
+        `http://localhost:8080/api/Exams/deleteExamById/${id}`
+      );
+      if (response.status == 200) {
+        alert("Exam Delete succesfully");
+        const updateExam = actionExam.filter((exam) => exam.exam_id != id);
+        setExamsStatus(updateExam);
+      } else {
+        alert("Failed to delete Exam.");
+      }
+    } catch (error) {
+      console.error(" Error deleting Exam", error);
+      alert(" Somethimg went wrong while deleting the exams");
+    }
+    // setExamsStatus(actionExam.filter((exams) => exams.id !== id));
   };
 
   return (
@@ -56,32 +71,35 @@ export default function AcceptExame() {
               </tr>
             </thead>
             <tbody>
-              {actionExam.map((exams) => (
-                <tr key={exams.id}>
-                  <td className="border-2 px-4 py-2">{exams.exame_id}</td>
-                  <td className="border-2 px-4 py-2">{exams.exam_name}</td>
-                  <td className="border-2 px-4 py-2">{exams.date}</td>
-                  <td className="border-2 px-4 py-2">{exams.start_time}</td>
-                  <td className="border-2 px-4 py-2">{exams.end_time}</td>
-                  <td className="border-2 px-4 py-2">{exams.status}</td>
-                  {/* <td className="border-2 px-4 py-2">{exams.status}</td> */}
-                  <td className="border-2 px-4 py-2">
-                    <button
-                      className="bg-slate-800 shadow-xl mr-10 m-1 hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded "
-                      onClick={() => updateStatus(exams.id, "Accepted")}
-                    >
-                      Accept Exam
-                    </button>
-
-                    <button
-                      className="bg-slate-800 shadow-xl hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded "
-                      onClick={() => deleteExams(exams.id)}
-                    >
-                      Delete Exam
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {actionExam.map(
+                (exam) => (
+                  console.log("Exam data:", exam),
+                  (
+                    <tr key={exam.exam_id}>
+                      <td className="border-2 px-4 py-2">{exam.exame_id}</td>
+                      <td className="border-2 px-4 py-2">{exam.exam_name}</td>
+                      <td className="border-2 px-4 py-2">{exam.date}</td>
+                      <td className="border-2 px-4 py-2">{exam.start_time}</td>
+                      <td className="border-2 px-4 py-2">{exam.end_time}</td>
+                      <td className="border-2 px-4 py-2">{exam.status}</td>
+                      <td className="border-2 px-4 py-2">
+                        <button
+                          className="bg-slate-800 shadow-xl mr-10 m-1 hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded"
+                          onClick={() => updateStatus(exam.exame_id, "Accepted")}
+                        >
+                          Accept Exam
+                        </button>
+                        <button
+                          className="bg-slate-800 shadow-xl hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded"
+                          onClick={() => deleteExams(exam.exame_id)}
+                        >
+                          Delete Exam
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                )
+              )}
             </tbody>
           </table>
         </div>
