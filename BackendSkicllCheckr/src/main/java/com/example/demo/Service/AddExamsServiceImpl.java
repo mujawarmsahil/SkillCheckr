@@ -35,4 +35,11 @@ public class AddExamsServiceImpl implements AddExamsService{
 		return addExamsRepo.deleteByIdExam(exam_id);
 	}
 
+
+	@Override
+	public boolean upComingExam(int exam_id) {
+		// TODO Auto-generated method stub
+		return addExamsRepo.upComingExam( exam_id);
+	}
+
 }

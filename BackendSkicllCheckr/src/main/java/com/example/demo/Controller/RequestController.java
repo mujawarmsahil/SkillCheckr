@@ -57,9 +57,6 @@ public class RequestController {
 		}
 	}
 	
-	
-	
-	
 	@DeleteMapping("/deleteById/{request_id}")
 	public ResponseEntity<String> deleteRequest(@PathVariable Integer request_id)
 	{

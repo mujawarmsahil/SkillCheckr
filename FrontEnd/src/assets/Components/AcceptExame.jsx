@@ -18,12 +18,21 @@ export default function AcceptExame() {
       });
   }, []);
 
-  const updateStatus = (id, status) => {
-    setExamsStatus(
-      actionExam.map((exams) =>
-        exams.id === id ? { ...exams, Status: status } : exams
-      )
-    );
+  const updateStatus = async (id) => {
+    try {
+      const response = await axios.post(
+        `http://localhost:8080/api/Exams/upComingExam/${id}`,
+        { status: "Accepted" }
+      );
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
+
+    // setExamsStatus(
+    //   actionExam.map((exams) =>
+    //     exams.id === id ? { ...exams, Status: status } : exams
+    //   )
+    // );
   };
   const deleteExams = async (id) => {
     try {
@@ -76,7 +85,7 @@ export default function AcceptExame() {
                   console.log("Exam data:", exam),
                   (
                     <tr key={exam.exam_id}>
-                      <td className="border-2 px-4 py-2">{exam.exame_id}</td>
+                      <td className="border-2 px-4 py-2">{exam.exam_id}</td>
                       <td className="border-2 px-4 py-2">{exam.exam_name}</td>
                       <td className="border-2 px-4 py-2">{exam.date}</td>
                       <td className="border-2 px-4 py-2">{exam.start_time}</td>
@@ -85,13 +94,13 @@ export default function AcceptExame() {
                       <td className="border-2 px-4 py-2">
                         <button
                           className="bg-slate-800 shadow-xl mr-10 m-1 hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded"
-                          onClick={() => updateStatus(exam.exame_id, "Accepted")}
+                          onClick={() => updateStatus(exam.exam_id)}
                         >
                           Accept Exam
                         </button>
                         <button
                           className="bg-slate-800 shadow-xl hover:bg-sky-600 hover:text-white text-white px-3 py-3 rounded"
-                          onClick={() => deleteExams(exam.exame_id)}
+                          onClick={() => deleteExams(exam.exam_id)}
                         >
                           Delete Exam
                         </button>

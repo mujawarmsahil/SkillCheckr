@@ -10,10 +10,13 @@
     <fullyQualifiedTypeName name="com.example.demo.Model.Teacher"/>
     <fullyQualifiedTypeName name="com.example.demo.Model.Student"/>
     <fullyQualifiedTypeName name="org.springframework.http.ResponseEntity"/>
-    <fullyQualifiedTypeName name="java.sql.ResultSet"/>
     <fullyQualifiedTypeName name="java.sql.Connection"/>
     <fullyQualifiedTypeName name="org.apache.catalina.User"/>
     <fullyQualifiedTypeName name="com.example.demo.Model.User"/>
     <fullyQualifiedTypeName name="com.example.demo.Model.Subject"/>
     <fullyQualifiedTypeName name="java.util.List"/>
+    <fullyQualifiedTypeName name="java.sql.Timestamp"/>
+    <fullyQualifiedTypeName name="java.sql.ResultSet"/>
+    <fullyQualifiedTypeName name="java.sql.Time"/>
+    <fullyQualifiedTypeName name="org.springframework.http.HttpStatusCode"/>
 </qualifiedTypeNameHistroy>

@@ -5,5 +5,7 @@ public interface AddExamsService {
 	public Subject saveAllExams(Exams exam);
 	
 	public List<Exams>viewAllExams();
-	boolean deleteByIdExam(int exam_id);
+	public boolean deleteByIdExam(int exam_id);
+	
+	public boolean upComingExam(int exam_id);
 }

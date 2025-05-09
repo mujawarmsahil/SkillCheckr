@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -13,16 +13,31 @@ export default function AddExams() {
     totalMarks: "",
     passingMarks: "",
   });
-  const [subjects, setSubject] = useState([]);
+  // const [subjects, setSubject] = useState([]);
+
   const navigate = useNavigate();
+  const [teacherIdState, setTeacherId] = useState([]);
 
-  const teacherid = localStorage.getItem("teacher_id"); // Assuming teacher_id is stored after login
+  useEffect(() => {
+    const id = localStorage.getItem("teacher_id");
+    console.log("Teacher ID from localStorage:", id);
 
-  console.log("Teacher ID:", teacherid); // Log the teacher_id for debugging
-  if (!teacherid) {
-    alert("Teacher not logged in or teacher ID not found");
-    navigate("/user/teacher"); // Redirect to login page if teacher_id is not found
-  }
+    if (!id) {
+      alert("Teacher not logged in or teacher ID not found");
+      navigate("/user/teacher");
+    } else {
+      setTeacherId(id);
+    }
+  }, [navigate]);
+
+  const teacheridFromStorage = localStorage.getItem("teacher_id"); // Assuming teacher_id is stored after login
+  console.log("Teacher ID:", teacheridFromStorage); // Log the teacher_id for debugging // but one Ishuee its not Working the Microsoft Broweser
+
+  console.log("Teacher ID:", setTeacherId); // Log the teacher_id for debugging
+  // if (!setTeacherId) {
+  //   alert("Teacher not logged in or teacher ID not found");
+  //   navigate("/user/teacher"); // Redirect to login page if teacher_id is not found
+  // }
 
   function changeExamsDetails(e) {
     const name = e.target.name;
@@ -66,7 +81,6 @@ export default function AddExams() {
     }
     setExams((prev) => ({ ...prev, [name]: newValue }));
   }
-
   function timeToMinutes(time) {
     const [hours, minutes] = time.split(":");
     return parseInt(hours) * 60 + parseInt(minutes);
@@ -101,7 +115,7 @@ export default function AddExams() {
         subjectName: exams.subject,
         subjectCode: exams.subject_code,
       },
-      teacher_id: teacherid, // TODO: replace with dynamic teacher_id if needed
+      teacher_id: teacheridFromStorage, // TODO: replace with dynamic teacher_id if needed
       exam_name: exams.examName,
       date: dateTime,
       duration_minuets: duration,
@@ -114,11 +128,9 @@ export default function AddExams() {
 
     try {
       const response = await axios.post(
-        // /Backend Connect With FrontEnd
-        // "http://localhost:8080/api/Exams/addExams",///...................API Calling the Backend
         "http://localhost:8080/api/Exams/addExams", ///...................API Calling the Backend
         formattedExam,
-        // user,
+
         {
           headers: {
             "Content-Type": "application/json",
@@ -144,9 +156,6 @@ export default function AddExams() {
         }
 
         console.log("Subject ID:", subject_id);
-        // localStorage.setItem("subject_id", subject_id);
-        // navigate("/createExam");
-        // console.log("Exam created successfully:", response.data);
       } else {
         alert("Failed to Create Exams ");
       }

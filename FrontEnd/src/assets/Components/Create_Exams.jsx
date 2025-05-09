@@ -184,7 +184,7 @@ export default function Create_Exams() {
             {allQuestions.map((q, index) => (
               <div key={index} className="border p-3 mb-2">
                 <p>
-                  <strong>Q{index + 1}:</strong> {q.Question}
+                  <strong>Q{index + 1}:</strong> {q.question}
                 </p>
                 {[1, 2, 3, 4].map((num) => {
                   const opt = q[`option${num}`];

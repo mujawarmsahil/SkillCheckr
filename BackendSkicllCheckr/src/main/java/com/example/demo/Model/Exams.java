@@ -13,7 +13,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class Exams {
 
-    private int exame_id;  
+	private Subject subjet;
+    private int exam_id;  
     private int teacher_id;
     private Subject subject; 
     private String exam_name;

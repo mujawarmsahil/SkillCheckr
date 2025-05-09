@@ -118,7 +118,7 @@ public class AddExamsRepositoryImpl implements AddExamsRepository {
 	        @Override
 	        public Exams mapRow(ResultSet rs, int rowNum) throws SQLException {
 	            Exams exam = new Exams();
-	            exam.setExame_id(rs.getInt("exam_id"));
+	            exam.setExam_id(rs.getInt("exam_id"));
 	            exam.setTeacher_id(rs.getInt("teacher_id"));
 	            exam.setExam_name(rs.getString("exam_name"));
 	            exam.setDate(rs.getString("exam_date"));
@@ -179,6 +179,17 @@ public class AddExamsRepositoryImpl implements AddExamsRepository {
 	        e.printStackTrace();
 	        return false; // if any error occurs
 	    }
+	}
+
+
+	@Override
+	public boolean upComingExam(int exam_id) {
+		// TODO Auto-generated method stub
+		
+		String sql = "UPDATE exam SET status = 'Upcoming' WHERE exam_id = ?";
+				int rowsAffected = jdbcTemplate.update(sql,exam_id);
+				
+		return rowsAffected>0? true :false;
 	}
 
 

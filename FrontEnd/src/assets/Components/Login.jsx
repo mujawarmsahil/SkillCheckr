@@ -2,7 +2,6 @@ import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-
 export default function Login() {
   const [user, setUser] = useState({
     username: "",
@@ -41,11 +40,20 @@ export default function Login() {
           user
         );
         console.log("Login Response: " + response.data);
+
         const { role, roleId, userId } = response.data;
         console.log("Login Success:");
         console.log("Role:", role);
         console.log("Role ID:", roleId);
         console.log("User ID:", userId);
+        localStorage.setItem("role", role);
+        localStorage.setItem("user_id", userId);
+
+        if (role === "Teacher") {
+          localStorage.setItem("teacher_id", roleId);
+        } else if (role === "Student") {
+          localStorage.setItem("student_id", roleId);
+        }
 
         if (role === "Student") {
           alert(" log in the Student ");
