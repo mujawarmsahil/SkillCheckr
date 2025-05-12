@@ -27,6 +27,8 @@ public class RequestController {
 
 	@PostMapping("/save")
 	public ResponseEntity<String> saveRequest(@RequestBody RequestModel request) {
+		System.out.print("Show the data all of the "+request);
+		
 		try {
 		boolean result = reqService.saveRequest(request);
            if (result) {

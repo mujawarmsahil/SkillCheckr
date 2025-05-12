@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.demo.Model.Student;
 import com.example.demo.Model.Teacher;
-//import com.example.demo.Model.*;
+
 import com.example.demo.Repository.AdminRepository;
 
 @Service
@@ -18,7 +18,17 @@ public class AdminServiceImpl implements AdminService {
 
     
     
-
+    @Override
+    public boolean addStudentFromRequest(int request_id) {
+    	// TODO Auto-generated method stub
+    	
+    	String username = getUsernameByRequestId(request_id);
+    	if(adminRepository.isUsernameExist(username))  {
+    		return false;
+    	}
+    	
+    	return adminRepository.addStudentFromRequest(request_id);
+    }
 	@Override
 	public boolean addTeacherFromRequest(int request_id) {
 		
@@ -30,18 +40,25 @@ public class AdminServiceImpl implements AdminService {
 		return adminRepository.addTeacherFromRequest(request_id);
 	}
 
+	
 
 
 
-	@Override
-	public boolean addStudentFromRequest(int request_id) {
-		// TODO Auto-generated method stub
-		String username = getUsernameByRequestId(request_id);
-        if (adminRepository.isUsernameExist(username)) {
-            return false;  // Username already exists, return false
-        }
-		return adminRepository.addStudentFromRequest(request_id);
-	}
+//	@Override
+//	public boolean addStudentFromRequest(int request_id) {
+//		// TODO Auto-generated method stub
+//		String username = getUsernameByRequestId(request_id);
+//		  System.out.println("Fetched Username = " + username);
+//        if (adminRepository.isUsernameExist(username)) {
+//            return false;  // Username already exists, return false
+//        }
+//        
+//        boolean success = adminRepository.addStudentFromRequest(request_id);
+//        System.out.println("Student Add Status "+success);
+//        
+////		return adminRepository.addStudentFromRequest(request_id);
+//        return success;
+//	}
 	
 	@Override
 	public List <Teacher> getAllTeacher() 
@@ -68,12 +85,16 @@ public class AdminServiceImpl implements AdminService {
 	        return adminRepository.isUsernameExist(username);
 	    }
 	 
-	 private String getUsernameByRequestId(int requestId) {
-	        // Logic to fetch username from request table using requestId
-	        // This will depend on your current method for fetching request data
+	 @Override
+	public String getUsernameByRequestId(int requestId) {
 	        return "someUsername";  // Replace with actual logic
 	    }
 
+
+//	 @Override
+//	 public String getUsernameByRequestId(int requestId) {
+//	     return adminRepository.getUsernameByRequestId(requestId);
+//	 }
 
 
 
@@ -83,4 +104,16 @@ public class AdminServiceImpl implements AdminService {
 		
 		return adminRepository.deleteStudentid(Student_id);
 	}
+
+
+
+
+
+
+
+
+
+
+
+
 }

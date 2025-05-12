@@ -1,0 +1,32 @@
+package com.example.demo.Service;
+
+
+
+
+import java.util.List;
+
+
+import org.springframework.stereotype.Service;
+
+import com.example.demo.Model.*;
+
+
+@Service
+public interface AdminService {
+
+	    boolean addTeacherFromRequest(int request_id);
+	    
+	    boolean addStudentFromRequest(int request_id);
+	    boolean isUsernameExist(String username);
+	    public  List<Teacher> getAllTeacher();
+	    public  List<Student> getAllStudent();
+	    
+	    public boolean deleteTeacherbyId(int Teacher_id);
+	    public boolean deleteStudentid(int Student_id);
+
+		String getUsernameByRequestId(int requestId);
+	    
+	   
+	
+	
+}

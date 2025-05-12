@@ -1,0 +1,92 @@
+package com.example.demo.Service;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.example.demo.Model.Student;
+import com.example.demo.Model.Teacher;
+//import com.example.demo.Model.*;
+import com.example.demo.Repository.AdminRepository;
+
+@Service
+public class AdminServiceImpl implements AdminService {
+
+    @Autowired
+    private AdminRepository adminRepository;
+
+    
+    
+
+	@Override
+	public boolean addTeacherFromRequest(int request_id) {
+		
+		// TODO Auto-generated method stub
+		String username = getUsernameByRequestId(request_id);
+		  if (adminRepository.isUsernameExist(username)) {
+	            return false; 
+		  }
+		return adminRepository.addTeacherFromRequest(request_id);
+	}
+
+
+
+
+	@Override
+	public boolean addStudentFromRequest(int request_id) {
+		// TODO Auto-generated method stub
+		String username = getUsernameByRequestId(request_id);
+		  System.out.println("Fetched Username = " + username);
+        if (adminRepository.isUsernameExist(username)) {
+            return false;  // Username already exists, return false
+        }
+		return adminRepository.addStudentFromRequest(request_id);
+	}
+	
+	@Override
+	public List <Teacher> getAllTeacher() 
+	{
+		return adminRepository.getAllTeacher();
+		 
+	}
+	
+	@Override
+	public List <Student> getAllStudent() 
+	{
+		return adminRepository.getAllStudent();
+		 
+	}
+	
+	@Override
+	 public boolean deleteTeacherbyId(int Teacher_id)
+	 {
+		  return adminRepository.deleteTeacherbyId(Teacher_id);
+	 }
+	
+	 @Override
+	    public boolean isUsernameExist(String username) {
+	        return adminRepository.isUsernameExist(username);
+	    }
+	 
+//	 private String getUsernameByRequestId(int requestId) {
+//	        // Logic to fetch username from request table using requestId
+//	        // This will depend on your current method for fetching request data
+//	        return "someUsername";  // Replace with actual logic
+//	    }
+
+
+	 @Override
+	 public String getUsernameByRequestId(int requestId) {
+	     return adminRepository.getUsernameByRequestId(requestId);
+	 }
+
+
+
+	@Override
+	public boolean deleteStudentid(int Student_id) {
+		// TODO Auto-generated method stub
+		
+		return adminRepository.deleteStudentid(Student_id);
+	}
+}

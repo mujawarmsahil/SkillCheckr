@@ -1,133 +1,37 @@
 import React from "react";
 import { PieChart, Pie, Tooltip, Legend, Cell } from "recharts";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 
 export default function Tota_Exam() {
-  const data = [
-    { name: "Completed Exams", value: 60 },
-    { name: "Upcoming Exams", value: 35 },
-  ];
-
-  const [Completedexams, setCompletedExames] = useState([
-    {
-      id: 1,
-      name: "BCA DEC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "11:30 AM",
-      type: "MCQ",
-    },
-    {
-      id: 2,
-      name: "MCA DEC",
-      date: "2023-11-15",
-      ExamsStart: "09:00 AM",
-      EndExams: "10:30 AM",
-      type: "Written",
-    },
-
-    {
-      id: 4,
-      name: "MOCK TEST BE",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "11:30 AM",
-      type: "MCQ",
-    },
-    {
-      id: 5,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 5,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 5,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 5,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 5,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 5,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 5,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-  ]);
-
-  const [UpComingExam, setUpComping] = useState([
-    {
-      id: 6,
-      name: "MOC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "12:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 7,
-      name: "MTECH DEC",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "11:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 8,
-      name: "MSC JAN",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "11:00 AM",
-      type: "MCQ",
-    },
-    {
-      id: 9,
-      name: "MSC FEB",
-      date: "2023-10-01",
-      ExamsStart: "10:00 AM",
-      EndExams: "11:00 AM",
-      type: "MCQ",
-    },
-  ]);
+  const [UpComingExam, setUpComping] = useState([]);
+  const [Completedexams, setCompletedExames] = useState([]);
 
   const [effectData, setEffectData] = useState("completed");
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:8080/api/Exams/viewAllUpComingExam")
+      .then((response) => {
+        console.log("Exams data:", response.data);
+        setUpComping(response.data);
+      })
+      .catch((error) => {
+        console.error("Error fetching exams:", error);
+      });
+  }, []);
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:8080/api/Exams/viewAllCompletedExam")
+      .then((response) => {
+        console.log("Completed exams data:", response.data);
+        setCompletedExames(response.data);
+      })
+      .catch((error) => {
+        console.error("Error fetching completed exams:", error);
+      });
+  }, []);
 
   const handlePieClick = (entry) => {
     if (entry.name === "Completed Exams") {
@@ -137,6 +41,10 @@ export default function Tota_Exam() {
     }
   };
 
+  const data = [
+    { name: "Completed Exams", value: Completedexams.length },
+    { name: "Upcoming Exams", value: UpComingExam.length },
+  ];
   const COLORS = ["#ea580c", "#010f21"];
 
   return (
@@ -182,20 +90,18 @@ export default function Tota_Exam() {
                       <th className="border px-4 py-2">Exams Date</th>
                       <th className="border px-4 py-2">Exam Start</th>
                       <th className="border px-4 py-2">Exam End</th>
-                      <th className="border px-4 py-2">Exam Type</th>
                     </tr>
                   </thead>
                   <tbody>
                     {Completedexams.map((exam) => (
                       <tr key={exam.id}>
-                        <td className="border-2 px-4 py-2">{exam.id}</td>
-                        <td className="border-2 px-4 py-2">{exam.name}</td>
+                        <td className="border-2 px-4 py-2">{exam.exam_id}</td>
+                        <td className="border-2 px-4 py-2">{exam.exam_name}</td>
                         <td className="border-2 px-4 py-2">{exam.date}</td>
                         <td className="border-2 px-4 py-2">
-                          {exam.ExamsStart}
+                          {exam.start_time}
                         </td>
-                        <td className="border-2 px-4 py-2">{exam.EndExams}</td>
-                        <td className="border-2 px-4 py-2">{exam.type}</td>
+                        <td className="border-2 px-4 py-2">{exam.end_time}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -218,27 +124,25 @@ export default function Tota_Exam() {
                       <th className="border px-4 py-2">Coming Exams Date</th>
                       <th className="border px-4 py-2">Exam Start</th>
                       <th className="border px-4 py-2">Exam End</th>
-                      <th className="border px-4 py-2">Exam Type</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Completedexams.map((Comingexam) => (
+                    {UpComingExam.map((Comingexam) => (
                       <tr key={Comingexam.id}>
-                        <td className="border-2 px-4 py-2">{Comingexam.id}</td>
                         <td className="border-2 px-4 py-2">
-                          {Comingexam.name}
+                          {Comingexam.exam_id}
+                        </td>
+                        <td className="border-2 px-4 py-2">
+                          {Comingexam.exam_name}
                         </td>
                         <td className="border-2 px-4 py-2">
                           {Comingexam.date}
                         </td>
                         <td className="border-2 px-4 py-2">
-                          {Comingexam.ExamsStart}
+                          {Comingexam.start_time}
                         </td>
                         <td className="border-2 px-4 py-2">
-                          {Comingexam.EndExams}
-                        </td>
-                        <td className="border-2 px-4 py-2">
-                          {Comingexam.type}
+                          {Comingexam.end_time}
                         </td>
                       </tr>
                     ))}

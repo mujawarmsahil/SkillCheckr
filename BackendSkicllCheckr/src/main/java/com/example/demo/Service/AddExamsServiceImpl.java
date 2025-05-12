@@ -42,4 +42,18 @@ public class AddExamsServiceImpl implements AddExamsService{
 		return addExamsRepo.upComingExam( exam_id);
 	}
 
+
+	@Override
+	public List<Exams> viewAllcomingExam() {
+		// TODO Auto-generated method stub
+		return addExamsRepo.viewAllcomingExam();
+	}
+
+
+	@Override
+	public List<Exams> viewAllCompletedExam() {
+		// TODO Auto-generated method stub
+		return addExamsRepo.viewAllCompletedExam();
+	}
+
 }

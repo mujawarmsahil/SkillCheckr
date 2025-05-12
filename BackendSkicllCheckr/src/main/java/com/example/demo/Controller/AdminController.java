@@ -23,24 +23,11 @@ import com.example.demo.Service.AdminService;
 @RequestMapping("/api/Admin")
 @CrossOrigin(origins = "http://localhost:5173")
 public class AdminController {
-	
-	
+
 	@Autowired
 	public AdminService adminService;
 	
 	
-	@PostMapping("/addTeacher/{request_id}")
-	public ResponseEntity<Object> addteacherwithid(@PathVariable Integer request_id){
-		boolean b = adminService.addTeacherFromRequest(request_id);
-		
-		if(b) {
-			
-			return ResponseEntity.ok("Teacher added successfully");
-		}
-		else {
-			return ResponseEntity.ok(false);	
-		}
-		}	
 	
 	
 	@GetMapping("/viewAllTeacher")
@@ -68,18 +55,47 @@ public class AdminController {
 	}
 	
 
+//	@PostMapping("/addStudent/{request_id}")
+//	public ResponseEntity <Object> addStudentWithId(@PathVariable Integer request_id){ 
+//boolean b = adminService.addStudentFromRequest(request_id);
+//		System.out.print("Check the Response we Wait "+b);
+//		
+//		if(b) {
+//			 return ResponseEntity.ok("Student add SuccessFully ");
+//		}
+//		else {
+//			return ResponseEntity.ok(false);
+//			}
+//	}
+	
 	@PostMapping("/addStudent/{request_id}")
-	public ResponseEntity <Object> addStudentWithId(@PathVariable Integer request_id){ 
-		
+	public ResponseEntity<Object> addstudentwithid(@PathVariable Integer request_id){
 		boolean b = adminService.addStudentFromRequest(request_id);
+		
 		if(b) {
-			 return ResponseEntity.ok("Student add SuccessFully ");
+			
+			return ResponseEntity.ok("Student added successfully");
 		}
 		else {
-			return ResponseEntity.ok(false);
-
+			return ResponseEntity.ok(false);	
 		}
-	}
+		}	
+	
+	
+	@PostMapping("/addTeacher/{request_id}")
+	public ResponseEntity<Object> addteacherwithid(@PathVariable Integer request_id){
+		boolean b = adminService.addTeacherFromRequest(request_id);
+		
+		if(b) {
+			
+			return ResponseEntity.ok("Teacher added successfully");
+		}
+		else {
+			return ResponseEntity.ok(false);	
+		}
+		}	
+	
+	
 	
 	
 	@DeleteMapping("/teacherDeleteById/{Teacher_id}")
@@ -106,12 +122,5 @@ public class AdminController {
 		
 	}
 
-	
-	
-	
-
-//	
-	
-	
 	
 }

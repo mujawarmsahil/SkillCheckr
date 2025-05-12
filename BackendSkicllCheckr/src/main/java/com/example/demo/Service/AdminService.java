@@ -15,15 +15,16 @@ import com.example.demo.Model.*;
 public interface AdminService {
 
 	    boolean addTeacherFromRequest(int request_id);
-	    
 	    boolean addStudentFromRequest(int request_id);
+//	    System.out.println(" "+ boolean addStudentFrom);
 	    boolean isUsernameExist(String username);
 	    public  List<Teacher> getAllTeacher();
 	    public  List<Student> getAllStudent();
 	    
 	    public boolean deleteTeacherbyId(int Teacher_id);
 	    public boolean deleteStudentid(int Student_id);
-	    
+		public String getUsernameByRequestId(int requestId);
+	   
 	   
 	
 	

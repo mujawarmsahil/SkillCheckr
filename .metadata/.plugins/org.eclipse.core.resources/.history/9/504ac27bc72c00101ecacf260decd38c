@@ -1,0 +1,206 @@
+package com.example.demo.Repository;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import javax.sql.DataSource;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+import com.example.demo.Model.Exams;
+import com.example.demo.Model.Subject;
+
+@Repository
+public class AddExamsRepositoryImpl implements AddExamsRepository {
+
+	@Autowired
+	private DataSource dataSource;
+
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+
+	@Override
+	public Subject saveAllExams(Exams exam) {
+		try {
+			//  Validate input step 1 
+			if (exam.getDate() == null || exam.getDate().isEmpty()) {
+				System.err.println("Error: Exam date is null or empty.");
+				return null;
+			}
+
+			if (exam.getStart_time() == null || exam.getEnd_time() == null) {
+				System.err.println("Error: Start time or End time is null.");
+				return null;
+			}
+
+			String subjectCode = exam.getSubject().getSubjectCode();
+			int subjectId;
+
+			// Step 2: Check if subject exists
+			String checkSubjectQuery = "SELECT COUNT(*) FROM subject WHERE subject_code = ?";
+			int count = jdbcTemplate.queryForObject(checkSubjectQuery, new Object[]{subjectCode}, Integer.class);
+
+			if (count > 0) {
+				String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ?";
+				subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, new Object[]{subjectCode}, Integer.class);
+			} else {
+				String insertSubjectQuery = "INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)";
+				jdbcTemplate.update(insertSubjectQuery, exam.getSubject().getSubjectName(), subjectCode);
+
+				String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ?";
+				subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, new Object[]{subjectCode}, Integer.class);
+			}
+			
+			
+			 // Step 3: Validate teacher ID
+	        String checkTeacherQuery = "SELECT COUNT(*) FROM teacher WHERE teacher_id = ?";
+	        int teacherCount = jdbcTemplate.queryForObject(checkTeacherQuery, new Object[]{exam.getTeacher_id()}, Integer.class);
+
+	        if (teacherCount == 0) {
+	            System.err.println("Teacher ID is not valid.");
+	            return null; // Invalid teacher ID, so return null or handle accordingly.
+	        }
+
+			
+		
+
+			// Step 4: Prepare data for exam insert
+			if (exam.getStatus() == null || exam.getStatus().isEmpty()) {
+				exam.setStatus("Pending");
+			}
+
+			Timestamp examDate = Timestamp.valueOf(LocalDateTime.parse(exam.getDate()));
+
+			// Step 5: Insert exam
+			String insertExamQuery = "INSERT INTO exam (subject_id, teacher_id, exam_name, exam_date, duration_minutes, total_marks, pass_marks, status, start_time, end_time) "
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+			jdbcTemplate.update(
+				insertExamQuery,
+				subjectId,
+				exam.getTeacher_id(),
+				exam.getExam_name(),
+				examDate,
+				exam.getDuration_minuets(),
+				exam.getTotal_marks(),
+				exam.getPassing_marks(),
+				exam.getStatus(),
+				exam.getStart_time(),
+				exam.getEnd_time()
+			);
+
+			// Step 6: Return subject info
+			Subject subject = new Subject();
+			subject.setSubjectId(subjectId);
+			subject.setSubjectName(exam.getSubject().getSubjectName());
+			subject.setSubjectCode(subjectCode);
+
+			return subject;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+
+	
+	@Override
+	public boolean deleteByIdExam(int examId) {
+	    try {
+	        // 1. Get subject_id using exam_id
+	        String getSubjectIdSql = "SELECT subject_id FROM exam WHERE exam_id = ?";
+	        Integer subjectId = jdbcTemplate.queryForObject(getSubjectIdSql, Integer.class, examId);
+
+	        if (subjectId == null) {
+	            return false; // exam not found
+	        }
+
+	        // 2. Get all question_ids for this subject
+	        String getQuestionIdsSql = "SELECT question_id FROM question WHERE subject_id = ?";
+	        List<Integer> questionIds = jdbcTemplate.query(getQuestionIdsSql,
+	                (rs, rowNum) -> rs.getInt("question_id"), subjectId);
+
+	        // 3. Delete answers for each question_id
+	        for (Integer qid : questionIds) {
+	            jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", qid);
+	        }
+
+	        // 4. Delete all questions for the subject
+	        jdbcTemplate.update("DELETE FROM question WHERE subject_id = ?", subjectId);
+
+	        // 5. Delete the subject
+	        jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId);
+
+	        // 6. Finally, delete the exam
+	        jdbcTemplate.update("DELETE FROM exam WHERE exam_id = ?", examId);
+
+	        return true; // successful
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        return false; // if any error occurs
+	    }
+	}
+
+
+	@Override
+	public boolean upComingExam(int exam_id) {
+		// TODO Auto-generated method stub
+		
+		String sql = "UPDATE exam SET status = 'Upcoming' WHERE exam_id = ?";
+				int rowsAffected = jdbcTemplate.update(sql,exam_id);
+				
+		return rowsAffected>0? true :false;
+	}
+
+
+	@Override
+	public List<Exams> viewAllcomingExam() {
+		// TODO Auto-generated method stub
+		
+		
+		return null;
+	}
+	@Override
+	public List<Exams> viewAllExams() {
+	    String query = "SELECT * FROM exam";
+
+	    List<Exams> list = jdbcTemplate.query(query, new RowMapper<Exams>() {
+	        @Override
+	        public Exams mapRow(ResultSet rs, int rowNum) throws SQLException {
+	            Exams exam = new Exams();
+	            exam.setExam_id(rs.getInt("exam_id"));
+	            exam.setTeacher_id(rs.getInt("teacher_id"));
+	            exam.setExam_name(rs.getString("exam_name"));
+	            exam.setDate(rs.getString("exam_date"));
+	            exam.setStatus(rs.getString("status"));
+
+	            java.sql.Time sqlStartTime = rs.getTime("start_time");
+	            java.sql.Time sqlEndTime = rs.getTime("end_time");
+
+	            if (sqlStartTime != null)
+	                exam.setStart_time(sqlStartTime.toLocalTime());
+	            if (sqlEndTime != null)
+	                exam.setEnd_time(sqlEndTime.toLocalTime());
+
+	            // Optional fields - only if you want to send them to frontend
+	            exam.setDuration_minuets(rs.getInt("duration_minutes"));
+	            exam.setTotal_marks(rs.getInt("total_marks"));
+	            exam.setPassing_marks(rs.getInt("pass_marks"));
+
+	            return exam;
+	        }
+	    });
+
+	    return list;
+	}
+
+
+
+}

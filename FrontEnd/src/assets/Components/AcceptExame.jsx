@@ -19,21 +19,33 @@ export default function AcceptExame() {
   }, []);
 
   const updateStatus = async (id) => {
+    const selectedExam = actionExam.find((exam) => exam.exam_id === id);
+    if (!selectedExam) return;
+    if (
+      selectedExam.status === "Upcoming" ||
+      selectedExam.status === "Accepted"
+    ) {
+      {
+        alert("Exam already accepted");
+        return;
+      }
+    }
     try {
       const response = await axios.post(
-        `http://localhost:8080/api/Exams/upComingExam/${id}`,
-        { status: "Accepted" }
+        `http://localhost:8080/api/Exams/upComingExamStatus/${id}`
       );
+      if (response.status === 200) {
+        alert("Exam Accepted successfully");
+        const updatedExams = actionExam.map((exam) =>
+          exam.exam_id === id ? { ...exam, status: "Upcoming" } : exam
+        );
+        setExamsStatus(updatedExams);
+      }
     } catch (error) {
       console.error("Error updating status:", error);
     }
-
-    // setExamsStatus(
-    //   actionExam.map((exams) =>
-    //     exams.id === id ? { ...exams, Status: status } : exams
-    //   )
-    // );
   };
+
   const deleteExams = async (id) => {
     try {
       const response = await axios.delete(

@@ -15,8 +15,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-
-import com.example.demo.Model.*;
+import com.example.demo.Model.Student;
+import com.example.demo.Model.Teacher;
 
 @Repository
 public class AdminRepositoryImpl implements AdminRepository {
@@ -26,6 +26,73 @@ public class AdminRepositoryImpl implements AdminRepository {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+	
+	@Override
+	public boolean addStudentFromRequest(int request_id) {
+		// TODO Auto-generated method stub
+		try(Connection conn = dataSource.getConnection()){
+			String selectsql = "SELECT *FROM request WHERE request_id=?";
+
+			PreparedStatement psSelect = conn.prepareStatement(selectsql);
+			psSelect.setInt(1, request_id);
+			ResultSet rs = psSelect.executeQuery();
+			if(!rs.next())return false;
+			String username = rs.getString("username");
+			String password = rs.getString("password");
+			String role = rs.getString("requested_role");
+			String name = rs.getString("name");
+			String contact = rs.getString("contact");
+			String email = rs.getString("email");
+			
+			
+
+			String checkUserSql = " SELECT *FROM user WHERE username =?";
+			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
+			psCheck.setString(1,username);
+			ResultSet checkResult = psCheck.executeQuery();
+			if(checkResult.next()) {
+				System.out.print("username alredy exits: "+username);
+				return false;// or new RuntimeException 
+			}
+			
+			
+			String insertUser = "INSERT INTO user (username, password, user_role) VALUES(?,?,?)";
+			PreparedStatement psUser = conn.prepareStatement(insertUser, PreparedStatement.RETURN_GENERATED_KEYS);
+			psUser.setString(1, username);
+			psUser.setString(2, password);
+			psUser.setString(3, role);
+			psUser.executeUpdate();
+			ResultSet genKeys = psUser.getGeneratedKeys();
+			if (!genKeys.next())
+				return false;
+			
+			int userId = genKeys.getInt(1);
+			
+			
+			String insertStudent = "INSERT INTO student(user_id, name, contact, email) VALUES(?,?,?,?)";
+			PreparedStatement psStudent = conn.prepareStatement(insertStudent);
+
+			psStudent.setInt(1, userId);
+			psStudent.setString(2, name);
+			psStudent.setString(3, contact);
+			psStudent.setString(4, email);
+			psStudent.executeUpdate();
+
+			// update the Status
+			String updateRequest = "UPDATE request SET status = 'Approved' WHERE request_id = ?";
+
+			PreparedStatement psUpdate = conn.prepareStatement(updateRequest);
+			psUpdate.setInt(1, request_id);
+			psUpdate.executeUpdate();
+
+			return true;
+		}catch(Exception e){
+			System.out.println("Show the Error : "+e);
+			return false;
+		}
+
+	}
+
 
 	@Override
 	public boolean addTeacherFromRequest(int requestId) {
@@ -54,6 +121,8 @@ public class AdminRepositoryImpl implements AdminRepository {
 				System.out.print("username alredy exits: "+username);
 				return false;// or new RuntimeException 
 			}
+			
+			
 			
 			
 			
@@ -94,75 +163,94 @@ public class AdminRepositoryImpl implements AdminRepository {
 	}
 	
 	
-	
-	
 
-	@Override
-	public boolean addStudentFromRequest(int requestId) {
-		
-		
-		try (Connection conn = dataSource.getConnection()) {
-			String selectsql = "SELECT *FROM request WHERE request_id=?";
-			PreparedStatement psSelect = conn.prepareStatement(selectsql);
-			psSelect.setInt(1, requestId);
-			ResultSet rs = psSelect.executeQuery();
-			if (!rs.next()) return false;
-			String username = rs.getString("username");
-			String password = rs.getString("password");
-			String role = rs.getString("requested_role");
-			String name = rs.getString("name");
-			String contact = rs.getString("contact");
-			String email = rs.getString("email");
-			
-			
-			String checkUserSql = " SELECT *FROM user WHERE username =?";
-			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
-			psCheck.setString(1,username);
-			ResultSet checkResult = psCheck.executeQuery();
-			if(checkResult.next()) {
-				System.out.print("username alredy exits: "+username);
-				return false;// or new RuntimeException 
-			}
-			
-			String insertUser = "INSERT INTO user (username, password, user_role) VALUES(?,?,?)";
-			PreparedStatement psUser = conn.prepareStatement(insertUser, PreparedStatement.RETURN_GENERATED_KEYS);
-			psUser.setString(1, username);
-			psUser.setString(2, password);
-			psUser.setString(3, role);
-			psUser.executeUpdate();
-			ResultSet genKeys = psUser.getGeneratedKeys();
-			if (!genKeys.next())
-				return false;
-			int userId = genKeys.getInt(1);
-			String insertStudent = "INSERT INTO student (user_id, name, contact, email) VALUES(?,?,?,?)";
-			PreparedStatement psStudent = conn.prepareStatement(insertStudent);
+//	@Override
+//	public boolean addStudentFromRequest(int requestId) {
+//
+//	    try (Connection conn = dataSource.getConnection()) {
+//
+//	        // Step 1: Get request data
+//	        String selectsql = "SELECT * FROM request WHERE request_id = ?";
+//	        PreparedStatement psSelect = conn.prepareStatement(selectsql);
+//	        psSelect.setInt(1, requestId);
+//	        ResultSet rs = psSelect.executeQuery();
+//
+//	        if (!rs.next()) return false;
+//
+//	        String username = rs.getString("username");
+//	        String password = rs.getString("password");
+//	        String role = rs.getString("requested_role");
+//	        String name = rs.getString("name");
+//	        String contact = rs.getString("contact");
+//	        String email = rs.getString("email");
+//
+//	        // Step 2: Check if username already exists in user table
+//	        String checkUserSql = "SELECT * FROM user WHERE username = ?";
+//	        PreparedStatement psCheckUser = conn.prepareStatement(checkUserSql);
+//	        psCheckUser.setString(1, username);
+//	        ResultSet checkUserResult = psCheckUser.executeQuery();
+//	        if (checkUserResult.next()) {
+//	            System.out.println("Username already exists: " + username);
+//	            return false;
+//	        }
+//
+//	        // Step 3: Check if contact or email already exists in student table
+//	        String checkStudentSql = "SELECT * FROM student WHERE contact = ? OR email = ?";
+//	        PreparedStatement psCheckStudent = conn.prepareStatement(checkStudentSql);
+//	        psCheckStudent.setString(1, contact);
+//	        psCheckStudent.setString(2, email);
+//	        ResultSet checkStudentResult = psCheckStudent.executeQuery();
+//	        if (checkStudentResult.next()) {
+//	            System.out.println("Duplicate contact or email found. Contact: " + contact + ", Email: " + email);
+//	            return false;
+//	        }
+//
+//	        // Step 4: Insert into user table
+//	        String insertUser = "INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)";
+//	        PreparedStatement psUser = conn.prepareStatement(insertUser, PreparedStatement.RETURN_GENERATED_KEYS);
+//	        psUser.setString(1, username);
+//	        psUser.setString(2, password);
+//	        psUser.setString(3, role);
+//	        psUser.executeUpdate();
+//
+//	        ResultSet genKeys = psUser.getGeneratedKeys();
+//	        if (!genKeys.next()) return false;
+//	        int userId = genKeys.getInt(1);
+//
+//	        System.out.println("Generated user_id: " + userId);
+//
+//	        // Step 5: Insert into student table
+//	        String insertStudent = "INSERT INTO student (user_id, name, contact, email) VALUES (?, ?, ?, ?)";
+//	        PreparedStatement psStudent = conn.prepareStatement(insertStudent);
+//	        psStudent.setInt(1, userId);
+//	        psStudent.setString(2, name);
+//	        psStudent.setString(3, contact);
+//	        psStudent.setString(4, email);
+//	        psStudent.executeUpdate();
+//
+//	        System.out.println("Student added successfully: " + name);
+//
+//	        // Step 6: Update request status
+//	        String updateRequest = "UPDATE request SET status = 'Approved' WHERE request_id = ?";
+//	        PreparedStatement psUpdate = conn.prepareStatement(updateRequest);
+//	        psUpdate.setInt(1, requestId);
+//	        psUpdate.executeUpdate();
+//
+//	        return true;
+//
+//	    } catch (Exception e) {
+//	        System.out.println("Error while adding student:");
+//	        e.printStackTrace();  // Show full error
+//	        return false;
+//	    }
+//	}
 
-			psStudent.setInt(1, userId);
-			psStudent.setString(2, name);
-			psStudent.setString(3, contact);
-			psStudent.setString(4, email);
-			psStudent.executeUpdate();
 
-			String updateRequest = "UPDATE request SET status = 'Approved' WHERE request_id = ?";
-			PreparedStatement psUpdate = conn.prepareStatement(updateRequest);
-			psUpdate.setInt(1, requestId);
-			psUpdate.executeUpdate();
-			return true;
-
-		} catch (Exception e) {
-			System.out.println(" Errror While adding Student  " + e.getMessage());
-
-			return false;
-		}
-
-	}
-
-
-	@Override
-	public boolean changeExamStatus(int examId, String status) {
-		// TODO Auto-generated method stub
-		return false;
-	}
+//	@Override
+//	public boolean changeExamStatus(int examId, String status) {
+//		// TODO Auto-generated method stub
+//		return false;
+//	}
 	
 	
 
@@ -274,5 +362,27 @@ public class AdminRepositoryImpl implements AdminRepository {
 		    }
 //		return false;
 	}
+	
+	
+	@Override
+	public String getUsernameByRequestId(int requestId) {
+	    String username = null;
+	    try (Connection con = dataSource.getConnection()) {
+	        PreparedStatement ps = con.prepareStatement("SELECT username FROM request WHERE request_id = ?");
+	        ps.setInt(1, requestId);
+	        ResultSet rs = ps.executeQuery();
+	        if (rs.next()) {
+	            username = rs.getString("username");
+	        }
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+	    return username;
+	}
+
+
+
+	
+
 
 }

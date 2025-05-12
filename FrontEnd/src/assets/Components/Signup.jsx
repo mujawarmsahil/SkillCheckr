@@ -52,8 +52,9 @@ export default function Signup() {
 
     setErrorss(valiDationatErrors);
     if (Object.keys(valiDationatErrors).length === 0) {
-      // axios.post("http://localhost:8080/api/request/save", user)
-      axios
+      // axios
+        // .post("http://localhost:8080/api/requests/save", user)
+        axios
         .post("http://localhost:8080/api/requests/save", user)
 
         .then((response) => {

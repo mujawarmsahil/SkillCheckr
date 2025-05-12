@@ -15,6 +15,8 @@ public interface AddExamsRepository {
 	public boolean deleteByIdExam(int exam_id);
 	
 	public boolean upComingExam(int exam_id);
+	public List<Exams> viewAllcomingExam();
+	public List<Exams> viewAllCompletedExam();
 	
 
 	

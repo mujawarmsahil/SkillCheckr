@@ -74,7 +74,7 @@ public class AddExamsConntroller {
 	}
 	
 	
-	@PostMapping("/upComingExam/{exam_id}")
+	@PostMapping("/upComingExamStatus/{exam_id}")
 	public ResponseEntity<String> upComingExams(@PathVariable Integer exam_id)
 	
 	{
@@ -93,11 +93,34 @@ public class AddExamsConntroller {
 		
 	}
 	
-	@PostMapping("/completedExam")
-	public ResponseEntity<?> completedExams()
-	{ 
 	
-	return null;
+	@GetMapping("/viewAllUpComingExam")
+	public ResponseEntity<?> viewuAllUpomingExam()
+	{
+		List<Exams> list = addExamsService.viewAllcomingExam();
+		if(list==null||list.isEmpty())
+		{
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No registration requests found.");
+		}
+		else {
+			System.out.println("Show the List of the All Exams View  "+list);
+			
+			return ResponseEntity.ok(list);
+		}
+		 
 	}
+	
+	@GetMapping("/viewAllCompletedExam")
+	public ResponseEntity<?> viewAllCompletedExams() {
+	    List<Exams> list = addExamsService.viewAllCompletedExam();
+
+	    if (list == null || list.isEmpty()) {
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No Any Data Found ");
+	    } else {
+	        System.out.println("Show the list of the Completed Exam");
+	        return ResponseEntity.ok(list);
+	    }
+	}
+
 
 }
