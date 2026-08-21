@@ -1,0 +1,143 @@
+package com.skillcheckr.controller;
+
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import com.skillcheckr.model.User;
+import com.skillcheckr.service.AuthService;
+
+@ExtendWith(MockitoExtension.class)
+class AuthControllerTest {
+
+    @Mock
+    private AuthService authService;
+
+    @InjectMocks
+    private AuthController authController;
+
+    private MockMvc mockMvc;
+
+    private static final String LOGIN_URL = "/api/authentication/login";
+    private static final String LOGIN_BODY = "{\"username\":\"%s\",\"password\":\"%s\"}";
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(authController).build();
+    }
+
+    private User userWith(String username, String role, int userId) {
+        User user = new User();
+        user.setUsername(username);
+        user.setRole(role);
+        user.setUserId(userId);
+        return user;
+    }
+
+    @Test
+    void login_returnsUnauthorized_whenUserDoesNotExist() throws Exception {
+        when(authService.login("ghost", "wrong")).thenReturn(null);
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("ghost", "wrong")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void login_returnsUnauthorized_whenCredentialsInvalidCauseEmptyResult() throws Exception {
+        when(authService.login("ghost", "bad"))
+                .thenThrow(new EmptyResultDataAccessException(1));
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("ghost", "bad")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void login_returnsStudentPayload_whenRoleIsStudent() throws Exception {
+        when(authService.login("student1", "pass")).thenReturn(userWith("student1", "Student", 10));
+        when(authService.getStudentIdByUserId(10)).thenReturn(7);
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("student1", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Login Successful"))
+                .andExpect(jsonPath("$.role").value("Student"))
+                .andExpect(jsonPath("$.userId").value(10))
+                .andExpect(jsonPath("$.roleId").value(7));
+
+        verify(authService).getStudentIdByUserId(10);
+        verify(authService, never()).getTeacherIdByUserId(anyInt());
+        verify(authService, never()).getAdminIdByUserId(anyInt());
+    }
+
+    @Test
+    void login_returnsTeacherPayload_whenRoleIsTeacher() throws Exception {
+        when(authService.login("teacher1", "pass")).thenReturn(userWith("teacher1", "Teacher", 20));
+        when(authService.getTeacherIdByUserId(20)).thenReturn(5);
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("teacher1", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("Teacher"))
+                .andExpect(jsonPath("$.roleId").value(5))
+                .andExpect(jsonPath("$.userId").value(20));
+
+        verify(authService).getTeacherIdByUserId(20);
+        verify(authService, never()).getStudentIdByUserId(anyInt());
+        verify(authService, never()).getAdminIdByUserId(anyInt());
+    }
+
+    @Test
+    void login_returnsAdminPayload_whenRoleIsAdmin() throws Exception {
+        when(authService.login("admin1", "pass")).thenReturn(userWith("admin1", "Admin", 30));
+        when(authService.getAdminIdByUserId(30)).thenReturn(1);
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("admin1", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("Admin"))
+                .andExpect(jsonPath("$.roleId").value(1))
+                .andExpect(jsonPath("$.userId").value(30));
+
+        verify(authService).getAdminIdByUserId(30);
+        verify(authService, never()).getStudentIdByUserId(anyInt());
+        verify(authService, never()).getTeacherIdByUserId(anyInt());
+    }
+
+    @Test
+    void login_returnsZeroRoleId_whenRoleIsUnknown() throws Exception {
+        when(authService.login("mystery", "pass")).thenReturn(userWith("mystery", "Supervisor", 40));
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("mystery", "pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleId").value(0))
+                .andExpect(jsonPath("$.userId").value(40));
+
+        verify(authService, never()).getStudentIdByUserId(anyInt());
+        verify(authService, never()).getTeacherIdByUserId(anyInt());
+        verify(authService, never()).getAdminIdByUserId(anyInt());
+    }
+}

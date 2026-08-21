@@ -5,49 +5,91 @@ import {
   createRoutesFromElements,
   Route,
   RouterProvider,
-  Routes,
+  Navigate,
 } from "react-router-dom";
 import "./index.css";
-import App from "./App.jsx";
-import Home from "./assets/Components/Home.jsx";
-import About from "./assets/Components/About.jsx";
-import Blog from "./assets/Components/Blog.jsx";
-import Contact from "./assets/Components/Contact.jsx";
-import Authentication from "./assets/Components/Authentication.jsx";
-import Dashboard from "./assets/Components/Dashboard.jsx";
-import Question from "./assets/Components/Question.jsx";
-import Create_Exams from "./assets/Components/Create_Exams.jsx";
-import ExamsQueOption from "./assets/Components/ExamsQueOpetion.jsx";
-import ProtectedRoute from "./assets/Components/ProtectedRoute.jsx";
+
+import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
+
+import App from "./App";
+import Home from "./components/public/Home";
+import About from "./components/public/About";
+import Blog from "./components/public/Blog";
+import Contact from "./components/public/Contact";
+import Authentication from "./components/auth/Authentication";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import DashboardPage from "./pages/DashboardPage";
+import TakeExam from "./components/student/TakeExam";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
+      {/* Public Pages with Layout Header & Footer */}
       <Route path="/" element={<App />}>
-        <Route path="" element={<Home />} />
+        <Route index element={<Home />} />
         <Route path="about" element={<About />} />
         <Route path="blog" element={<Blog />} />
         <Route path="contact" element={<Contact />} />
       </Route>
+
+      {/* Auth Entry */}
       <Route path="/authentication" element={<Authentication />} />
-      <Route path="/user/:role" element={<Dashboard />} />
-      <Route path="/question" element={<Question />} />
-      <Route path="/createExam" element={<Create_Exams />} />
-      <Route path="/studentExams" element={<ExamsQueOption />} />
+      <Route path="/login" element={<Navigate to="/authentication" replace />} />
+      <Route path="/signup" element={<Navigate to="/authentication" replace />} />
+
+      {/* Protected Role Dashboards */}
       <Route
         path="/dashboard/:role"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <DashboardPage />
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/user/:role"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Protected Student Exam Taking Interface */}
+      <Route
+        path="/take-exam/:examId"
+        element={
+          <ProtectedRoute allowedRoles={["Student", "Admin", "Teacher"]}>
+            <TakeExam />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/studentExams"
+        element={<Navigate to="/dashboard/student" replace />}
+      />
+      <Route
+        path="/createExam"
+        element={<Navigate to="/dashboard/teacher" replace />}
+      />
+      <Route
+        path="/question"
+        element={<Navigate to="/dashboard/teacher" replace />}
+      />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </>
   )
 );
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
+    </AuthProvider>
   </StrictMode>
 );

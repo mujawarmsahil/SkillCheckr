@@ -1,0 +1,52 @@
+#!/bin/bash
+# ==========================================================
+# SkillCheckr Pre-Commit Quality Gate
+# Prevents git commits if frontend or backend linting fails
+# ==========================================================
+
+set -e
+
+echo ""
+echo "=========================================================="
+echo " 🛡️  SkillCheckr Pre-Commit Quality Gate"
+echo "=========================================================="
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+# 1. FRONTEND LINTING (ESLint)
+echo "🔍 [1/2] Running Frontend ESLint checks..."
+if [ -d "$ROOT_DIR/frontend" ]; then
+    if (cd "$ROOT_DIR/frontend" && npm run lint); then
+        echo "   ✅ Frontend linting passed!"
+    else
+        echo ""
+        echo "   ❌ ERROR: Frontend ESLint validation failed!"
+        echo "   Please fix linting errors before committing (run 'npm run lint --prefix frontend')."
+        echo "=========================================================="
+        exit 1
+    fi
+else
+    echo "   ⚠️  Frontend folder not found, skipping."
+fi
+
+# 2. BACKEND LINTING & COMPILATION (Maven Checkstyle + Compiler)
+echo "🔍 [2/2] Running Backend Checkstyle & Compilation checks..."
+if [ -d "$ROOT_DIR/backend" ]; then
+    if (cd "$ROOT_DIR/backend" && ./mvnw checkstyle:check test-compile -q); then
+        echo "   ✅ Backend checkstyle and compilation passed!"
+    else
+        echo ""
+        echo "   ❌ ERROR: Backend checkstyle or compilation validation failed!"
+        echo "   Please fix code standard issues before committing (run './mvnw checkstyle:check' in backend)."
+        echo "=========================================================="
+        exit 1
+    fi
+else
+    echo "   ⚠️  Backend folder not found, skipping."
+fi
+
+echo "=========================================================="
+echo " 🎉 All quality checks passed! Proceeding with commit."
+echo "=========================================================="
+echo ""
+exit 0

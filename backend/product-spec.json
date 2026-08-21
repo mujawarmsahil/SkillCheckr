@@ -1,0 +1,96 @@
+{
+  "product": {
+    "name": "SkillCheckr",
+    "version": "2.0.0",
+    "description": "Next-Generation Academic Examination and Dual-Engine Skill Assessment Platform (MCQ & Descriptive Question-Answer)",
+    "type": "Fullstack Application",
+    "architecture": {
+      "backend": "Spring Boot 3.4.4 (Java 21)",
+      "frontend": "React 19 (Vite, TailwindCSS, React Router v7, Recharts)",
+      "database": "MySQL 8.x"
+    }
+  },
+  "scripts": {
+    "backend:dev": "./mvnw spring-boot:run",
+    "backend:build": "./mvnw clean package -DskipTests",
+    "backend:compile": "./mvnw clean compile",
+    "backend:test": "./mvnw test",
+    "backend:lint": "./mvnw checkstyle:check",
+    "frontend:dev": "npm run dev --prefix ../frontend",
+    "frontend:build": "npm run build --prefix ../frontend",
+    "frontend:lint": "npm run lint --prefix ../frontend",
+    "frontend:lint:fix": "npm run lint --prefix ../frontend -- --fix",
+    "all:lint": "npm run lint --prefix ../frontend && ./mvnw checkstyle:check test-compile",
+    "all:build": "npm run build --prefix ../frontend && ./mvnw clean package -DskipTests",
+    "pre-commit:check": "npm run lint --prefix ../frontend && ./mvnw checkstyle:check test-compile"
+  },
+  "modules": {
+    "authentication": {
+      "roles": ["Admin", "Teacher", "Student"],
+      "endpoints": {
+        "login": "POST /api/authentication/login",
+        "register": "POST /api/requests/save"
+      }
+    },
+    "examination_engine": {
+      "formats": {
+        "MCQ": {
+          "description": "Multiple Choice Questions with 4 options and automated instant scoring.",
+          "grading": "Instant automated scorecard generation with answer-key analysis."
+        },
+        "QUESTION_ANSWER": {
+          "description": "Theory/Subjective questions with reference rubric, word counters, and autosave draft.",
+          "grading": "Model rubric comparison and teacher evaluation workflow."
+        }
+      },
+      "endpoints": {
+        "create_exam": "POST /api/exams/addExams",
+        "add_questions": "POST /api/create/addQues",
+        "get_questions": "GET /api/exams/{id}/questions",
+        "submit_exam": "POST /api/results/submit",
+        "get_student_results": "GET /api/results/student/{studentId}"
+      }
+    },
+    "admin_console": {
+      "features": [
+        "Review and approve pending registration requests for teachers and students",
+        "Manage active user rosters and credentials",
+        "Approve teacher-submitted exams for student discovery",
+        "Monitor aggregate platform distribution statistics"
+      ],
+      "endpoints": {
+        "pending_requests": "GET /api/requests/viewAllRegisterUsers",
+        "approve_teacher": "POST /api/admin/addTeacher/{requestId}",
+        "approve_student": "POST /api/admin/addStudent/{requestId}",
+        "delete_request": "DELETE /api/requests/deleteById/{requestId}",
+        "all_teachers": "GET /api/admin/teachers",
+        "all_students": "GET /api/admin/students",
+        "approve_exam": "POST /api/exams/upComingExamStatus/{examId}",
+        "stats": "GET /api/admin/stats"
+      }
+    }
+  },
+  "database": {
+    "name": "exam_application_system",
+    "schema_file": "src/main/resources/schema.sql",
+    "tables": [
+      "user",
+      "admin",
+      "teacher",
+      "student",
+      "request",
+      "subject",
+      "exam",
+      "question",
+      "answer",
+      "result"
+    ]
+  },
+  "code_quality": {
+    "frontend_linter": "eslint (v9.x)",
+    "backend_linter": "maven-checkstyle-plugin (v3.4.0)",
+    "git_hooks": {
+      "pre-commit": "Enforces frontend ESLint check and backend checkstyle/compilation before any commit"
+    }
+  }
+}

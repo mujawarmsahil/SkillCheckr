@@ -1,7 +1,6 @@
-import Layout from "./Layout";
+import React from "react";
+import Layout from "./components/layout/Layout";
 
 export default function App() {
-  return (
-    <Layout/>
-  );
+  return <Layout />;
 }

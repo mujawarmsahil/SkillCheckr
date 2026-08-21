@@ -1,40 +1,20 @@
 {
-  "name": "frontend",
+  "name": "skillcheckr-workspace",
+  "version": "2.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "description": "SkillCheckr Monorepo Workspace - Spring Boot + React Vite",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "cd backend && ./mvnw spring-boot:run",
+    "build": "npm run build --prefix frontend && cd backend && ./mvnw clean package -DskipTests",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "cd backend && ./mvnw clean package -DskipTests",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "npm run lint --prefix frontend",
+    "lint:backend": "cd backend && ./mvnw checkstyle:check",
+    "test": "cd backend && ./mvnw test",
+    "install:hooks": "cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit",
+    "precommit": "./.git/hooks/pre-commit"
   },
-  "dependencies": {
-    "@reduxjs/toolkit": "^2.6.1",
-    "axios": "^1.8.4",
-    "bootstrap": "^5.3.3",
-    "jquery": "^3.7.1",
-    "node-fetch": "^3.3.2",
-    "react": "^19.1.0",
-    "react_redux": "^1.2.1",
-    "react-dom": "^19.1.0",
-    "react-redux": "^9.2.0",
-    "react-router-dom": "^7.4.0",
-    "react-slick": "^0.30.3",
-    "recharts": "^2.15.1"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.21.0",
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.21",
-    "eslint": "^9.21.0",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "globals": "^15.15.0",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.17",
-    "vite": "^6.2.0"
-  }
+  "keywords": ["exam", "education", "spring-boot", "react", "assessment"]
 }
