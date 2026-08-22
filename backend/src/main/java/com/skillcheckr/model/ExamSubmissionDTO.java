@@ -39,4 +39,16 @@ public class ExamSubmissionDTO {
 	@JsonProperty("text_answers")
 	@JsonAlias({"textAnswers", "descriptiveAnswers"})
 	private Map<String, String> textAnswers; // questionId -> written text answer
+
+	@JsonProperty("violations_count")
+	@JsonAlias({"violationsCount", "violations"})
+	private int violationsCount;
+
+	@JsonProperty("is_disqualified")
+	@JsonAlias({"isDisqualified", "disqualified"})
+	private boolean disqualified;
+
+	@JsonProperty("disqualification_reason")
+	@JsonAlias({"disqualificationReason"})
+	private String disqualificationReason;
 }

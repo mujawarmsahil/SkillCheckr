@@ -11,5 +11,7 @@ public interface ResultRepository {
 
 	List<ExamResultDTO> getResultsByStudentId(int studentId);
 
+	ExamResultDTO getResultByExamAndStudent(int examId, int studentId);
+
 	List<ExamResultDTO> getAllResults();
 }

@@ -34,11 +34,34 @@ public class ResultController {
 						.body(Map.of("message", "Invalid submission data: exam ID is required"));
 			}
 
+			// Prevent duplicate submission if already exists
+			int studentId = submission.getStudentId();
+			int examId = submission.getExamId();
+			if (studentId > 0 && examId > 0) {
+				ExamResultDTO existing = resultService.getResultByExamAndStudent(examId, studentId);
+				if (existing != null) {
+					return ResponseEntity.ok(existing);
+				}
+			}
+
 			ExamResultDTO result = resultService.submitExam(submission);
 			return ResponseEntity.ok(result);
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body(Map.of("message", "Error submitting exam: " + e.getMessage()));
+		}
+	}
+
+	@GetMapping("/check/{examId}/{studentId}")
+	public ResponseEntity<?> checkStudentExamStatus(@PathVariable("examId") Integer examId, @PathVariable("studentId") Integer studentId) {
+		try {
+			ExamResultDTO existing = resultService.getResultByExamAndStudent(examId, studentId);
+			if (existing != null) {
+				return ResponseEntity.ok(Map.of("hasSubmitted", true, "result", existing));
+			}
+			return ResponseEntity.ok(Map.of("hasSubmitted", false));
+		} catch (Exception e) {
+			return ResponseEntity.ok(Map.of("hasSubmitted", false));
 		}
 	}
 

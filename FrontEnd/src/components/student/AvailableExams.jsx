@@ -1,28 +1,58 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 
 export default function AvailableExams() {
   const [exams, setExams] = useState([]);
+  const [submittedExamsMap, setSubmittedExamsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("ALL"); // ALL, MCQ, QUESTION_ANSWER
+  const { user } = useAuth();
   const { showError } = useToast();
   const navigate = useNavigate();
 
   const fetchUpcomingExams = useCallback(async () => {
     setLoading(true);
     try {
+      const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
+
+      // 1. Fetch upcoming exams
       const res = await apiClient.get("/api/exams/viewAllUpComingExam");
-      setExams(Array.isArray(res.data) ? res.data : []);
+      const fetchedExams = Array.isArray(res.data) ? res.data : [];
+      setExams(fetchedExams);
+
+      // 2. Fetch student's completed results to enforce single attempt policy
+      try {
+        const resultsRes = await apiClient.get(`/api/results/student/${studentId}`);
+        const results = Array.isArray(resultsRes.data) ? resultsRes.data : [];
+        const map = {};
+        results.forEach((r) => {
+          const eId = r.exam_id || r.examId;
+          if (eId) {
+            map[eId] = r;
+          }
+        });
+        setSubmittedExamsMap(map);
+      } catch {
+        // Fallback: check local storage results cache if offline
+        try {
+          const localKey = `submitted_results_${studentId}`;
+          const localResults = JSON.parse(localStorage.getItem(localKey) || "{}");
+          setSubmittedExamsMap(localResults);
+        } catch {
+          // ignore
+        }
+      }
     } catch (err) {
       showError(err.message || "Failed to fetch upcoming exams");
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  }, [user?.roleId, showError]);
 
   useEffect(() => {
     fetchUpcomingExams();
@@ -48,7 +78,7 @@ export default function AvailableExams() {
           Available Examinations
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Select an active examination to test your proficiency
+          Select an active examination to test your proficiency (Single-attempt policy enforced)
         </p>
       </div>
 
@@ -110,10 +140,15 @@ export default function AvailableExams() {
             const totalMarks = exam.total_marks || exam.totalMarks || 100;
             const passMarks = exam.passing_marks || exam.passingMarks || 40;
 
+            const existingResult = submittedExamsMap[examId];
+            const isSubmitted = !!existingResult;
+
             return (
               <div
                 key={examId}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4"
+                className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4 ${
+                  isSubmitted ? "border-emerald-300 bg-emerald-50/20" : "border-slate-200"
+                }`}
               >
                 {/* Card Header */}
                 <div className="space-y-2">
@@ -121,13 +156,21 @@ export default function AvailableExams() {
                     <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
                       {subjectName}
                     </span>
-                    <span
-                      className={`text-xs font-bold px-2.5 py-1 rounded-md ${
-                        isMcq ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
-                      }`}
-                    >
-                      {isMcq ? "MCQ Exam" : "Q&A (Theory)"}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {isSubmitted && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                          <Icon name="check-circle" className="w-3.5 h-3.5" />
+                          Submitted
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-md ${
+                          isMcq ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {isMcq ? "MCQ Exam" : "Q&A (Theory)"}
+                      </span>
+                    </div>
                   </div>
 
                   <h3 className="font-bold text-slate-900 text-base leading-snug">
@@ -151,25 +194,56 @@ export default function AvailableExams() {
                   </div>
                 </div>
 
-                {/* Start Exam CTA */}
-                <button
-                  onClick={() =>
-                    navigate(`/take-exam/${examId}`, {
-                      state: {
-                        examId,
-                        examName: exam.exam_name || exam.examName,
-                        examType,
-                        subjectName,
-                        durationMinutes: duration,
-                        totalMarks,
-                        passingMarks: passMarks,
-                      },
-                    })
-                  }
-                  className="w-full py-2.5 px-4 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-                >
-                  Start Examination →
-                </button>
+                {/* Action CTA: Disabled when exam is already completed */}
+                {isSubmitted ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-2.5 px-4 bg-slate-100 border border-slate-200 text-slate-400 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2"
+                      title="You have already completed this examination."
+                    >
+                      <Icon name="check-circle" className="w-4 h-4 text-emerald-500" />
+                      <span>Exam Completed</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/take-exam/${examId}`, {
+                          state: {
+                            examId,
+                            examName: exam.exam_name || exam.examName,
+                            examType,
+                            subjectName,
+                          },
+                        })
+                      }
+                      className="w-full py-1.5 px-3 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors text-center"
+                    >
+                      View Scorecard ({existingResult.marksObtained}/{existingResult.totalMarks}) →
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(`/take-exam/${examId}`, {
+                        state: {
+                          examId,
+                          examName: exam.exam_name || exam.examName,
+                          examType,
+                          subjectName,
+                          durationMinutes: duration,
+                          totalMarks,
+                          passingMarks: passMarks,
+                        },
+                      })
+                    }
+                    className="w-full py-2.5 px-4 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    Start Examination →
+                  </button>
+                )}
               </div>
             );
           })}

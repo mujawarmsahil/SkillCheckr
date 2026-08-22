@@ -26,6 +26,11 @@ public class ResultServiceImpl implements ResultService {
 	}
 
 	@Override
+	public ExamResultDTO getResultByExamAndStudent(int examId, int studentId) {
+		return resultRepository.getResultByExamAndStudent(examId, studentId);
+	}
+
+	@Override
 	public List<ExamResultDTO> getAllResults() {
 		return resultRepository.getAllResults();
 	}

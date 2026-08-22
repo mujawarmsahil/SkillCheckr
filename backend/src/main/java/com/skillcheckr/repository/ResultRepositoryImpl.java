@@ -124,8 +124,17 @@ public class ResultRepositoryImpl implements ResultRepository {
 			marksObtained = totalMarks; // Default pending teacher grading
 		}
 
-		double percentage = totalMarks > 0 ? ((double) marksObtained / totalMarks) * 100.0 : 0.0;
-		String status = isMcq ? (marksObtained >= passingMarks ? "Pass" : "Fail") : "Submitted for Evaluation";
+		double percentage;
+		String status;
+
+		if (submission.isDisqualified()) {
+			marksObtained = 0;
+			percentage = 0.0;
+			status = "Disqualified: " + (submission.getDisqualificationReason() != null ? submission.getDisqualificationReason() : "Academic Integrity Violation");
+		} else {
+			percentage = totalMarks > 0 ? ((double) marksObtained / totalMarks) * 100.0 : 0.0;
+			status = isMcq ? (marksObtained >= passingMarks ? "Pass" : "Fail") : "Submitted for Evaluation";
+		}
 
 		String nowFormatted = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 		int resultId = resultIdSequence.incrementAndGet();
@@ -153,6 +162,9 @@ public class ResultRepositoryImpl implements ResultRepository {
 				.passingMarks(passingMarks)
 				.percentage(Math.round(percentage * 100.0) / 100.0)
 				.status(status)
+				.violationsCount(submission.getViolationsCount())
+				.disqualified(submission.isDisqualified())
+				.disqualificationReason(submission.getDisqualificationReason())
 				.submittedAt(nowFormatted)
 				.questionBreakdown(breakdown)
 				.build();
@@ -201,6 +213,49 @@ public class ResultRepositoryImpl implements ResultRepository {
 		}
 
 		return new ArrayList<>();
+	}
+
+	@Override
+	public ExamResultDTO getResultByExamAndStudent(int examId, int studentId) {
+		List<ExamResultDTO> cached = studentResultsCache.get(studentId);
+		if (cached != null) {
+			for (ExamResultDTO r : cached) {
+				if (r.getExamId() == examId) {
+					return r;
+				}
+			}
+		}
+
+		try {
+			ensureResultTableExists();
+			String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name "
+					+ "FROM result r "
+					+ "LEFT JOIN exam e ON r.exam_id = e.exam_id "
+					+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
+					+ "WHERE r.exam_id = ? AND r.student_id = ? ORDER BY r.result_id DESC LIMIT 1";
+			List<ExamResultDTO> list = jdbcTemplate.query(sql, (rs, rowNum) -> ExamResultDTO.builder()
+					.resultId(rs.getInt("result_id"))
+					.examId(rs.getInt("exam_id"))
+					.examName(rs.getString("exam_name"))
+					.examType(rs.getString("exam_type") != null ? rs.getString("exam_type") : "MCQ")
+					.subjectName(rs.getString("subject_name"))
+					.studentId(rs.getInt("student_id"))
+					.marksObtained(rs.getInt("marks_obtained"))
+					.totalMarks(rs.getInt("total_marks"))
+					.passingMarks(rs.getInt("passing_marks"))
+					.percentage(rs.getDouble("percentage"))
+					.status(rs.getString("status"))
+					.submittedAt(rs.getString("submitted_at"))
+					.build(), examId, studentId);
+
+			if (!list.isEmpty()) {
+				return list.get(0);
+			}
+		} catch (Exception e) {
+			System.err.println("Could not query student exam result: " + e.getMessage());
+		}
+
+		return null;
 	}
 
 	@Override

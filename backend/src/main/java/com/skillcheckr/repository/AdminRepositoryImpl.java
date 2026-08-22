@@ -13,6 +13,7 @@ import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.Student;
@@ -26,6 +27,9 @@ public class AdminRepositoryImpl implements AdminRepository {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	private PasswordEncoder passwordEncoder;
 
 	@Override
 	public boolean addStudentFromRequest(int requestId) {
@@ -43,6 +47,11 @@ public class AdminRepositoryImpl implements AdminRepository {
 			String contact = rs.getString("contact");
 			String email = rs.getString("email");
 
+			// Ensure BCrypt hashed password
+			String encodedPassword = (password != null && (password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$")))
+				? password
+				: passwordEncoder.encode(password);
+
 			// Check if username already exists
 			String checkUserSql = "SELECT user_id FROM user WHERE username = ?";
 			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
@@ -55,7 +64,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 				String insertUser = "INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)";
 				PreparedStatement psUser = conn.prepareStatement(insertUser, PreparedStatement.RETURN_GENERATED_KEYS);
 				psUser.setString(1, username);
-				psUser.setString(2, password);
+				psUser.setString(2, encodedPassword);
 				psUser.setString(3, role);
 				psUser.executeUpdate();
 				ResultSet genKeys = psUser.getGeneratedKeys();
@@ -108,6 +117,11 @@ public class AdminRepositoryImpl implements AdminRepository {
 			String contact = rs.getString("contact");
 			String email = rs.getString("email");
 
+			// Ensure BCrypt hashed password
+			String encodedPassword = (password != null && (password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$")))
+				? password
+				: passwordEncoder.encode(password);
+
 			// Check if username already exists
 			String checkUserSql = "SELECT user_id FROM user WHERE username = ?";
 			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
@@ -120,7 +134,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 				String insertUser = "INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)";
 				PreparedStatement psUser = conn.prepareStatement(insertUser, PreparedStatement.RETURN_GENERATED_KEYS);
 				psUser.setString(1, username);
-				psUser.setString(2, password);
+				psUser.setString(2, encodedPassword);
 				psUser.setString(3, role);
 				psUser.executeUpdate();
 				ResultSet genKeys = psUser.getGeneratedKeys();
@@ -173,13 +187,13 @@ public class AdminRepositoryImpl implements AdminRepository {
 		return jdbcTemplate.query("SELECT * FROM teacher ORDER BY teacher_id DESC", new RowMapper<Teacher>() {
 			@Override
 			public Teacher mapRow(ResultSet rs, int rowNum) throws SQLException {
-				Teacher t = new Teacher();
-				t.setTeacherId(rs.getInt("teacher_id"));
-				try { t.setUserId(rs.getInt("user_id")); } catch (Exception ignored) {}
-				t.setTeacherName(rs.getString("name"));
-				try { t.setTeacherContact(rs.getString("contact")); } catch (Exception ignored) {}
-				t.setTeacherEmail(rs.getString("email"));
-				return t;
+				Teacher teacher = new Teacher();
+				teacher.setTeacherId(rs.getInt("teacher_id"));
+				teacher.setUserId(rs.getInt("user_id"));
+				teacher.setTeacherName(rs.getString("name"));
+				teacher.setTeacherEmail(rs.getString("email"));
+				teacher.setTeacherContact(rs.getString("contact"));
+				return teacher;
 			}
 		});
 	}
@@ -189,12 +203,12 @@ public class AdminRepositoryImpl implements AdminRepository {
 		return jdbcTemplate.query("SELECT * FROM student ORDER BY student_id DESC", new RowMapper<Student>() {
 			@Override
 			public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
-				Student s = new Student();
-				s.setStudentId(rs.getInt("student_id"));
-				s.setStudentName(rs.getString("name"));
-				try { s.setStudentContact(rs.getString("contact")); } catch (Exception ignored) {}
-				s.setStudentEmail(rs.getString("email"));
-				return s;
+				Student student = new Student();
+				student.setStudentId(rs.getInt("student_id"));
+				student.setStudentName(rs.getString("name"));
+				student.setStudentEmail(rs.getString("email"));
+				student.setStudentContact(rs.getString("contact"));
+				return student;
 			}
 		});
 	}
@@ -202,14 +216,12 @@ public class AdminRepositoryImpl implements AdminRepository {
 	@Override
 	public boolean deleteTeacherById(int teacherId) {
 		try {
-			String getUserIdQuery = "SELECT user_id FROM teacher WHERE teacher_id = ?";
-			List<Integer> userIds = jdbcTemplate.query(getUserIdQuery, (rs, rowNum) -> rs.getInt("user_id"), teacherId);
-
+			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM teacher WHERE teacher_id = ?",
+				(rs, rowNum) -> rs.getInt("user_id"), teacherId);
 			int teacherDeleted = jdbcTemplate.update("DELETE FROM teacher WHERE teacher_id = ?", teacherId);
-			if (!userIds.isEmpty() && userIds.get(0) > 0) {
+			if (!userIds.isEmpty() && teacherDeleted > 0) {
 				jdbcTemplate.update("DELETE FROM user WHERE user_id = ?", userIds.get(0));
 			}
-
 			return teacherDeleted > 0;
 		} catch (Exception e) {
 			System.err.println("Error deleting teacher: " + e.getMessage());
@@ -220,14 +232,12 @@ public class AdminRepositoryImpl implements AdminRepository {
 	@Override
 	public boolean deleteStudentById(int studentId) {
 		try {
-			String getUserIdQuery = "SELECT user_id FROM student WHERE student_id = ?";
-			List<Integer> userIds = jdbcTemplate.query(getUserIdQuery, (rs, rowNum) -> rs.getInt("user_id"), studentId);
-
+			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM student WHERE student_id = ?",
+				(rs, rowNum) -> rs.getInt("user_id"), studentId);
 			int studentDeleted = jdbcTemplate.update("DELETE FROM student WHERE student_id = ?", studentId);
-			if (!userIds.isEmpty() && userIds.get(0) > 0) {
+			if (!userIds.isEmpty() && studentDeleted > 0) {
 				jdbcTemplate.update("DELETE FROM user WHERE user_id = ?", userIds.get(0));
 			}
-
 			return studentDeleted > 0;
 		} catch (Exception e) {
 			System.err.println("Error deleting student: " + e.getMessage());
@@ -239,8 +249,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 	public String getUsernameByRequestId(int requestId) {
 		try {
 			String sql = "SELECT username FROM request WHERE request_id = ?";
-			List<String> list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("username"), requestId);
-			return list.isEmpty() ? null : list.get(0);
+			return jdbcTemplate.queryForObject(sql, String.class, requestId);
 		} catch (Exception e) {
 			return null;
 		}
@@ -266,7 +275,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 			stats.put("completedExams", completedExams != null ? completedExams : 0);
 			stats.put("pendingRequests", pendingRequests != null ? pendingRequests : 0);
 		} catch (Exception e) {
-			System.err.println("Error calculating admin stats: " + e.getMessage());
+			System.err.println("Error gathering admin stats: " + e.getMessage());
 		}
 		return stats;
 	}

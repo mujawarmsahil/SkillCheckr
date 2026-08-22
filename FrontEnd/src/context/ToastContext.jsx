@@ -1,24 +1,41 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useRef } from "react";
 import { Icon } from "../components/common/Icons";
 
 const ToastContext = createContext(null);
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const activeMessagesRef = useRef(new Set());
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => {
+      const toastToRemove = prev.find((t) => t.id === id);
+      if (toastToRemove) {
+        activeMessagesRef.current.delete(toastToRemove.message);
+      }
+      return prev.filter((t) => t.id !== id);
+    });
+  }, []);
 
   const addToast = useCallback((message, type = "info", duration = 4000) => {
-    const id = Date.now() + Math.random().toString(36).substr(2, 9);
+    if (!message) return;
+
+    // Strict deduplication: do not display the exact same message if already showing
+    if (activeMessagesRef.current.has(message)) {
+      return;
+    }
+
+    activeMessagesRef.current.add(message);
+    const id = Date.now() + "-" + Math.random().toString(36).substring(2, 9);
+
     setToasts((prev) => [...prev, { id, message, type }]);
 
     if (duration > 0) {
       setTimeout(() => {
+        activeMessagesRef.current.delete(message);
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, duration);
     }
-  }, []);
-
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const showSuccess = useCallback((msg, duration) => addToast(msg, "success", duration), [addToast]);
