@@ -22,4 +22,18 @@ public interface ExamService {
 	Exam getExamById(int examId);
 
 	List<Exam> getExamsByTeacherId(int teacherId);
+
+	boolean registerStudentForExam(int studentId, int examId);
+
+	boolean isStudentRegisteredForExam(int studentId, int examId);
+
+	List<Integer> getRegisteredExamIdsForStudent(int studentId);
+
+	List<com.skillcheckr.model.ExamRegistration> getRegistrationsByStudentId(int studentId);
+
+	List<com.skillcheckr.model.Student> getRegisteredStudentsByExamId(int examId);
+
+	int getRegistrationCountByExamId(int examId);
+
+	boolean unregisterStudentFromExam(int studentId, int examId);
 }

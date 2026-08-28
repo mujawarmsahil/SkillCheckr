@@ -4,6 +4,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -100,6 +101,37 @@ class RegistrationRequestControllerTest {
                 .andExpect(jsonPath("$[0].request_id").value(3))
                 .andExpect(jsonPath("$[0].name").value("Sam"))
                 .andExpect(jsonPath("$[0].requested_role").value("Student"));
+    }
+
+    @Test
+    void updateStatus_returns200_whenUpdated() throws Exception {
+        when(registrationRequestService.updateRequestStatus(5, "Rejected")).thenReturn(true);
+
+        mockMvc.perform(put("/api/requests/status/5")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"Rejected\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void updateStatus_returns404_whenNotFound() throws Exception {
+        when(registrationRequestService.updateRequestStatus(99, "Rejected")).thenReturn(false);
+
+        mockMvc.perform(put("/api/requests/status/99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"Rejected\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void rejectRequest_returns200_whenRejected() throws Exception {
+        when(registrationRequestService.updateRequestStatus(5, "Rejected")).thenReturn(true);
+
+        mockMvc.perform(post("/api/requests/reject/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

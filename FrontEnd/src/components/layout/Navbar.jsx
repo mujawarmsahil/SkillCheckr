@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Icon } from "../common/Icons";
 
 export default function Navbar() {
-  const { isAuthenticated, role, logout } = useAuth();
+  const { user, isAuthenticated, role, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -60,7 +60,15 @@ export default function Navbar() {
                 to={`/dashboard/${(role || "student").toLowerCase()}`}
                 className="inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 rounded-2xl text-sm sm:text-base font-bold transition-all shadow-sm"
               >
-                <Icon name="user" className="w-5 h-5" />
+                {user?.profileImage ? (
+                  <img
+                    src={user.profileImage}
+                    alt={user.username}
+                    className="w-6 h-6 rounded-full object-cover border border-orange-300"
+                  />
+                ) : (
+                  <Icon name="user" className="w-5 h-5" />
+                )}
                 <span>Dashboard ({role})</span>
               </Link>
               <button

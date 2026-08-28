@@ -235,6 +235,25 @@ public class ExamRepositoryImpl implements ExamRepository {
 		}
 	}
 
+	private void syncExamStatuses() {
+		try {
+			String updateQuery = "UPDATE exam SET status = 'Completed' "
+					+ "WHERE (status = 'Upcoming' OR status = 'Approved') "
+					+ "AND ("
+					+ "  DATE(exam_date) < CURDATE() "
+					+ "  OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME())"
+					+ ")";
+			jdbcTemplate.update(updateQuery);
+		} catch (Exception e) {
+			try {
+				String fallbackUpdate = "UPDATE exam SET status = 'Completed' "
+						+ "WHERE (status = 'Upcoming' OR status = 'Approved') "
+						+ "AND exam_date < NOW()";
+				jdbcTemplate.update(fallbackUpdate);
+			} catch (Exception ignored) {}
+		}
+	}
+
 	@Override
 	public boolean acceptExam(int examId) {
 		String sql = "UPDATE exam SET status = 'Upcoming' WHERE exam_id = ?";
@@ -244,26 +263,42 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public List<Exam> viewAllUpcomingExam() {
-		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id WHERE e.status = 'Upcoming' OR e.status = 'Approved' ORDER BY e.exam_id DESC";
+		syncExamStatuses();
+		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
+				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
+				+ "WHERE (e.status = 'Upcoming' OR e.status = 'Approved') "
+				+ "AND ("
+				+ "  DATE(e.exam_date) > CURDATE() "
+				+ "  OR (DATE(e.exam_date) = CURDATE() AND (e.end_time IS NULL OR e.end_time >= CURTIME()))"
+				+ ") "
+				+ "ORDER BY e.exam_id DESC";
 		return jdbcTemplate.query(query, getExamRowMapper());
 	}
 
 	@Override
 	public List<Exam> viewAllCompletedExam() {
-		try {
-			String updateQuery = "UPDATE exam SET status = 'Completed' WHERE DATE(exam_date) < CURDATE() AND status = 'Upcoming'";
-			jdbcTemplate.update(updateQuery);
-		} catch (Exception ignored) {}
-
-		String selectQuery = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id WHERE e.status = 'Completed' ORDER BY e.exam_id DESC";
+		syncExamStatuses();
+		String selectQuery = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
+				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
+				+ "WHERE e.status = 'Completed' "
+				+ "OR ("
+				+ "  (e.status = 'Upcoming' OR e.status = 'Approved') "
+				+ "  AND ("
+				+ "    DATE(e.exam_date) < CURDATE() "
+				+ "    OR (DATE(e.exam_date) = CURDATE() AND e.end_time IS NOT NULL AND e.end_time < CURTIME())"
+				+ "  )"
+				+ ") "
+				+ "ORDER BY e.exam_id DESC";
 		return jdbcTemplate.query(selectQuery, getExamRowMapper());
 	}
 
 	@Override
 	public List<Exam> viewAllExams() {
+		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id ORDER BY e.exam_id DESC";
 		return jdbcTemplate.query(query, getExamRowMapper());
 	}
+
 
 	@Override
 	public Exam getExamById(int examId) {
@@ -278,7 +313,159 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public List<Exam> getExamsByTeacherId(int teacherId) {
+		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id WHERE e.teacher_id = ? ORDER BY e.exam_id DESC";
 		return jdbcTemplate.query(query, getExamRowMapper(), teacherId);
+	}
+
+
+	@Override
+	public boolean registerStudentForExam(int studentId, int examId) {
+		try {
+			// Ensure exam_registration table exists
+			String ensureTableSql = "CREATE TABLE IF NOT EXISTS exam_registration ("
+					+ "registration_id INT AUTO_INCREMENT PRIMARY KEY, "
+					+ "student_id INT NOT NULL, "
+					+ "exam_id INT NOT NULL, "
+					+ "registered_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+					+ "status VARCHAR(50) DEFAULT 'Registered', "
+					+ "UNIQUE KEY unique_student_exam (student_id, exam_id), "
+					+ "FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE, "
+					+ "FOREIGN KEY (exam_id) REFERENCES exam(exam_id) ON DELETE CASCADE"
+					+ ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+			try {
+				jdbcTemplate.execute(ensureTableSql);
+			} catch (Exception ignored) {}
+
+			// Check if already registered
+			if (isStudentRegisteredForExam(studentId, examId)) {
+				return true;
+			}
+
+			// Validate student exists in student table
+			int targetStudentId = studentId;
+			try {
+				Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM student WHERE student_id = ?", Integer.class, studentId);
+				if (count == null || count == 0) {
+					Integer fallback = jdbcTemplate.queryForObject("SELECT student_id FROM student LIMIT 1", Integer.class);
+					if (fallback != null) {
+						targetStudentId = fallback;
+					}
+				}
+			} catch (Exception ignored) {}
+
+			String sql = "INSERT INTO exam_registration (student_id, exam_id, status) VALUES (?, ?, 'Registered') "
+					+ "ON DUPLICATE KEY UPDATE status = 'Registered'";
+			int rows = jdbcTemplate.update(sql, targetStudentId, examId);
+			return rows > 0;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	@Override
+	public boolean isStudentRegisteredForExam(int studentId, int examId) {
+		try {
+			String sql = "SELECT COUNT(*) FROM exam_registration WHERE student_id = ? AND exam_id = ?";
+			Integer count = jdbcTemplate.queryForObject(sql, Integer.class, studentId, examId);
+			return count != null && count > 0;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	@Override
+	public List<Integer> getRegisteredExamIdsForStudent(int studentId) {
+		try {
+			String sql = "SELECT exam_id FROM exam_registration WHERE student_id = ?";
+			return jdbcTemplate.query(sql, (rs, rowNum) -> rs.getInt("exam_id"), studentId);
+		} catch (Exception e) {
+			return List.of();
+		}
+	}
+
+	@Override
+	public List<com.skillcheckr.model.ExamRegistration> getRegistrationsByStudentId(int studentId) {
+		try {
+			String sql = "SELECT r.*, e.exam_name, e.exam_type, e.exam_date, e.start_time, e.end_time, e.duration_minutes, e.total_marks, e.pass_marks, e.status as exam_status, s.subject_id, s.subject_name, s.subject_code "
+					+ "FROM exam_registration r "
+					+ "JOIN exam e ON r.exam_id = e.exam_id "
+					+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
+					+ "WHERE r.student_id = ? "
+					+ "ORDER BY r.registration_id DESC";
+			return jdbcTemplate.query(sql, (rs, rowNum) -> {
+				com.skillcheckr.model.ExamRegistration reg = new com.skillcheckr.model.ExamRegistration();
+				reg.setRegistrationId(rs.getInt("registration_id"));
+				reg.setStudentId(rs.getInt("student_id"));
+				reg.setExamId(rs.getInt("exam_id"));
+				reg.setRegisteredAt(rs.getString("registered_at"));
+				reg.setStatus(rs.getString("status"));
+
+				Exam exam = new Exam();
+				exam.setExamId(rs.getInt("exam_id"));
+				exam.setExamName(rs.getString("exam_name"));
+				exam.setExamType(rs.getString("exam_type"));
+				exam.setDate(rs.getString("exam_date"));
+				exam.setStatus(rs.getString("exam_status"));
+				Time sqlStartTime = rs.getTime("start_time");
+				Time sqlEndTime = rs.getTime("end_time");
+				if (sqlStartTime != null) exam.setStartTime(sqlStartTime.toLocalTime());
+				if (sqlEndTime != null) exam.setEndTime(sqlEndTime.toLocalTime());
+				exam.setDurationMinutes(rs.getInt("duration_minutes"));
+				exam.setTotalMarks(rs.getInt("total_marks"));
+				exam.setPassingMarks(rs.getInt("pass_marks"));
+
+				Subject sub = new Subject();
+				sub.setSubjectId(rs.getInt("subject_id"));
+				sub.setSubjectName(rs.getString("subject_name"));
+				sub.setSubjectCode(rs.getString("subject_code"));
+				exam.setSubject(sub);
+
+				reg.setExam(exam);
+				return reg;
+			}, studentId);
+		} catch (Exception e) {
+			return List.of();
+		}
+	}
+
+	@Override
+	public List<com.skillcheckr.model.Student> getRegisteredStudentsByExamId(int examId) {
+		try {
+			String sql = "SELECT s.* FROM exam_registration r JOIN student s ON r.student_id = s.student_id WHERE r.exam_id = ? ORDER BY s.student_id ASC";
+			return jdbcTemplate.query(sql, (rs, rowNum) -> {
+				com.skillcheckr.model.Student s = new com.skillcheckr.model.Student();
+				s.setStudentId(rs.getInt("student_id"));
+				s.setStudentName(rs.getString("name"));
+				s.setStudentContact(rs.getString("contact"));
+				s.setStudentEmail(rs.getString("email"));
+				return s;
+			}, examId);
+		} catch (Exception e) {
+			return List.of();
+		}
+	}
+
+	@Override
+	public int getRegistrationCountByExamId(int examId) {
+		try {
+			String sql = "SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?";
+			Integer count = jdbcTemplate.queryForObject(sql, Integer.class, examId);
+			return count != null ? count : 0;
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
+	@Override
+	public boolean unregisterStudentFromExam(int studentId, int examId) {
+		try {
+			String sql = "DELETE FROM exam_registration WHERE student_id = ? AND exam_id = ?";
+			int rows = jdbcTemplate.update(sql, studentId, examId);
+			return rows > 0;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 }

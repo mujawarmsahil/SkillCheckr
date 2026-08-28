@@ -136,14 +136,20 @@ export default function StudentResults() {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {results.map((r, idx) => {
                   const isPass = r.status === "Pass";
-                  const isMcq = (r.examType || "MCQ").toUpperCase() === "MCQ";
+                  const isMcq = (r.exam_type || r.examType || "MCQ").toUpperCase() === "MCQ";
+                  const marksObtained = r.marks_obtained !== undefined ? r.marks_obtained : r.marksObtained !== undefined ? r.marksObtained : 0;
+                  const totalMarks = r.total_marks || r.totalMarks || 100;
+                  const percentage = r.percentage !== undefined ? r.percentage : totalMarks > 0 ? Math.round(((marksObtained / totalMarks) * 100) * 10) / 10 : 0;
+                  const examName = r.exam_name || r.examName || "Exam";
+                  const subjectName = r.subject_name || r.subjectName || "General";
+                  const submittedAt = r.submitted_at || r.submittedAt || "Recent";
 
                   return (
-                    <tr key={r.resultId || idx} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3.5 px-4 font-semibold text-slate-900">{r.examName}</td>
+                    <tr key={r.result_id || r.resultId || idx} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-slate-900">{examName}</td>
                       <td className="py-3.5 px-4">
                         <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                          {r.subjectName || "General"}
+                          {subjectName}
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
@@ -156,17 +162,17 @@ export default function StudentResults() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 font-mono font-medium">
-                        <strong className="text-slate-900">{r.marksObtained}</strong> / {r.totalMarks}
+                        <strong className="text-slate-900">{marksObtained}</strong> / {totalMarks}
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
                           <div className="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full ${isPass ? "bg-emerald-500" : "bg-rose-500"}`}
-                              style={{ width: `${Math.min(100, r.percentage || 0)}%` }}
+                              style={{ width: `${Math.min(100, percentage)}%` }}
                             ></div>
                           </div>
-                          <span className="text-xs font-bold text-slate-800">{r.percentage}%</span>
+                          <span className="text-xs font-bold text-slate-800">{percentage}%</span>
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
@@ -179,7 +185,7 @@ export default function StudentResults() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right text-xs text-slate-400">
-                        {r.submittedAt?.split("T")[0] || r.submittedAt || "Recent"}
+                        {String(submittedAt).split("T")[0]}
                       </td>
                     </tr>
                   );

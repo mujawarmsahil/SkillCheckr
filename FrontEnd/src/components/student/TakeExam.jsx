@@ -26,6 +26,7 @@ export default function TakeExam() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [resultData, setResultData] = useState(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [accessBlocked, setAccessBlocked] = useState(null);
 
   // -------------------------------------------------------------
   // ANTI-CHEATING & PROCTORING STATE
@@ -63,17 +64,34 @@ export default function TakeExam() {
   const stopWebcam = useCallback(() => {
     if (streamRef.current) {
       try {
-        streamRef.current.getTracks().forEach((track) => {
-          track.stop();
-          track.enabled = false;
+        const tracks = streamRef.current.getTracks();
+        tracks.forEach((track) => {
+          try {
+            track.stop();
+            track.enabled = false;
+          } catch {
+            // ignore
+          }
         });
       } catch (err) {
         console.warn("Track cleanup warning:", err);
       }
       streamRef.current = null;
     }
+
     if (videoRef.current) {
       try {
+        const srcObj = videoRef.current.srcObject;
+        if (srcObj && typeof srcObj.getTracks === "function") {
+          srcObj.getTracks().forEach((track) => {
+            try {
+              track.stop();
+              track.enabled = false;
+            } catch {
+              // ignore
+            }
+          });
+        }
         videoRef.current.pause();
         videoRef.current.srcObject = null;
       } catch (err) {
@@ -113,10 +131,23 @@ export default function TakeExam() {
   }, []);
 
   useEffect(() => {
-    if (resultData || isDisqualified) {
+    if (resultData || isDisqualified || alreadySubmitted) {
       stopWebcam();
     }
-  }, [resultData, isDisqualified, stopWebcam]);
+  }, [resultData, isDisqualified, alreadySubmitted, stopWebcam]);
+
+  useEffect(() => {
+    const handleUnload = () => {
+      stopWebcam();
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    window.addEventListener("pagehide", handleUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      window.removeEventListener("pagehide", handleUnload);
+      stopWebcam();
+    };
+  }, [stopWebcam]);
 
   // -------------------------------------------------------------
   // 2. FETCH EXAM AND PREVENT DUPLICATE SUBMISSIONS
@@ -154,7 +185,7 @@ export default function TakeExam() {
       }
 
       let examDetails = location.state;
-      if (!examDetails?.examName) {
+      if (!examDetails?.examName || !examDetails?.date) {
         try {
           const res = await apiClient.get(`/api/exams/${examId}`);
           examDetails = res.data;
@@ -163,6 +194,106 @@ export default function TakeExam() {
         }
       }
       setExam(examDetails || { exam_name: "Examination", exam_type: "MCQ" });
+
+      // Registration & Valid Window Verification
+      const userRole = user?.role || localStorage.getItem("role") || "Student";
+      if (userRole === "Student") {
+        let isRegistered = false;
+        try {
+          const regRes = await apiClient.get(`/api/exams/${examId}/isRegistered/${studentId}`);
+          isRegistered = !!regRes.data?.isRegistered;
+        } catch {
+          try {
+            const localRegs = JSON.parse(localStorage.getItem(`student_${studentId}_registered_exams`) || "{}");
+            isRegistered = !!localRegs[examId];
+          } catch {
+            isRegistered = false;
+          }
+        }
+
+        const rawDate = examDetails?.date || examDetails?.exam_date || examDetails?.examDate || "";
+        let datePart = "";
+        if (rawDate) {
+          const trimmed = String(rawDate).trim();
+          if (trimmed.includes(" ")) {
+            datePart = trimmed.split(" ")[0];
+          } else if (trimmed.includes("T")) {
+            datePart = trimmed.split("T")[0];
+          } else {
+            datePart = trimmed;
+          }
+        } else {
+          datePart = new Date().toISOString().split("T")[0];
+        }
+
+        let year = 2026;
+        let month = 1;
+        let day = 1;
+        if (datePart.includes("-")) {
+          const parts = datePart.split("-").map((v) => parseInt(v, 10));
+          year = parts[0] || 2026;
+          month = parts[1] || 1;
+          day = parts[2] || 1;
+        }
+
+        const startTimeStr = examDetails?.start_time || examDetails?.startTime || "00:00";
+        const endTimeStr = examDetails?.end_time || examDetails?.endTime || "23:59";
+
+        const [sh, sm] = String(startTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
+        const [eh, em] = String(endTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
+
+        const startDateTime = new Date(year, month - 1, day, sh, sm, 0, 0);
+        const endDateTime = new Date(year, month - 1, day, eh, em, 0, 0);
+        if (endDateTime < startDateTime) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+
+        const now = new Date();
+        const isRegistrationOpen = now < startDateTime;
+        const isExamUpcoming = now < startDateTime;
+        const isExamExpired = now > endDateTime;
+
+        if (!isRegistered) {
+          stopWebcam();
+          setAccessBlocked({
+            reason: "NOT_REGISTERED",
+            message: "You are not registered for this examination. Registered candidate access only.",
+            datePart,
+            startTimeStr,
+            endTimeStr,
+            isRegistrationOpen,
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (isExamUpcoming) {
+          stopWebcam();
+          setAccessBlocked({
+            reason: "NOT_STARTED",
+            message: `This examination has not started yet. The examination window opens on ${datePart} at ${startTimeStr}.`,
+            datePart,
+            startTimeStr,
+            endTimeStr,
+            startDateTime,
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (isExamExpired) {
+          stopWebcam();
+          setAccessBlocked({
+            reason: "EXPIRED",
+            message: `The scheduled testing window for this examination has ended (${datePart} ${endTimeStr}).`,
+            datePart,
+            startTimeStr,
+            endTimeStr,
+          });
+          setLoading(false);
+          return;
+        }
+      }
 
       const initialDuration = (examDetails?.duration_minutes || examDetails?.durationMinutes || 60) * 60;
       setTimeLeftSeconds(initialDuration);
@@ -253,7 +384,7 @@ export default function TakeExam() {
     } finally {
       setLoading(false);
     }
-  }, [examId, location.state, user?.userId, user?.roleId, showError, startWebcam, stopWebcam]);
+  }, [examId, location.state, user?.userId, user?.roleId, user?.role, showError, startWebcam, stopWebcam]);
 
   useEffect(() => {
     fetchExamAndQuestions();
@@ -798,11 +929,157 @@ export default function TakeExam() {
   }
 
   // -------------------------------------------------------------
+  // ACCESS BLOCKED (NOT REGISTERED / NOT STARTED / EXPIRED)
+  // -------------------------------------------------------------
+  if (accessBlocked) {
+    const isNotReg = accessBlocked.reason === "NOT_REGISTERED";
+    const isNotStarted = accessBlocked.reason === "NOT_STARTED";
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 select-none">
+        <div className="w-full max-w-lg bg-white text-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+          <div
+            className={`p-8 text-center ${
+              isNotReg ? "bg-slate-900 text-white" : isNotStarted ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
+            }`}
+          >
+            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-3">
+              <Icon name={isNotReg ? "lock" : isNotStarted ? "clock" : "alert-triangle"} className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-black">
+              {isNotReg
+                ? "Registration Required"
+                : isNotStarted
+                ? "Examination Not Started"
+                : "Examination Window Closed"}
+            </h2>
+            <p className="text-xs text-white/90 mt-1">
+              {exam?.exam_name || `Exam #${examId}`} • {exam?.subject?.subject_name || "General"}
+            </p>
+          </div>
+
+          <div className="p-6 space-y-5 text-center">
+            <p className="text-sm text-slate-600 leading-relaxed font-medium">
+              {accessBlocked.message}
+            </p>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 text-xs text-slate-600">
+              <div className="flex justify-between">
+                <span className="font-semibold text-slate-500">Scheduled Date:</span>
+                <span className="font-bold text-slate-800">{accessBlocked.datePart}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-slate-500">Time Window:</span>
+                <span className="font-mono font-bold text-slate-800">{accessBlocked.startTimeStr} - {accessBlocked.endTimeStr}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-2">
+              {isNotReg && accessBlocked.isRegistrationOpen && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
+                    try {
+                      await apiClient.post(`/api/exams/${examId}/register`, {
+                        studentId: parseInt(studentId, 10),
+                        examId: parseInt(examId, 10),
+                      });
+                      showSuccess("Successfully registered! Launching exam hall...");
+                      setAccessBlocked(null);
+                      fetchExamAndQuestions();
+                    } catch (err) {
+                      showError(err.response?.data?.message || "Failed to register for exam");
+                    }
+                  }}
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                >
+                  <Icon name="check-circle" className="w-4 h-4" />
+                  <span>Register Now & Enter Exam →</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  stopWebcam();
+                  navigate("/dashboard/student");
+                }}
+                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+              >
+                Back to Available Exams
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // -------------------------------------------------------------
   // POST-SUBMISSION / ALREADY SUBMITTED RESULT VIEW
   // -------------------------------------------------------------
   if (resultData) {
-    const isDisq = resultData.disqualified || resultData.is_disqualified || isDisqualified;
+    const isDisq = !!(resultData.disqualified || resultData.is_disqualified || isDisqualified);
     const isPass = !isDisq && resultData.status === "Pass";
+
+    const marksObtained =
+      resultData.marks_obtained !== undefined
+        ? resultData.marks_obtained
+        : resultData.marksObtained !== undefined
+        ? resultData.marksObtained
+        : resultData.score !== undefined
+        ? resultData.score
+        : 0;
+
+    const totalMarks =
+      resultData.total_marks ||
+      resultData.totalMarks ||
+      resultData.total ||
+      exam?.total_marks ||
+      exam?.totalMarks ||
+      (questions.length > 0 ? questions.length : 100);
+
+    const percentage =
+      resultData.percentage !== undefined
+        ? resultData.percentage
+        : totalMarks > 0
+        ? Math.round(((marksObtained / totalMarks) * 100) * 10) / 10
+        : 0;
+
+    const examName =
+      resultData.exam_name ||
+      resultData.examName ||
+      exam?.exam_name ||
+      exam?.examName ||
+      `Exam #${examId}`;
+
+    const subjectName =
+      resultData.subject_name ||
+      resultData.subjectName ||
+      exam?.subject?.subject_name ||
+      exam?.subject?.subjectName ||
+      "General";
+
+    const disqReason =
+      resultData.disqualification_reason ||
+      resultData.disqualificationReason ||
+      disqualificationReason ||
+      "Academic Integrity Violation";
+
+    const violationsCount =
+      resultData.violations_count !== undefined
+        ? resultData.violations_count
+        : resultData.violationsCount !== undefined
+        ? resultData.violationsCount
+        : totalViolations;
+
+    const breakdownList =
+      resultData.question_breakdown ||
+      resultData.questionBreakdown ||
+      resultData.breakdown ||
+      [];
 
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 select-none">
@@ -826,7 +1103,7 @@ export default function TakeExam() {
                 : "Exam Submitted"}
             </h2>
             <p className="text-xs text-white/90 mt-1">
-              {resultData.examName || exam?.exam_name} • {resultData.subjectName}
+              {examName} • {subjectName}
             </p>
           </div>
 
@@ -857,10 +1134,10 @@ export default function TakeExam() {
             <div className="bg-rose-50 border-b border-rose-200 p-4 text-center">
               <p className="text-xs font-bold text-rose-800 uppercase tracking-wide">Academic Integrity Violation</p>
               <p className="text-sm font-semibold text-rose-900 mt-1">
-                {resultData.disqualificationReason || disqualificationReason || "Disqualified for exam violations"}
+                {disqReason}
               </p>
               <p className="text-xs text-rose-700 mt-1">
-                Total Security Flags: {resultData.violationsCount || totalViolations}
+                Total Security Flags: {violationsCount}
               </p>
             </div>
           )}
@@ -871,59 +1148,70 @@ export default function TakeExam() {
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Score</span>
                 <p className="text-2xl font-extrabold text-slate-900 mt-1">
-                  {resultData.marksObtained} <span className="text-xs font-normal text-slate-400">/ {resultData.totalMarks}</span>
+                  {marksObtained} <span className="text-xs font-normal text-slate-400">/ {totalMarks}</span>
                 </p>
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Percentage</span>
                 <p className={`text-2xl font-extrabold mt-1 ${isDisq ? "text-rose-600" : "text-orange-600"}`}>
-                  {resultData.percentage}%
+                  {percentage}%
                 </p>
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Outcome</span>
                 <p className={`text-base font-bold mt-2 ${isDisq ? "text-rose-600" : isPass ? "text-emerald-600" : "text-amber-600"}`}>
-                  {isDisq ? "Disqualified" : resultData.status}
+                  {isDisq ? "Disqualified" : resultData.status || "Submitted"}
                 </p>
               </div>
             </div>
 
             {/* MCQ Breakdown */}
-            {!isDisq && resultData.questionBreakdown && resultData.questionBreakdown.length > 0 && (
+            {!isDisq && breakdownList.length > 0 && (
               <div className="space-y-3 pt-2">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Question Review ({resultData.questionBreakdown.length})
+                  Question Review ({breakdownList.length})
                 </h4>
                 <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
-                  {resultData.questionBreakdown.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3 rounded-xl border text-xs space-y-1 ${
-                        item.isCorrect ? "bg-emerald-50/70 border-emerald-200" : "bg-rose-50/70 border-rose-200"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-semibold text-slate-800">
-                          {idx + 1}. {item.question}
+                  {breakdownList.map((item, idx) => {
+                    const selectedAns = item.selected_answer || item.selectedAnswer || item.answer || item.chosen || "None";
+                    const correctAns = item.correct_answer || item.correctAnswer || item.correctOption || "";
+                    const isItemCorrect =
+                      item.is_correct !== undefined
+                        ? !!item.is_correct
+                        : item.isCorrect !== undefined
+                        ? !!item.isCorrect
+                        : !!(selectedAns && correctAns && selectedAns.trim().toLowerCase() === correctAns.trim().toLowerCase());
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border text-xs space-y-1 ${
+                          isItemCorrect ? "bg-emerald-50/70 border-emerald-200" : "bg-rose-50/70 border-rose-200"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-slate-800">
+                            {idx + 1}. {item.question}
+                          </p>
+                          <span
+                            className={`font-bold px-2 py-0.5 rounded text-[10px] ${
+                              isItemCorrect ? "bg-emerald-200 text-emerald-800" : "bg-rose-200 text-rose-800"
+                            }`}
+                          >
+                            {isItemCorrect ? "Correct (+1)" : "Incorrect (0)"}
+                          </span>
+                        </div>
+                        <p className="text-slate-600">
+                          Your answer: <strong className="text-slate-900">{selectedAns}</strong>
                         </p>
-                        <span
-                          className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                            item.isCorrect ? "bg-emerald-200 text-emerald-800" : "bg-rose-200 text-rose-800"
-                          }`}
-                        >
-                          {item.isCorrect ? "Correct (+1)" : "Incorrect (0)"}
-                        </span>
+                        {!isItemCorrect && correctAns && (
+                          <p className="text-emerald-700 font-medium">Correct answer: {correctAns}</p>
+                        )}
                       </div>
-                      <p className="text-slate-600">
-                        Your answer: <strong className="text-slate-900">{item.selectedAnswer || "None"}</strong>
-                      </p>
-                      {!item.isCorrect && item.correctAnswer && (
-                        <p className="text-emerald-700 font-medium">Correct answer: {item.correctAnswer}</p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -931,7 +1219,10 @@ export default function TakeExam() {
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
               <button
-                onClick={() => navigate("/dashboard/student")}
+                onClick={() => {
+                  stopWebcam();
+                  navigate("/dashboard/student");
+                }}
                 className="flex-1 py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-sm transition-all text-center"
               >
                 Return to Student Dashboard

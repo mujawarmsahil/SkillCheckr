@@ -96,4 +96,10 @@ public class RegistrationRequestRepositoryImpl implements RegistrationRequestRep
         int value = jdbcTemplate.update("DELETE FROM request WHERE request_id = ?", id);
         return value > 0;
     }
+
+    @Override
+    public boolean updateRequestStatus(int id, String status) {
+        int value = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ?", status, id);
+        return value > 0;
+    }
 }

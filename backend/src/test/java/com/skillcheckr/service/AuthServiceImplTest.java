@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.skillcheckr.model.User;
+import com.skillcheckr.model.UserProfileDTO;
 import com.skillcheckr.repository.AuthRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -64,5 +65,53 @@ class AuthServiceImplTest {
 
         assertThat(authService.getAdminIdByUserId(30)).isEqualTo(1);
         verify(authRepository).getAdminIdByUserId(30);
+    }
+
+    @Test
+    void getUserProfile_delegatesToRepository() {
+        UserProfileDTO profile = UserProfileDTO.builder()
+                .userId(1)
+                .username("user1")
+                .name("User One")
+                .email("user1@test.com")
+                .build();
+        when(authRepository.getUserProfile(1)).thenReturn(profile);
+
+        UserProfileDTO actual = authService.getUserProfile(1);
+
+        assertThat(actual).isSameAs(profile);
+        verify(authRepository).getUserProfile(1);
+    }
+
+    @Test
+    void updateUserProfile_delegatesToRepository() {
+        UserProfileDTO profile = UserProfileDTO.builder()
+                .userId(1)
+                .username("user1_updated")
+                .name("User One Updated")
+                .email("user1_updated@test.com")
+                .build();
+        when(authRepository.updateUserProfile(profile)).thenReturn(profile);
+
+        UserProfileDTO actual = authService.updateUserProfile(profile);
+
+        assertThat(actual).isSameAs(profile);
+        verify(authRepository).updateUserProfile(profile);
+    }
+
+    @Test
+    void isUsernameInUse_delegatesToRepository() {
+        when(authRepository.isUsernameInUse("user1", 1)).thenReturn(true);
+
+        assertThat(authService.isUsernameInUse("user1", 1)).isTrue();
+        verify(authRepository).isUsernameInUse("user1", 1);
+    }
+
+    @Test
+    void isEmailInUse_delegatesToRepository() {
+        when(authRepository.isEmailInUse("user1@test.com", 1)).thenReturn(false);
+
+        assertThat(authService.isEmailInUse("user1@test.com", 1)).isFalse();
+        verify(authRepository).isEmailInUse("user1@test.com", 1);
     }
 }

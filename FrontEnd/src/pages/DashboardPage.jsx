@@ -1,15 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AdminDashboard from "../components/admin/AdminDashboard";
 import TeacherDashboard from "../components/teacher/TeacherDashboard";
 import StudentDashboard from "../components/student/StudentDashboard";
+import EditProfileModal from "../components/auth/EditProfileModal";
 import { Icon } from "../components/common/Icons";
 
 export default function DashboardPage() {
   const { role: urlRole } = useParams();
   const { user, role, logout } = useAuth();
   const navigate = useNavigate();
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
   const activeRole = (urlRole || role || "student").toLowerCase();
 
@@ -30,31 +32,46 @@ export default function DashboardPage() {
         <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-                {(user?.username || "U").charAt(0).toUpperCase()}
+              <div className="w-14 h-14 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-xl shadow-sm overflow-hidden border-2 border-orange-100 flex-shrink-0">
+                {user?.profileImage ? (
+                  <img
+                    src={user.profileImage}
+                    alt={user.name || user.username || "Profile"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  (user?.name || user?.username || "U").charAt(0).toUpperCase()
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2.5">
                   <h1 className="text-xl font-black text-slate-900">
-                    Welcome, {user?.username || "User"}
+                    Welcome, {user?.name || user?.username || "User"}
                   </h1>
                   <span className="text-xs font-bold px-3 py-1 rounded-full bg-orange-100 text-orange-700 capitalize">
                     {role || activeRole}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                  SkillCheckr Academic Assessment & Evaluation Portal
+                  {user?.email ? `${user.email} • ` : ""}@{user?.username || "user"} • SkillCheckr Academic Portal
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => setIsEditProfileOpen(true)}
+                className="py-2.5 px-4 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:shadow"
+              >
+                <Icon name="edit" className="w-4 h-4" />
+                <span>Edit Profile</span>
+              </button>
               <button
                 onClick={handleLogout}
                 className="py-2.5 px-4 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
               >
                 <Icon name="logout" className="w-4 h-4" />
-                Sign Out
+                <span>Sign Out</span>
               </button>
             </div>
           </div>
@@ -67,6 +84,12 @@ export default function DashboardPage() {
         {activeRole === "teacher" && <TeacherDashboard />}
         {activeRole === "student" && <StudentDashboard />}
       </div>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+      />
     </div>
   );
 }

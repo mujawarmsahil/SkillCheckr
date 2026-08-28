@@ -140,4 +140,84 @@ class AuthControllerTest {
         verify(authService, never()).getTeacherIdByUserId(anyInt());
         verify(authService, never()).getAdminIdByUserId(anyInt());
     }
+
+    @Test
+    void getUserProfile_returnsProfile_whenUserExists() throws Exception {
+        com.skillcheckr.model.UserProfileDTO profile = com.skillcheckr.model.UserProfileDTO.builder()
+                .userId(10)
+                .username("student1")
+                .name("Alice Student")
+                .email("alice@test.com")
+                .role("Student")
+                .roleId(7)
+                .build();
+        when(authService.getUserProfile(10)).thenReturn(profile);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user_id").value(10))
+                .andExpect(jsonPath("$.username").value("student1"))
+                .andExpect(jsonPath("$.name").value("Alice Student"))
+                .andExpect(jsonPath("$.email").value("alice@test.com"));
+    }
+
+    @Test
+    void getUserProfile_returns404_whenUserDoesNotExist() throws Exception {
+        when(authService.getUserProfile(999)).thenReturn(null);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/999"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateProfile_returnsSuccess_whenDataIsValid() throws Exception {
+        com.skillcheckr.model.UserProfileDTO updated = com.skillcheckr.model.UserProfileDTO.builder()
+                .userId(10)
+                .username("student1_updated")
+                .name("Alice Updated")
+                .email("alice_updated@test.com")
+                .role("Student")
+                .build();
+
+        when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
+        when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
+        when(authService.updateUserProfile(org.mockito.ArgumentMatchers.any(com.skillcheckr.model.UserProfileDTO.class))).thenReturn(updated);
+
+        String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"password\":\"newSecret123\"}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Profile updated successfully"))
+                .andExpect(jsonPath("$.profile.name").value("Alice Updated"));
+    }
+
+    @Test
+    void updateProfile_returnsBadRequest_whenUsernameInUse() throws Exception {
+        when(authService.isUsernameInUse("existing_user", 10)).thenReturn(true);
+
+        String json = "{\"username\":\"existing_user\",\"name\":\"Alice\",\"email\":\"alice@test.com\"}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Username is already taken by another account"));
+    }
+
+    @Test
+    void updateProfile_returnsBadRequest_whenEmailInUse() throws Exception {
+        when(authService.isUsernameInUse("alice", 10)).thenReturn(false);
+        when(authService.isEmailInUse("existing@test.com", 10)).thenReturn(true);
+
+        String json = "{\"username\":\"alice\",\"name\":\"Alice\",\"email\":\"existing@test.com\"}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Email is already in use by another account"));
+    }
 }

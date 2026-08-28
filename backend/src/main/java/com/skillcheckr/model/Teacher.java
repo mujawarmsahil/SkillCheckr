@@ -24,4 +24,7 @@ public class Teacher {
 
 	@JsonProperty("teacher_email")
 	private String teacherEmail;
+
+	@JsonProperty("profile_image")
+	private String profileImage;
 }

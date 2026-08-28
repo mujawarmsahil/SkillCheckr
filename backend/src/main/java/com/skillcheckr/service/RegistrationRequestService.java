@@ -1,16 +1,16 @@
 package com.skillcheckr.service;
 
-import com.skillcheckr.model.RegistrationRequest;
-//import com.sun.net.httpserver.Request;
+import java.util.List;
 
-import java.util.*;
+import com.skillcheckr.model.RegistrationRequest;
 
 public interface RegistrationRequestService {
-	
-	 public boolean saveRequest(RegistrationRequest request);
-	
-	public  List<RegistrationRequest> getAllRequests();
-	 
-	public boolean deleteRequest(int id);
 
+    boolean saveRequest(RegistrationRequest request);
+
+    List<RegistrationRequest> getAllRequests();
+
+    boolean deleteRequest(int id);
+
+    boolean updateRequestStatus(int id, String status);
 }
