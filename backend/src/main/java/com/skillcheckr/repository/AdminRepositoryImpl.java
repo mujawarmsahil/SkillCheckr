@@ -259,13 +259,27 @@ public class AdminRepositoryImpl implements AdminRepository {
 	public Map<String, Object> getAdminStats() {
 		Map<String, Object> stats = new HashMap<>();
 		try {
+			try {
+				String syncSql = "UPDATE exam SET status = 'Completed' "
+						+ "WHERE (status = 'Upcoming' OR status = 'Approved') "
+						+ "AND ("
+						+ "  DATE(exam_date) < CURDATE() "
+						+ "  OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME())"
+						+ ")";
+				jdbcTemplate.update(syncSql);
+			} catch (Exception ignored) {}
+
 			Integer totalStudents = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM student", Integer.class);
 			Integer totalTeachers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM teacher", Integer.class);
 			Integer totalExams = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam", Integer.class);
-			Integer pendingExams = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE status = 'Pending'", Integer.class);
-			Integer upcomingExams = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE status = 'Upcoming' OR status = 'Approved'", Integer.class);
-			Integer completedExams = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE status = 'Completed'", Integer.class);
-			Integer pendingRequests = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE status = 'Pending'", Integer.class);
+			Integer pendingExams = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE status = 'Pending' OR status IS NULL", Integer.class);
+			Integer upcomingExams = jdbcTemplate.queryForObject(
+					"SELECT COUNT(*) FROM exam WHERE (status = 'Upcoming' OR status = 'Approved') AND (DATE(exam_date) > CURDATE() OR (DATE(exam_date) = CURDATE() AND (end_time IS NULL OR end_time >= CURTIME())))",
+					Integer.class);
+			Integer completedExams = jdbcTemplate.queryForObject(
+					"SELECT COUNT(*) FROM exam WHERE status = 'Completed' OR (DATE(exam_date) < CURDATE() OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME()))",
+					Integer.class);
+			Integer pendingRequests = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE status = 'Pending' OR status IS NULL", Integer.class);
 
 			stats.put("totalStudents", totalStudents != null ? totalStudents : 0);
 			stats.put("totalTeachers", totalTeachers != null ? totalTeachers : 0);
@@ -279,4 +293,5 @@ public class AdminRepositoryImpl implements AdminRepository {
 		}
 		return stats;
 	}
+
 }

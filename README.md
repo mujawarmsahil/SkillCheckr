@@ -112,11 +112,13 @@ Before running the application, make sure you have installed:
 mysql -u root -p < backend/src/main/resources/schema.sql
 ```
 
-3. Update database credentials if needed in [`backend/src/main/resources/application.properties`](file:///Users/sahilmujawar/Desktop/projects/SkillCheckr/backend/src/main/resources/application.properties):
+3. Configure your database and secret credentials via environment variables (or `.env`):
    ```properties
-   spring.datasource.url=jdbc:mysql://localhost:3306/exam_application_system
-   spring.datasource.username=root
-   spring.datasource.password=S@h!l2803
+   DB_URL=jdbc:mysql://localhost:3306/exam_application_system
+   DB_USERNAME=root
+   DB_PASSWORD=your_mysql_password
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
    ```
 
 ### 🔑 Default Administrator Login

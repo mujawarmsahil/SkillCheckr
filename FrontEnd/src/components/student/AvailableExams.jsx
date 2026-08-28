@@ -8,14 +8,26 @@ import { Icon } from "../common/Icons";
 export default function AvailableExams() {
   const [exams, setExams] = useState([]);
   const [submittedExamsMap, setSubmittedExamsMap] = useState({});
+  const [registeredExamsMap, setRegisteredExamsMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [registeringId, setRegisteringId] = useState(null);
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState("ALL"); // ALL, MCQ, QUESTION_ANSWER
+  const [filterType, setFilterType] = useState("ALL"); // ALL, REGISTERED, MCQ, QUESTION_ANSWER
+  const [currentTime, setCurrentTime] = useState(new Date());
+
   const { user } = useAuth();
-  const { showError } = useToast();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
-  const fetchUpcomingExams = useCallback(async () => {
+  // Live ticker for real-time window status and countdowns
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchUpcomingExamsAndRegistrations = useCallback(async () => {
     setLoading(true);
     try {
       const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
@@ -25,7 +37,30 @@ export default function AvailableExams() {
       const fetchedExams = Array.isArray(res.data) ? res.data : [];
       setExams(fetchedExams);
 
-      // 2. Fetch student's completed results to enforce single attempt policy
+      // 2. Fetch student's registrations
+      try {
+        const regRes = await apiClient.get(`/api/exams/registrations/student/${studentId}`);
+        const regIds = Array.isArray(regRes.data) ? regRes.data : [];
+        const regMap = {};
+        regIds.forEach((id) => {
+          if (typeof id === "number" || typeof id === "string") {
+            regMap[id] = true;
+          } else if (id && (id.examId || id.exam_id)) {
+            regMap[id.examId || id.exam_id] = true;
+          }
+        });
+        setRegisteredExamsMap(regMap);
+      } catch (regErr) {
+        console.warn("Could not fetch registrations from server:", regErr);
+        try {
+          const localRegs = JSON.parse(localStorage.getItem(`student_${studentId}_registered_exams`) || "{}");
+          setRegisteredExamsMap(localRegs);
+        } catch {
+          // ignore fallback error
+        }
+      }
+
+      // 3. Fetch student's completed results to enforce single attempt policy
       try {
         const resultsRes = await apiClient.get(`/api/results/student/${studentId}`);
         const results = Array.isArray(resultsRes.data) ? resultsRes.data : [];
@@ -38,13 +73,12 @@ export default function AvailableExams() {
         });
         setSubmittedExamsMap(map);
       } catch {
-        // Fallback: check local storage results cache if offline
         try {
           const localKey = `submitted_results_${studentId}`;
           const localResults = JSON.parse(localStorage.getItem(localKey) || "{}");
           setSubmittedExamsMap(localResults);
         } catch {
-          // ignore
+          // ignore fallback error
         }
       }
     } catch (err) {
@@ -55,18 +89,114 @@ export default function AvailableExams() {
   }, [user?.roleId, showError]);
 
   useEffect(() => {
-    fetchUpcomingExams();
-  }, [fetchUpcomingExams]);
+    fetchUpcomingExamsAndRegistrations();
+  }, [fetchUpcomingExamsAndRegistrations]);
+
+  const handleRegister = async (examId, examName) => {
+    const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
+    setRegisteringId(examId);
+
+    try {
+      const res = await apiClient.post(`/api/exams/${examId}/register`, {
+        studentId: parseInt(studentId, 10),
+        examId: parseInt(examId, 10),
+      });
+
+      showSuccess(res.data?.message || `Successfully registered for ${examName}!`);
+      setRegisteredExamsMap((prev) => {
+        const updated = { ...prev, [examId]: true };
+        try {
+          localStorage.setItem(`student_${studentId}_registered_exams`, JSON.stringify(updated));
+        } catch {
+          // ignore storage error
+        }
+        return updated;
+      });
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || "Failed to register for examination";
+      showError(errorMsg);
+    } finally {
+      setRegisteringId(null);
+    }
+  };
+
+  // Helper to parse exam timing details
+  const getExamTimingInfo = (exam) => {
+    const rawDate = exam.date || exam.exam_date || exam.examDate || "";
+    let datePart = "";
+    if (rawDate) {
+      const trimmed = String(rawDate).trim();
+      if (trimmed.includes(" ")) {
+        datePart = trimmed.split(" ")[0];
+      } else if (trimmed.includes("T")) {
+        datePart = trimmed.split("T")[0];
+      } else {
+        datePart = trimmed;
+      }
+    } else {
+      datePart = new Date().toISOString().split("T")[0];
+    }
+
+    let year = 2026;
+    let month = 1;
+    let day = 1;
+    if (datePart.includes("-")) {
+      const parts = datePart.split("-").map((v) => parseInt(v, 10));
+      year = parts[0] || 2026;
+      month = parts[1] || 1;
+      day = parts[2] || 1;
+    }
+
+    const startTimeStr = exam.start_time || exam.startTime || "00:00";
+    const endTimeStr = exam.end_time || exam.endTime || "23:59";
+
+    const [sh, sm] = String(startTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
+    const [eh, em] = String(endTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
+
+    const startDateTime = new Date(year, month - 1, day, sh, sm, 0, 0);
+    const endDateTime = new Date(year, month - 1, day, eh, em, 0, 0);
+
+    // If end time is before start time (e.g. overnight test), advance end time by 1 day
+    if (endDateTime < startDateTime) {
+      endDateTime.setDate(endDateTime.getDate() + 1);
+    }
+
+    const now = currentTime;
+    const isRegistrationClosed = now >= startDateTime;
+    const isExamUpcoming = now < startDateTime;
+    const isExamActive = now >= startDateTime && now <= endDateTime;
+    const isExamExpired = now > endDateTime;
+
+    return {
+      datePart,
+      startTimeStr,
+      endTimeStr,
+      startDateTime,
+      endDateTime,
+      isRegistrationClosed,
+      isExamUpcoming,
+      isExamActive,
+      isExamExpired,
+    };
+  };
 
   const filteredExams = exams.filter((e) => {
+    const examId = e.exam_id || e.examId;
     const title = (e.exam_name || e.examName || "").toLowerCase();
     const subName = (e.subject?.subject_name || e.subject?.subjectName || "").toLowerCase();
     const matchesSearch = title.includes(search.toLowerCase()) || subName.includes(search.toLowerCase());
 
     const type = (e.exam_type || e.examType || "MCQ").toUpperCase();
-    const matchesType = filterType === "ALL" || type === filterType;
+    const isRegistered = !!registeredExamsMap[examId];
 
-    return matchesSearch && matchesType;
+    if (!matchesSearch) return false;
+
+    if (filterType === "ALL") return true;
+    if (filterType === "REGISTERED") return isRegistered;
+    if (filterType === "MCQ") return type === "MCQ";
+    if (filterType === "QUESTION_ANSWER") return type === "QUESTION_ANSWER";
+
+    return true;
   });
 
   return (
@@ -75,10 +205,10 @@ export default function AvailableExams() {
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="book" className="w-5 h-5 text-orange-500" />
-          Available Examinations
+          Examination Portal
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Select an active examination to test your proficiency (Single-attempt policy enforced)
+          Register for scheduled assessments. Only registered students with valid active time windows can attend.
         </p>
       </div>
 
@@ -91,15 +221,16 @@ export default function AvailableExams() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by exam name or subject..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-500 focus:bg-white"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-500 focus:bg-white transition-all"
           />
         </div>
 
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
           {[
-            { id: "ALL", label: "All Formats" },
-            { id: "MCQ", label: "MCQ Exams" },
+            { id: "ALL", label: "All Exams" },
+            { id: "REGISTERED", label: `My Registered (${Object.keys(registeredExamsMap).length})` },
+            { id: "MCQ", label: "MCQ Format" },
             { id: "QUESTION_ANSWER", label: "Q&A (Theory)" },
           ].map((tab) => (
             <button
@@ -121,13 +252,19 @@ export default function AvailableExams() {
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-xs text-slate-500">Loading available examinations...</p>
+          <p className="text-xs text-slate-500">Loading examinations and registration status...</p>
         </div>
       ) : filteredExams.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
           <Icon name="book" className="w-10 h-10 text-slate-300 mx-auto" />
-          <h3 className="text-base font-bold text-slate-700">No active examinations currently available</h3>
-          <p className="text-xs text-slate-400">Check back later or contact your instructor for scheduled tests.</p>
+          <h3 className="text-base font-bold text-slate-700">
+            {filterType === "REGISTERED" ? "No Registered Examinations Found" : "No examinations currently available"}
+          </h3>
+          <p className="text-xs text-slate-400">
+            {filterType === "REGISTERED"
+              ? "Browse 'All Exams' to register for upcoming tests."
+              : "Check back later or contact your instructor for scheduled tests."}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -142,33 +279,69 @@ export default function AvailableExams() {
 
             const existingResult = submittedExamsMap[examId];
             const isSubmitted = !!existingResult;
+            const isRegistered = !!registeredExamsMap[examId];
+
+            const {
+              datePart,
+              startTimeStr,
+              endTimeStr,
+              isRegistrationClosed,
+              isExamUpcoming,
+              isExamActive,
+            } = getExamTimingInfo(exam);
+
+            const isRegisteringThis = registeringId === examId;
 
             return (
               <div
                 key={examId}
                 className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4 ${
-                  isSubmitted ? "border-emerald-300 bg-emerald-50/20" : "border-slate-200"
+                  isSubmitted
+                    ? "border-emerald-300 bg-emerald-50/20"
+                    : isRegistered && isExamActive
+                    ? "border-orange-400 ring-2 ring-orange-200/60"
+                    : isRegistered
+                    ? "border-emerald-200"
+                    : "border-slate-200"
                 }`}
               >
                 {/* Card Header */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">
                       {subjectName}
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      {isSubmitted && (
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Submission Status */}
+                      {isSubmitted ? (
                         <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                           <Icon name="check-circle" className="w-3.5 h-3.5" />
                           Submitted
                         </span>
+                      ) : isRegistered ? (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                          <Icon name="check-circle" className="w-3.5 h-3.5" />
+                          Registered
+                        </span>
+                      ) : isRegistrationClosed ? (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                          <Icon name="lock" className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Registration Closed</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200">
+                          Registration Open
+                        </span>
                       )}
+
+                      {/* Format Badge */}
                       <span
                         className={`text-xs font-bold px-2.5 py-1 rounded-md ${
                           isMcq ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
                         }`}
                       >
-                        {isMcq ? "MCQ Exam" : "Q&A (Theory)"}
+                        {isMcq ? "MCQ" : "Theory"}
                       </span>
                     </div>
                   </div>
@@ -188,24 +361,16 @@ export default function AvailableExams() {
                     <Icon name="award" className="w-3.5 h-3.5 text-slate-400" />
                     <span>Passing: <strong className="text-slate-800">{passMarks}/{totalMarks}</strong></span>
                   </div>
-                  <div className="col-span-2 text-slate-500 flex items-center gap-1.5 pt-1 border-t border-slate-200/60">
-                    <span>Date: {exam.date?.split("T")[0] || exam.date}</span>
-                    <span>({exam.start_time || exam.startTime || "10:00"})</span>
+                  <div className="flex items-center gap-1.5 col-span-2">
+                    <Icon name="clock" className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Slot: <strong className="text-slate-800 font-mono">{datePart} ({startTimeStr} - {endTimeStr})</strong></span>
                   </div>
                 </div>
 
-                {/* Action CTA: Disabled when exam is already completed */}
-                {isSubmitted ? (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      disabled
-                      className="w-full py-2.5 px-4 bg-slate-100 border border-slate-200 text-slate-400 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2"
-                      title="You have already completed this examination."
-                    >
-                      <Icon name="check-circle" className="w-4 h-4 text-emerald-500" />
-                      <span>Exam Completed</span>
-                    </button>
+                {/* Card CTA Actions */}
+                <div className="pt-1">
+                  {isSubmitted ? (
+                    /* 1. Already Submitted -> View Scorecard */
                     <button
                       type="button"
                       onClick={() =>
@@ -213,37 +378,101 @@ export default function AvailableExams() {
                           state: {
                             examId,
                             examName: exam.exam_name || exam.examName,
-                            examType,
+                            examType: (exam.exam_type || exam.examType || "MCQ").toUpperCase(),
                             subjectName,
                           },
                         })
                       }
-                      className="w-full py-1.5 px-3 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors text-center"
+                      className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2"
                     >
-                      View Scorecard ({existingResult.marksObtained}/{existingResult.totalMarks}) →
+                      <Icon name="award" className="w-4 h-4" />
+                      <span>View Final Scorecard</span>
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate(`/take-exam/${examId}`, {
-                        state: {
-                          examId,
-                          examName: exam.exam_name || exam.examName,
-                          examType,
-                          subjectName,
-                          durationMinutes: duration,
-                          totalMarks,
-                          passingMarks: passMarks,
-                        },
-                      })
-                    }
-                    className="w-full py-2.5 px-4 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-                  >
-                    Start Examination →
-                  </button>
-                )}
+                  ) : isRegistered ? (
+                    /* 2. Registered Student Options */
+                    isExamActive ? (
+                      /* 2A. Registered & Timing is Active NOW -> Can enter exam */
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(`/take-exam/${examId}`, {
+                            state: {
+                              examId,
+                              examName: exam.exam_name || exam.examName,
+                              examType: (exam.exam_type || exam.examType || "MCQ").toUpperCase(),
+                              subjectName,
+                              durationMinutes: duration,
+                              totalMarks,
+                              passingMarks: passMarks,
+                            },
+                          })
+                        }
+                        className="w-full py-2.5 px-4 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 animate-pulse"
+                      >
+                        <Icon name="check-circle" className="w-4 h-4" />
+                        <span>Attend Examination Hall →</span>
+                      </button>
+                    ) : isExamUpcoming ? (
+                      /* 2B. Registered & Timing is in Future -> Disabled with countdown */
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-2.5 px-4 bg-blue-50 border border-blue-200 text-blue-700 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2"
+                        title={`Exam starts on ${datePart} at ${startTimeStr}.`}
+                      >
+                        <Icon name="clock" className="w-4 h-4 text-blue-500" />
+                        <span>Exam Not Started Yet</span>
+                      </button>
+                    ) : (
+                      /* 2C. Registered & Timing Expired -> Disabled */
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-2.5 px-4 bg-slate-100 border border-slate-200 text-slate-500 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2 select-none"
+                        title="The scheduled time window for this exam has passed."
+                      >
+                        <Icon name="clock" className="w-4 h-4 text-slate-400" />
+                        <span>Exam Window Expired</span>
+                      </button>
+                    )
+                  ) : (
+                    /* 3. Not Registered Student */
+                    !isRegistrationClosed ? (
+                      /* 3A. Not Registered & Registration Open -> Can Register */
+                      <button
+                        type="button"
+                        disabled={isRegisteringThis}
+                        onClick={() => handleRegister(examId, exam.exam_name || exam.examName)}
+                        className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-semibold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isRegisteringThis ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Registering...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Icon name="plus" className="w-4 h-4" />
+                            <span>Register for Exam</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      /* 3B. Not Registered & Registration Deadline Passed */
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-50/90 via-rose-50/60 to-slate-50 border border-rose-200 text-rose-700 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2 shadow-xs select-none transition-all"
+                        title="Registration deadline for this examination has passed."
+                      >
+                        <span className="w-5 h-5 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                          <Icon name="lock" className="w-3.5 h-3.5" />
+                        </span>
+                        <span className="font-bold">Registration Closed</span>
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             );
           })}

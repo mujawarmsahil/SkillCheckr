@@ -19,6 +19,7 @@ import Blog from "./components/public/Blog";
 import Contact from "./components/public/Contact";
 import Authentication from "./components/auth/Authentication";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import DashboardRedirect from "./components/auth/DashboardRedirect";
 import DashboardPage from "./pages/DashboardPage";
 import TakeExam from "./components/student/TakeExam";
 
@@ -35,10 +36,19 @@ const router = createBrowserRouter(
 
       {/* Auth Entry */}
       <Route path="/authentication" element={<Authentication />} />
+      <Route path="/oauth2/callback" element={<Authentication />} />
       <Route path="/login" element={<Navigate to="/authentication" replace />} />
       <Route path="/signup" element={<Navigate to="/authentication" replace />} />
 
       {/* Protected Role Dashboards */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardRedirect />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard/:role"
         element={

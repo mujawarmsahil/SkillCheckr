@@ -54,4 +54,39 @@ public class ExamServiceImpl implements ExamService {
 	public List<Exam> getExamsByTeacherId(int teacherId) {
 		return examRepository.getExamsByTeacherId(teacherId);
 	}
+
+	@Override
+	public boolean registerStudentForExam(int studentId, int examId) {
+		return examRepository.registerStudentForExam(studentId, examId);
+	}
+
+	@Override
+	public boolean isStudentRegisteredForExam(int studentId, int examId) {
+		return examRepository.isStudentRegisteredForExam(studentId, examId);
+	}
+
+	@Override
+	public List<Integer> getRegisteredExamIdsForStudent(int studentId) {
+		return examRepository.getRegisteredExamIdsForStudent(studentId);
+	}
+
+	@Override
+	public List<com.skillcheckr.model.ExamRegistration> getRegistrationsByStudentId(int studentId) {
+		return examRepository.getRegistrationsByStudentId(studentId);
+	}
+
+	@Override
+	public List<com.skillcheckr.model.Student> getRegisteredStudentsByExamId(int examId) {
+		return examRepository.getRegisteredStudentsByExamId(examId);
+	}
+
+	@Override
+	public int getRegistrationCountByExamId(int examId) {
+		return examRepository.getRegistrationCountByExamId(examId);
+	}
+
+	@Override
+	public boolean unregisterStudentFromExam(int studentId, int examId) {
+		return examRepository.unregisterStudentFromExam(studentId, examId);
+	}
 }

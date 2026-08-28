@@ -21,6 +21,8 @@ public class Admin {
 	private String adminEmail;
 	@JsonProperty("admin_contact")
 	private String adminContact;
+	@JsonProperty("profile_image")
+	private String profileImage;
 	 
 	 
 	

@@ -4,6 +4,25 @@ import apiClient from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 
+export const isExamDateTimePassed = (exam) => {
+  if (!exam) return false;
+  if (exam.status === "Completed") return true;
+  const dateStr = (exam.date || exam.exam_date || "").split("T")[0];
+  if (!dateStr) return false;
+  const endTimeStr = exam.end_time || exam.endTime || "23:59:59";
+  try {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const timeParts = endTimeStr.split(":").map(Number);
+    const hours = timeParts[0] || 0;
+    const minutes = timeParts[1] || 0;
+    const seconds = timeParts[2] || 0;
+    const examEndTime = new Date(year, month - 1, day, hours, minutes, seconds);
+    return examEndTime < new Date();
+  } catch {
+    return false;
+  }
+};
+
 export default function TotalExams() {
   const [upcomingExams, setUpcomingExams] = useState([]);
   const [completedExams, setCompletedExams] = useState([]);
@@ -18,8 +37,26 @@ export default function TotalExams() {
         apiClient.get("/api/exams/viewAllUpComingExam"),
         apiClient.get("/api/exams/viewAllCompletedExam"),
       ]);
-      setUpcomingExams(Array.isArray(upRes.data) ? upRes.data : []);
-      setCompletedExams(Array.isArray(compRes.data) ? compRes.data : []);
+
+      const rawUpcoming = Array.isArray(upRes.data) ? upRes.data : [];
+      const rawCompleted = Array.isArray(compRes.data) ? compRes.data : [];
+
+      const genuinelyUpcoming = [];
+      const allCompleted = [...rawCompleted];
+
+      rawUpcoming.forEach((e) => {
+        if (isExamDateTimePassed(e)) {
+          const id = e.exam_id || e.examId;
+          if (!allCompleted.some((c) => (c.exam_id || c.examId) === id)) {
+            allCompleted.push({ ...e, status: "Completed" });
+          }
+        } else {
+          genuinelyUpcoming.push(e);
+        }
+      });
+
+      setUpcomingExams(genuinelyUpcoming);
+      setCompletedExams(allCompleted);
     } catch (err) {
       showError(err.message || "Failed to load examination statistics");
     } finally {
@@ -139,18 +176,40 @@ export default function TotalExams() {
                   <th className="py-3 px-4">Exam Date</th>
                   <th className="py-3 px-4">Start Time</th>
                   <th className="py-3 px-4">End Time</th>
+                  <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {currentList.map((exam, idx) => (
-                  <tr key={exam.exam_id || exam.examId || idx} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4 font-mono text-xs text-slate-400">#{exam.exam_id || exam.examId}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-900">{exam.exam_name || exam.examName}</td>
-                    <td className="py-3 px-4 text-xs text-slate-600">{exam.date?.split("T")[0] || exam.date}</td>
-                    <td className="py-3 px-4 text-xs text-slate-500">{exam.start_time || exam.startTime || "10:00"}</td>
-                    <td className="py-3 px-4 text-xs text-slate-500">{exam.end_time || exam.endTime || "11:00"}</td>
-                  </tr>
-                ))}
+                {currentList.map((exam, idx) => {
+                  const isPassed = isExamDateTimePassed(exam);
+                  const displayStatus = isPassed ? "Completed" : (exam.status || "Upcoming");
+
+                  return (
+                    <tr key={exam.exam_id || exam.examId || idx} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 px-4 font-mono text-xs text-slate-400">#{exam.exam_id || exam.examId}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-900">{exam.exam_name || exam.examName}</td>
+                      <td className="py-3 px-4 text-xs text-slate-600">{exam.date?.split("T")[0] || exam.date}</td>
+                      <td className="py-3 px-4 text-xs text-slate-500">{exam.start_time || exam.startTime || "10:00"}</td>
+                      <td className="py-3 px-4 text-xs text-slate-500">{exam.end_time || exam.endTime || "11:00"}</td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                            displayStatus === "Completed"
+                              ? "bg-slate-100 text-slate-700"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {displayStatus === "Completed" ? (
+                            <Icon name="check-circle" className="w-3 h-3 text-slate-600" />
+                          ) : (
+                            <Icon name="clock" className="w-3 h-3 text-emerald-600" />
+                          )}
+                          {displayStatus}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

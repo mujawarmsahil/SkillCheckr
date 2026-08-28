@@ -1,19 +1,18 @@
 package com.skillcheckr.repository;
-import java.util.*;
+
+import java.util.List;
+
 import com.skillcheckr.model.RegistrationRequest;
 
 public interface RegistrationRequestRepository {
-	
-public boolean saveRequest(RegistrationRequest request);
 
+    boolean saveRequest(RegistrationRequest request);
 
+    List<RegistrationRequest> getAllRequests();
 
- public List <RegistrationRequest> getAllRequests();
- 
- 
- public boolean deleteRequestById(int id);
- 
- 
- RegistrationRequest getRequestById(int id);  
- 
+    RegistrationRequest getRequestById(int id);
+
+    boolean deleteRequestById(int id);
+
+    boolean updateRequestStatus(int id, String status);
 }

@@ -50,4 +50,12 @@ class RegistrationRequestServiceTest {
         assertThat(registrationRequestService.deleteRequest(4)).isTrue();
         verify(registrationRequestRepository).deleteRequestById(4);
     }
+
+    @Test
+    void updateRequestStatus_delegatesToRepository() {
+        when(registrationRequestRepository.updateRequestStatus(4, "Approved")).thenReturn(true);
+
+        assertThat(registrationRequestService.updateRequestStatus(4, "Approved")).isTrue();
+        verify(registrationRequestRepository).updateRequestStatus(4, "Approved");
+    }
 }

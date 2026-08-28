@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from "react";
 import apiClient from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
+import { isExamDateTimePassed } from "./TotalExams";
 
 export default function AcceptExam() {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("ALL"); // "ALL", "PENDING", "UPCOMING", "COMPLETED"
   const { showSuccess, showError } = useToast();
 
   const fetchExams = useCallback(async () => {
@@ -50,10 +52,24 @@ export default function AcceptExam() {
     }
   };
 
+  const getComputedExamStatus = (exam) => {
+    const rawStatus = (exam.status || "Pending").trim();
+    if (rawStatus.toLowerCase() === "pending") return "Pending";
+    if (rawStatus.toLowerCase() === "completed") return "Completed";
+    if (isExamDateTimePassed(exam)) return "Completed";
+    return "Upcoming";
+  };
+
   const filteredExams = exams.filter((e) => {
     const title = (e.exam_name || e.examName || "").toLowerCase();
     const sub = (e.subject?.subject_name || e.subject?.subjectName || "").toLowerCase();
-    return title.includes(search.toLowerCase()) || sub.includes(search.toLowerCase());
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query || title.includes(query) || sub.includes(query);
+
+    const computedStatus = getComputedExamStatus(e).toUpperCase();
+    const matchesFilter = filterStatus === "ALL" || computedStatus === filterStatus;
+
+    return matchesSearch && matchesFilter;
   });
 
   return (
@@ -62,16 +78,16 @@ export default function AcceptExam() {
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="check" className="w-5 h-5 text-orange-500" />
-          Examination Approval Console
+          Examination Approval & Management
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Review, approve, and activate educator-created assessments for student enrollment
+          Review educator-created assessments, approve upcoming exams, and audit schedule statuses
         </p>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="relative flex-1">
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="relative flex-1 w-full">
           <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -80,6 +96,28 @@ export default function AcceptExam() {
             placeholder="Search exams by title or subject..."
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
           />
+        </div>
+
+        {/* Status Filters */}
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          {[
+            { id: "ALL", label: "All Exams" },
+            { id: "PENDING", label: "Pending" },
+            { id: "UPCOMING", label: "Upcoming" },
+            { id: "COMPLETED", label: "Completed" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterStatus(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                filterStatus === tab.id
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -90,10 +128,10 @@ export default function AcceptExam() {
           <p className="text-xs text-slate-500">Loading examinations...</p>
         </div>
       ) : filteredExams.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
+        <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3 shadow-sm">
           <Icon name="check-circle" className="w-10 h-10 text-slate-300 mx-auto" />
-          <h3 className="text-base font-bold text-slate-700">No exams pending approval</h3>
-          <p className="text-xs text-slate-400">All submitted tests have been processed.</p>
+          <h3 className="text-base font-bold text-slate-700">No exams match your criteria</h3>
+          <p className="text-xs text-slate-400">All submitted assessments have been updated.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -113,8 +151,10 @@ export default function AcceptExam() {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredExams.map((exam) => {
                   const examId = exam.exam_id || exam.examId;
-                  const isApproved = exam.status === "Upcoming" || exam.status === "Approved" || exam.status === "Completed";
-                  const isPending = exam.status === "Pending" || !exam.status;
+                  const computedStatus = getComputedExamStatus(exam);
+                  const isPending = computedStatus === "Pending";
+                  const isUpcoming = computedStatus === "Upcoming";
+                  const isCompleted = computedStatus === "Completed";
 
                   return (
                     <tr key={examId} className="hover:bg-slate-50/70 transition-colors">
@@ -136,16 +176,23 @@ export default function AcceptExam() {
                       </td>
                       <td className="py-3.5 px-4">
                         <span
-                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                            isApproved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                            isUpcoming
+                              ? "bg-emerald-100 text-emerald-800"
+                              : isCompleted
+                              ? "bg-slate-100 text-slate-700"
+                              : "bg-amber-100 text-amber-800"
                           }`}
                         >
-                          {exam.status || "Pending"}
+                          {isUpcoming && <Icon name="clock" className="w-3 h-3 text-emerald-600" />}
+                          {isCompleted && <Icon name="check-circle" className="w-3 h-3 text-slate-600" />}
+                          {isPending && <Icon name="alert" className="w-3 h-3 text-amber-600" />}
+                          {computedStatus}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {isPending ? (
+                          {isPending && (
                             <button
                               onClick={() => handleApproveExam(examId)}
                               className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1"
@@ -153,10 +200,19 @@ export default function AcceptExam() {
                               <Icon name="check" className="w-3.5 h-3.5" />
                               Approve
                             </button>
-                          ) : (
+                          )}
+
+                          {isUpcoming && (
                             <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
                               <Icon name="check-circle" className="w-4 h-4" />
-                              Active
+                              Scheduled
+                            </span>
+                          )}
+
+                          {isCompleted && (
+                            <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
+                              <Icon name="check-circle" className="w-4 h-4 text-slate-400" />
+                              Concluded
                             </span>
                           )}
 
