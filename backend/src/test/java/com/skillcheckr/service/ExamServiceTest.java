@@ -14,6 +14,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.skillcheckr.model.Exam;
+import com.skillcheckr.model.ExamRegistration;
+import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.repository.ExamRepository;
 
@@ -84,5 +86,82 @@ class ExamServiceTest {
 
         assertThat(examService.viewAllCompletedExam()).hasSize(1);
         verify(examRepository).viewAllCompletedExam();
+    }
+
+    @Test
+    void getExamById_delegatesToRepository() {
+        Exam exam = new Exam();
+        exam.setExamId(1);
+        when(examRepository.getExamById(1)).thenReturn(exam);
+
+        assertThat(examService.getExamById(1)).isSameAs(exam);
+        verify(examRepository).getExamById(1);
+    }
+
+    @Test
+    void getExamsByTeacherId_delegatesToRepository() {
+        Exam exam = new Exam();
+        when(examRepository.getExamsByTeacherId(10)).thenReturn(List.of(exam));
+
+        assertThat(examService.getExamsByTeacherId(10)).hasSize(1);
+        verify(examRepository).getExamsByTeacherId(10);
+    }
+
+    @Test
+    void registerStudentForExam_delegatesToRepository() {
+        when(examRepository.registerStudentForExam(1, 2)).thenReturn(true);
+
+        assertThat(examService.registerStudentForExam(1, 2)).isTrue();
+        verify(examRepository).registerStudentForExam(1, 2);
+    }
+
+    @Test
+    void isStudentRegisteredForExam_delegatesToRepository() {
+        when(examRepository.isStudentRegisteredForExam(1, 2)).thenReturn(true);
+
+        assertThat(examService.isStudentRegisteredForExam(1, 2)).isTrue();
+        verify(examRepository).isStudentRegisteredForExam(1, 2);
+    }
+
+    @Test
+    void getRegisteredExamIdsForStudent_delegatesToRepository() {
+        when(examRepository.getRegisteredExamIdsForStudent(1)).thenReturn(List.of(2, 3));
+
+        assertThat(examService.getRegisteredExamIdsForStudent(1)).containsExactly(2, 3);
+        verify(examRepository).getRegisteredExamIdsForStudent(1);
+    }
+
+    @Test
+    void getRegistrationsByStudentId_delegatesToRepository() {
+        ExamRegistration reg = new ExamRegistration();
+        when(examRepository.getRegistrationsByStudentId(1)).thenReturn(List.of(reg));
+
+        assertThat(examService.getRegistrationsByStudentId(1)).containsExactly(reg);
+        verify(examRepository).getRegistrationsByStudentId(1);
+    }
+
+    @Test
+    void getRegisteredStudentsByExamId_delegatesToRepository() {
+        Student student = new Student();
+        when(examRepository.getRegisteredStudentsByExamId(2)).thenReturn(List.of(student));
+
+        assertThat(examService.getRegisteredStudentsByExamId(2)).containsExactly(student);
+        verify(examRepository).getRegisteredStudentsByExamId(2);
+    }
+
+    @Test
+    void getRegistrationCountByExamId_delegatesToRepository() {
+        when(examRepository.getRegistrationCountByExamId(2)).thenReturn(7);
+
+        assertThat(examService.getRegistrationCountByExamId(2)).isEqualTo(7);
+        verify(examRepository).getRegistrationCountByExamId(2);
+    }
+
+    @Test
+    void unregisterStudentFromExam_delegatesToRepository() {
+        when(examRepository.unregisterStudentFromExam(1, 2)).thenReturn(true);
+
+        assertThat(examService.unregisterStudentFromExam(1, 2)).isTrue();
+        verify(examRepository).unregisterStudentFromExam(1, 2);
     }
 }
