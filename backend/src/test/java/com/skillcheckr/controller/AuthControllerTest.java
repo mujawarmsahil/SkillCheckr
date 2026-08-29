@@ -170,7 +170,7 @@ class AuthControllerTest {
     }
 
     @Test
-    void updateProfile_returnsSuccess_whenDataIsValid() throws Exception {
+    void updateProfile_returnsSuccess_whenDataIsValid_withoutPasswordChange() throws Exception {
         com.skillcheckr.model.UserProfileDTO updated = com.skillcheckr.model.UserProfileDTO.builder()
                 .userId(10)
                 .username("student1_updated")
@@ -183,7 +183,7 @@ class AuthControllerTest {
         when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
         when(authService.updateUserProfile(org.mockito.ArgumentMatchers.any(com.skillcheckr.model.UserProfileDTO.class))).thenReturn(updated);
 
-        String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"password\":\"newSecret123\"}";
+        String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\"}";
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -192,6 +192,61 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Profile updated successfully"))
                 .andExpect(jsonPath("$.profile.name").value("Alice Updated"));
+    }
+
+    @Test
+    void updateProfile_returnsSuccess_whenDataIsValid_withValidOldPassword() throws Exception {
+        com.skillcheckr.model.UserProfileDTO updated = com.skillcheckr.model.UserProfileDTO.builder()
+                .userId(10)
+                .username("student1_updated")
+                .name("Alice Updated")
+                .email("alice_updated@test.com")
+                .role("Student")
+                .build();
+
+        when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
+        when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
+        when(authService.verifyCurrentPassword(10, "oldSecret123")).thenReturn(true);
+        when(authService.updateUserProfile(org.mockito.ArgumentMatchers.any(com.skillcheckr.model.UserProfileDTO.class))).thenReturn(updated);
+
+        String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"old_password\":\"oldSecret123\",\"password\":\"newSecret123\"}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Profile updated successfully"))
+                .andExpect(jsonPath("$.profile.name").value("Alice Updated"));
+    }
+
+    @Test
+    void updateProfile_returnsBadRequest_whenOldPasswordInvalid() throws Exception {
+        when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
+        when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
+        when(authService.verifyCurrentPassword(10, "wrongOldPass")).thenReturn(false);
+
+        String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"current_password\":\"wrongOldPass\",\"password\":\"newSecret123\"}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid current password. Cannot change password."));
+    }
+
+    @Test
+    void updateProfile_returnsBadRequest_whenOldPasswordMissingOnPasswordChange() throws Exception {
+        when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
+        when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
+
+        String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"password\":\"newSecret123\"}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Current password is required to change password"));
     }
 
     @Test

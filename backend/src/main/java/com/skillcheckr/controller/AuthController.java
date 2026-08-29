@@ -58,6 +58,7 @@ public class AuthController {
 
                 String name = fullProfile != null && fullProfile.getName() != null ? fullProfile.getName() : user.getUsername();
                 String email = fullProfile != null && fullProfile.getEmail() != null ? fullProfile.getEmail() : "";
+                String contact = fullProfile != null && fullProfile.getContact() != null ? fullProfile.getContact() : "";
                 String profileImage = fullProfile != null && fullProfile.getProfileImage() != null ? fullProfile.getProfileImage() : user.getProfileImage();
 
                 Map<String, Object> response = new HashMap<>();
@@ -65,6 +66,7 @@ public class AuthController {
                 response.put("username", user.getUsername());
                 response.put("name", name);
                 response.put("email", email);
+                response.put("contact", contact);
                 if (profileImage != null) {
                     response.put("profile_image", profileImage);
                     response.put("profileImage", profileImage);
@@ -163,10 +165,22 @@ public class AuthController {
 
         // Validate password if provided
         if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
-            if (profile.getPassword().trim().length() < 4) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Password must be at least 4 characters long"));
+            String newPassword = profile.getPassword().trim();
+            if (newPassword.length() < 4) {
+                return ResponseEntity.badRequest().body(Map.of("message", "New password must be at least 4 characters long"));
             }
-            profile.setPassword(profile.getPassword().trim());
+
+            if (profile.getOldPassword() == null || profile.getOldPassword().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Current password is required to change password"));
+            }
+
+            boolean isOldPasswordValid = authService.verifyCurrentPassword(profile.getUserId(), profile.getOldPassword().trim());
+            if (!isOldPasswordValid) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "Invalid current password. Cannot change password."));
+            }
+
+            profile.setPassword(newPassword);
         } else {
             profile.setPassword(null); // Keep existing password
         }
