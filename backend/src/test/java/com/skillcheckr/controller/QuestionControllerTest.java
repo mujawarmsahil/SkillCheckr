@@ -1,8 +1,13 @@
 package com.skillcheckr.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
@@ -45,7 +50,9 @@ class QuestionControllerTest {
         mockMvc.perform(post("/api/create/addQues")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.message").value("Questions added successfully"));
 
         verify(questionService).saveQuestionsWithAnswers(org.mockito.ArgumentMatchers.argThat(
                 questions -> questions.size() == 1
@@ -54,18 +61,55 @@ class QuestionControllerTest {
     }
 
     @Test
-    void addAllQuestion_acceptsMultipleQuestions() throws Exception {
-        String payload = "[{\"subjectId\":1,\"question\":\"Q1\",\"option1\":\"a\",\"option2\":\"b\","
-                + "\"option3\":\"c\",\"option4\":\"d\",\"correctOption\":\"a\"},"
-                + "{\"subjectId\":1,\"question\":\"Q2\",\"option1\":\"a\",\"option2\":\"b\","
-                + "\"option3\":\"c\",\"option4\":\"d\",\"correctOption\":\"b\"}]";
+    void addAllQuestion_returns500_whenServiceThrows() throws Exception {
+        doThrow(new RuntimeException("DB write failure")).when(questionService).saveQuestionsWithAnswers(any());
 
         mockMvc.perform(post("/api/create/addQues")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(payload))
-                .andExpect(status().isOk());
+                        .content("[{\"question\":\"test\"}]"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Failed to add questions: DB write failure"));
+    }
 
-        verify(questionService).saveQuestionsWithAnswers(org.mockito.ArgumentMatchers.argThat(
-                questions -> questions.size() == 2));
+    @Test
+    void getQuestionsBySubject_returnsQuestions() throws Exception {
+        QuestionDTO q = new QuestionDTO();
+        q.setQuestionId(1);
+        q.setSubjectId(10);
+        when(questionService.getQuestionsBySubjectId(10)).thenReturn(List.of(q));
+
+        mockMvc.perform(get("/api/create/subject/10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].question_id").value(1));
+    }
+
+    @Test
+    void getQuestionsByExam_returnsQuestions() throws Exception {
+        QuestionDTO q = new QuestionDTO();
+        q.setQuestionId(2);
+        q.setExamId(5);
+        when(questionService.getQuestionsByExamId(5)).thenReturn(List.of(q));
+
+        mockMvc.perform(get("/api/create/exam/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].question_id").value(2));
+    }
+
+    @Test
+    void deleteQuestion_returns200_whenDeleted() throws Exception {
+        when(questionService.deleteQuestionById(1)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/create/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Question deleted successfully"));
+    }
+
+    @Test
+    void deleteQuestion_returns404_whenNotFound() throws Exception {
+        when(questionService.deleteQuestionById(99)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/create/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Question not found"));
     }
 }

@@ -123,4 +123,13 @@ class AdminServiceTest {
         assertThat(adminService.deleteStudentById(22)).isFalse();
         verify(adminRepository).deleteStudentById(22);
     }
+
+    @Test
+    void getAdminStats_delegatesToRepository() {
+        java.util.Map<String, Object> stats = java.util.Map.of("totalStudents", 5);
+        when(adminRepository.getAdminStats()).thenReturn(stats);
+
+        assertThat(adminService.getAdminStats()).isEqualTo(stats);
+        verify(adminRepository).getAdminStats();
+    }
 }

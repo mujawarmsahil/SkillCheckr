@@ -1,6 +1,8 @@
 package com.skillcheckr.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 
@@ -39,5 +41,35 @@ class QuestionServiceTest {
         questionService.saveQuestionsWithAnswers(List.of());
 
         verify(questionRepository).saveQuestionWithAnswers(List.of());
+    }
+
+    @Test
+    void getQuestionsBySubjectId_delegatesToRepository() {
+        QuestionDTO dto = new QuestionDTO();
+        when(questionRepository.getQuestionsBySubjectId(1)).thenReturn(List.of(dto));
+
+        List<QuestionDTO> actual = questionService.getQuestionsBySubjectId(1);
+
+        assertThat(actual).hasSize(1);
+        verify(questionRepository).getQuestionsBySubjectId(1);
+    }
+
+    @Test
+    void getQuestionsByExamId_delegatesToRepository() {
+        QuestionDTO dto = new QuestionDTO();
+        when(questionRepository.getQuestionsByExamId(2)).thenReturn(List.of(dto));
+
+        List<QuestionDTO> actual = questionService.getQuestionsByExamId(2);
+
+        assertThat(actual).hasSize(1);
+        verify(questionRepository).getQuestionsByExamId(2);
+    }
+
+    @Test
+    void deleteQuestionById_delegatesToRepository() {
+        when(questionRepository.deleteQuestionById(3)).thenReturn(true);
+
+        assertThat(questionService.deleteQuestionById(3)).isTrue();
+        verify(questionRepository).deleteQuestionById(3);
     }
 }

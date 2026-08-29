@@ -151,4 +151,13 @@ class AdminControllerTest {
 
         mockMvc.perform(delete("/api/Admin/studentDelteteById/22")).andExpect(status().isNotFound());
     }
+
+    @Test
+    void getAdminStats_returnsOk_withStats() throws Exception {
+        when(adminService.getAdminStats()).thenReturn(java.util.Map.of("totalStudents", 5));
+
+        mockMvc.perform(get("/api/Admin/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalStudents").value(5));
+    }
 }
