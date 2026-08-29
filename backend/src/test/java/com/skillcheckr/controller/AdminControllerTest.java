@@ -39,10 +39,12 @@ class AdminControllerTest {
     }
 
     @Test
-    void viewAllTeacher_returns404_whenEmpty() throws Exception {
+    void viewAllTeacher_returnsEmptyList_whenEmpty() throws Exception {
         when(adminService.getAllTeacher()).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/Admin/viewAllTeacher")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/Admin/viewAllTeacher"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test
@@ -56,14 +58,17 @@ class AdminControllerTest {
         mockMvc.perform(get("/api/Admin/viewAllTeacher"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].teacher_id").value(1))
-                .andExpect(jsonPath("$[0].teacher_name").value("Alice"));
+                .andExpect(jsonPath("$[0].name").value("Alice"))
+                .andExpect(jsonPath("$[0].email").value("alice@example.com"));
     }
 
     @Test
-    void viewAllStudent_returns404_whenEmpty() throws Exception {
+    void viewAllStudent_returnsEmptyList_whenEmpty() throws Exception {
         when(adminService.getAllStudent()).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/Admin/viewAllStudent")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/Admin/viewAllStudent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test
@@ -77,30 +82,46 @@ class AdminControllerTest {
         mockMvc.perform(get("/api/Admin/viewAllStudent"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].student_id").value(2))
-                .andExpect(jsonPath("$[0].student_name").value("Bob"));
+                .andExpect(jsonPath("$[0].name").value("Bob"))
+                .andExpect(jsonPath("$[0].email").value("bob@example.com"));
     }
 
     @Test
     void addStudent_returnsOk_whenAccepted() throws Exception {
         when(adminService.addStudentFromRequest(4)).thenReturn(true);
 
-        mockMvc.perform(post("/api/Admin/addStudent/4")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/Admin/addStudent/4"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Student added successfully"));
     }
 
     @Test
-    void addStudent_returnsFalseBody_whenRejected() throws Exception {
+    void addStudent_returnsBadRequest_whenRejected() throws Exception {
         when(adminService.addStudentFromRequest(4)).thenReturn(false);
 
         mockMvc.perform(post("/api/Admin/addStudent/4"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value(false));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
     void addTeacher_returnsOk_whenAccepted() throws Exception {
         when(adminService.addTeacherFromRequest(5)).thenReturn(true);
 
-        mockMvc.perform(post("/api/Admin/addTeacher/5")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/Admin/addTeacher/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Teacher added successfully"));
+    }
+
+    @Test
+    void addTeacher_returnsBadRequest_whenRejected() throws Exception {
+        when(adminService.addTeacherFromRequest(5)).thenReturn(false);
+
+        mockMvc.perform(post("/api/Admin/addTeacher/5"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
