@@ -68,4 +68,22 @@ class QuestionControllerTest {
         verify(questionService).saveQuestionsWithAnswers(org.mockito.ArgumentMatchers.argThat(
                 questions -> questions.size() == 2));
     }
+
+    @Test
+    void getAllQuestions_returnsOk() throws Exception {
+        QuestionDTO q = QuestionDTO.builder().questionId(1).question("What is Java?").build();
+        when(questionService.getAllQuestions()).thenReturn(List.of(q));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/questions/all"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].question").value("What is Java?"));
+    }
+
+    @Test
+    void deleteQuestion_returnsOk_whenFound() throws Exception {
+        when(questionService.deleteQuestionById(5)).thenReturn(true);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/questions/5"))
+                .andExpect(status().isOk());
+    }
 }

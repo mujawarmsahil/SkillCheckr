@@ -29,35 +29,31 @@ public class AdminController {
 	@GetMapping({"/viewAllTeacher", "/teachers"})
 	public ResponseEntity<?> viewAllTeacher() {
 		List<Teacher> list = adminService.getAllTeacher();
-		return ResponseEntity.ok(list != null ? list : List.of());
+		if (list == null || list.isEmpty()) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
+		}
+		return ResponseEntity.ok(list);
 	}
 
 	@GetMapping({"/viewAllStudent", "/students"})
 	public ResponseEntity<?> viewAllStudent() {
 		List<Student> list = adminService.getAllStudent();
-		return ResponseEntity.ok(list != null ? list : List.of());
+		if (list == null || list.isEmpty()) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
+		}
+		return ResponseEntity.ok(list);
 	}
 
 	@PostMapping({"/addStudent/{request_id}", "/students/from-request/{request_id}"})
 	public ResponseEntity<Object> addStudentFromRequest(@PathVariable("request_id") Integer requestId) {
 		boolean success = adminService.addStudentFromRequest(requestId);
-		if (success) {
-			return ResponseEntity.ok(Map.of("message", "Student added successfully", "success", true));
-		} else {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-					.body(Map.of("message", "Failed to add student. User may already exist or request invalid.", "success", false));
-		}
+		return ResponseEntity.ok(success);
 	}
 
 	@PostMapping({"/addTeacher/{request_id}", "/teachers/from-request/{request_id}"})
 	public ResponseEntity<Object> addTeacherFromRequest(@PathVariable("request_id") Integer requestId) {
 		boolean success = adminService.addTeacherFromRequest(requestId);
-		if (success) {
-			return ResponseEntity.ok(Map.of("message", "Teacher added successfully", "success", true));
-		} else {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-					.body(Map.of("message", "Failed to add teacher. User may already exist or request invalid.", "success", false));
-		}
+		return ResponseEntity.ok(success);
 	}
 
 	@DeleteMapping({"/teacherDeleteById/{teacher_id}", "/teachers/{teacher_id}"})
@@ -75,11 +71,41 @@ public class AdminController {
 	public ResponseEntity<?> deleteStudent(@PathVariable("student_id") Integer studentId) {
 		boolean deleted = adminService.deleteStudentById(studentId);
 		if (deleted) {
-			return ResponseEntity.ok(Map.of("message", "Student deleted successfully", "success", true));
+			return ResponseEntity.ok(Map.of("message", "Student account updated/removed successfully", "success", true));
 		} else {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND)
-					.body(Map.of("message", "Student not found or could not be deleted", "success", false));
+					.body(Map.of("message", "Student not found or could not be processed", "success", false));
 		}
+	}
+
+	@org.springframework.web.bind.annotation.PutMapping({"/student/{student_id}/status", "/students/{student_id}/status"})
+	public ResponseEntity<?> toggleStudentStatus(
+			@PathVariable("student_id") Integer studentId,
+			@org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body) {
+		String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
+				? body.get("status").trim()
+				: "Active";
+		boolean updated = adminService.toggleStudentStatus(studentId, status);
+		if (updated) {
+			return ResponseEntity.ok(Map.of("message", "Student status updated to " + status, "success", true));
+		}
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(Map.of("message", "Student not found or status update failed", "success", false));
+	}
+
+	@org.springframework.web.bind.annotation.PutMapping({"/teacher/{teacher_id}/status", "/teachers/{teacher_id}/status"})
+	public ResponseEntity<?> toggleTeacherStatus(
+			@PathVariable("teacher_id") Integer teacherId,
+			@org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body) {
+		String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
+				? body.get("status").trim()
+				: "Active";
+		boolean updated = adminService.toggleTeacherStatus(teacherId, status);
+		if (updated) {
+			return ResponseEntity.ok(Map.of("message", "Teacher status updated to " + status, "success", true));
+		}
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(Map.of("message", "Teacher not found or status update failed", "success", false));
 	}
 
 	@GetMapping("/stats")

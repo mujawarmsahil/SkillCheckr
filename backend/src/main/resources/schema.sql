@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS `user` (
     `user_role` VARCHAR(50) NOT NULL,
     `profile_image` LONGTEXT NULL,
     `auth_provider` VARCHAR(50) DEFAULT 'LOCAL',
-    `provider_id` VARCHAR(255) NULL
+    `provider_id` VARCHAR(255) NULL,
+    `status` VARCHAR(50) DEFAULT 'Active'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 2. Admin Table
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS `teacher` (
     `contact` VARCHAR(20),
     `email` VARCHAR(100) NOT NULL,
     `profile_image` LONGTEXT NULL,
+    `status` VARCHAR(50) DEFAULT 'Active',
     FOREIGN KEY (`user_id`) REFERENCES `user`(`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -47,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `student` (
     `contact` VARCHAR(20),
     `email` VARCHAR(100) NOT NULL,
     `profile_image` LONGTEXT NULL,
+    `status` VARCHAR(50) DEFAULT 'Active',
     FOREIGN KEY (`user_id`) REFERENCES `user`(`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -24,6 +24,16 @@ public class QuestionServiceImpl implements QuestionService {
 	}
 
 	@Override
+	public List<QuestionDTO> getAllQuestions() {
+		return questionRepository.getAllQuestions();
+	}
+
+	@Override
+	public QuestionDTO getQuestionById(int questionId) {
+		return questionRepository.getQuestionById(questionId);
+	}
+
+	@Override
 	public List<QuestionDTO> getQuestionsBySubjectId(int subjectId) {
 		return questionRepository.getQuestionsBySubjectId(subjectId);
 	}
@@ -31,6 +41,11 @@ public class QuestionServiceImpl implements QuestionService {
 	@Override
 	public List<QuestionDTO> getQuestionsByExamId(int examId) {
 		return questionRepository.getQuestionsByExamId(examId);
+	}
+
+	@Override
+	public boolean updateQuestion(QuestionDTO question) {
+		return questionRepository.updateQuestion(question);
 	}
 
 	@Override

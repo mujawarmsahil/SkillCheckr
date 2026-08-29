@@ -36,4 +36,8 @@ public class User {
     @JsonProperty("provider_id")
     @JsonAlias({"provider_id", "providerId"})
     private String providerId;
+
+    @JsonProperty("status")
+    @JsonAlias({"status", "is_active", "isActive"})
+    private String status;
 }

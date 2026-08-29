@@ -266,10 +266,11 @@ public class ResultRepositoryImpl implements ResultRepository {
 
 		try {
 			ensureResultTableExists();
-			String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name "
+			String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name, stu.name AS student_name "
 					+ "FROM result r "
 					+ "LEFT JOIN exam e ON r.exam_id = e.exam_id "
 					+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
+					+ "LEFT JOIN student stu ON r.student_id = stu.student_id "
 					+ "ORDER BY r.result_id DESC";
 			return jdbcTemplate.query(sql, (rs, rowNum) -> ExamResultDTO.builder()
 					.resultId(rs.getInt("result_id"))
@@ -278,6 +279,7 @@ public class ResultRepositoryImpl implements ResultRepository {
 					.examType(rs.getString("exam_type") != null ? rs.getString("exam_type") : "MCQ")
 					.subjectName(rs.getString("subject_name"))
 					.studentId(rs.getInt("student_id"))
+					.studentName(rs.getString("student_name") != null ? rs.getString("student_name") : "Student #" + rs.getInt("student_id"))
 					.marksObtained(rs.getInt("marks_obtained"))
 					.totalMarks(rs.getInt("total_marks"))
 					.passingMarks(rs.getInt("passing_marks"))

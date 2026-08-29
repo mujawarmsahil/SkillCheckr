@@ -15,6 +15,8 @@ public interface ExamRepository {
 
 	boolean acceptExam(int examId);
 
+	boolean updateExamStatus(int examId, String status);
+
 	List<Exam> viewAllUpcomingExam();
 
 	List<Exam> viewAllCompletedExam();

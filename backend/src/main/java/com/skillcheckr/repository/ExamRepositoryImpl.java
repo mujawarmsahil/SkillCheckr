@@ -262,6 +262,13 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 	@Override
+	public boolean updateExamStatus(int examId, String status) {
+		String sql = "UPDATE exam SET status = ? WHERE exam_id = ?";
+		int rowsAffected = jdbcTemplate.update(sql, status, examId);
+		return rowsAffected > 0;
+	}
+
+	@Override
 	public List<Exam> viewAllUpcomingExam() {
 		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "

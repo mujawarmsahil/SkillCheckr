@@ -22,6 +22,10 @@ public interface AdminRepository {
 
 	boolean deleteStudentById(int studentId);
 
+	boolean toggleTeacherStatus(int teacherId, String status);
+
+	boolean toggleStudentStatus(int studentId, String status);
+
 	String getUsernameByRequestId(int requestId);
 
 	Map<String, Object> getAdminStats();

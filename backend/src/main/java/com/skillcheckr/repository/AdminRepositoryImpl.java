@@ -190,9 +190,18 @@ public class AdminRepositoryImpl implements AdminRepository {
 				Teacher teacher = new Teacher();
 				teacher.setTeacherId(rs.getInt("teacher_id"));
 				teacher.setUserId(rs.getInt("user_id"));
-				teacher.setTeacherName(rs.getString("name"));
-				teacher.setTeacherEmail(rs.getString("email"));
-				teacher.setTeacherContact(rs.getString("contact"));
+				teacher.setName(rs.getString("name"));
+				teacher.setEmail(rs.getString("email"));
+				teacher.setContact(rs.getString("contact"));
+				try {
+					teacher.setProfileImage(rs.getString("profile_image"));
+				} catch (Exception ignored) {}
+				try {
+					String st = rs.getString("status");
+					teacher.setStatus(st != null && !st.trim().isEmpty() ? st : "Active");
+				} catch (Exception ignored) {
+					teacher.setStatus("Active");
+				}
 				return teacher;
 			}
 		});
@@ -205,9 +214,19 @@ public class AdminRepositoryImpl implements AdminRepository {
 			public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
 				Student student = new Student();
 				student.setStudentId(rs.getInt("student_id"));
-				student.setStudentName(rs.getString("name"));
-				student.setStudentEmail(rs.getString("email"));
-				student.setStudentContact(rs.getString("contact"));
+				student.setUserId(rs.getInt("user_id"));
+				student.setName(rs.getString("name"));
+				student.setEmail(rs.getString("email"));
+				student.setContact(rs.getString("contact"));
+				try {
+					student.setProfileImage(rs.getString("profile_image"));
+				} catch (Exception ignored) {}
+				try {
+					String st = rs.getString("status");
+					student.setStatus(st != null && !st.trim().isEmpty() ? st : "Active");
+				} catch (Exception ignored) {
+					student.setStatus("Active");
+				}
 				return student;
 			}
 		});
@@ -218,6 +237,25 @@ public class AdminRepositoryImpl implements AdminRepository {
 		try {
 			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM teacher WHERE teacher_id = ?",
 				(rs, rowNum) -> rs.getInt("user_id"), teacherId);
+
+			// Check if teacher has associated exams
+			Integer examCount = 0;
+			try {
+				examCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE teacher_id = ?", Integer.class, teacherId);
+			} catch (Exception ignored) {}
+
+			if (examCount != null && examCount > 0) {
+				// Prefer soft deletion / deactivation to preserve exam history
+				jdbcTemplate.update("UPDATE teacher SET status = 'Inactive' WHERE teacher_id = ?", teacherId);
+				if (!userIds.isEmpty()) {
+					try {
+						jdbcTemplate.update("UPDATE user SET status = 'Inactive' WHERE user_id = ?", userIds.get(0));
+					} catch (Exception ignored) {}
+				}
+				return true;
+			}
+
+			// Safe to hard delete if no exams created
 			int teacherDeleted = jdbcTemplate.update("DELETE FROM teacher WHERE teacher_id = ?", teacherId);
 			if (!userIds.isEmpty() && teacherDeleted > 0) {
 				jdbcTemplate.update("DELETE FROM user WHERE user_id = ?", userIds.get(0));
@@ -234,6 +272,29 @@ public class AdminRepositoryImpl implements AdminRepository {
 		try {
 			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM student WHERE student_id = ?",
 				(rs, rowNum) -> rs.getInt("user_id"), studentId);
+
+			// Check if student has exam results or registrations
+			Integer resultCount = 0;
+			try {
+				resultCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM result WHERE student_id = ?", Integer.class, studentId);
+			} catch (Exception ignored) {}
+
+			if (resultCount != null && resultCount > 0) {
+				// Prefer soft deactivation to preserve academic history & scorecard integrity
+				jdbcTemplate.update("UPDATE student SET status = 'Inactive' WHERE student_id = ?", studentId);
+				if (!userIds.isEmpty()) {
+					try {
+						jdbcTemplate.update("UPDATE user SET status = 'Inactive' WHERE user_id = ?", userIds.get(0));
+					} catch (Exception ignored) {}
+				}
+				return true;
+			}
+
+			// Clean up registrations
+			try {
+				jdbcTemplate.update("DELETE FROM exam_registration WHERE student_id = ?", studentId);
+			} catch (Exception ignored) {}
+
 			int studentDeleted = jdbcTemplate.update("DELETE FROM student WHERE student_id = ?", studentId);
 			if (!userIds.isEmpty() && studentDeleted > 0) {
 				jdbcTemplate.update("DELETE FROM user WHERE user_id = ?", userIds.get(0));
@@ -241,6 +302,44 @@ public class AdminRepositoryImpl implements AdminRepository {
 			return studentDeleted > 0;
 		} catch (Exception e) {
 			System.err.println("Error deleting student: " + e.getMessage());
+			return false;
+		}
+	}
+
+	@Override
+	public boolean toggleTeacherStatus(int teacherId, String status) {
+		try {
+			String safeStatus = (status != null && status.equalsIgnoreCase("Inactive")) ? "Inactive" : "Active";
+			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM teacher WHERE teacher_id = ?",
+					(rs, rowNum) -> rs.getInt("user_id"), teacherId);
+			int rows = jdbcTemplate.update("UPDATE teacher SET status = ? WHERE teacher_id = ?", safeStatus, teacherId);
+			if (!userIds.isEmpty()) {
+				try {
+					jdbcTemplate.update("UPDATE user SET status = ? WHERE user_id = ?", safeStatus, userIds.get(0));
+				} catch (Exception ignored) {}
+			}
+			return rows > 0;
+		} catch (Exception e) {
+			System.err.println("Error toggling teacher status: " + e.getMessage());
+			return false;
+		}
+	}
+
+	@Override
+	public boolean toggleStudentStatus(int studentId, String status) {
+		try {
+			String safeStatus = (status != null && status.equalsIgnoreCase("Inactive")) ? "Inactive" : "Active";
+			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM student WHERE student_id = ?",
+					(rs, rowNum) -> rs.getInt("user_id"), studentId);
+			int rows = jdbcTemplate.update("UPDATE student SET status = ? WHERE student_id = ?", safeStatus, studentId);
+			if (!userIds.isEmpty()) {
+				try {
+					jdbcTemplate.update("UPDATE user SET status = ? WHERE user_id = ?", safeStatus, userIds.get(0));
+				} catch (Exception ignored) {}
+			}
+			return rows > 0;
+		} catch (Exception e) {
+			System.err.println("Error toggling student status: " + e.getMessage());
 			return false;
 		}
 	}
@@ -281,6 +380,21 @@ public class AdminRepositoryImpl implements AdminRepository {
 					Integer.class);
 			Integer pendingRequests = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE status = 'Pending' OR status IS NULL", Integer.class);
 
+			Integer totalSubjects = 0;
+			try {
+				totalSubjects = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM subject", Integer.class);
+			} catch (Exception ignored) {}
+
+			Integer totalQuestions = 0;
+			try {
+				totalQuestions = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM question", Integer.class);
+			} catch (Exception ignored) {}
+
+			Integer totalResults = 0;
+			try {
+				totalResults = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM result", Integer.class);
+			} catch (Exception ignored) {}
+
 			stats.put("totalStudents", totalStudents != null ? totalStudents : 0);
 			stats.put("totalTeachers", totalTeachers != null ? totalTeachers : 0);
 			stats.put("totalExams", totalExams != null ? totalExams : 0);
@@ -288,6 +402,9 @@ public class AdminRepositoryImpl implements AdminRepository {
 			stats.put("upcomingExams", upcomingExams != null ? upcomingExams : 0);
 			stats.put("completedExams", completedExams != null ? completedExams : 0);
 			stats.put("pendingRequests", pendingRequests != null ? pendingRequests : 0);
+			stats.put("totalSubjects", totalSubjects != null ? totalSubjects : 0);
+			stats.put("totalQuestions", totalQuestions != null ? totalQuestions : 0);
+			stats.put("totalResults", totalResults != null ? totalResults : 0);
 		} catch (Exception e) {
 			System.err.println("Error gathering admin stats: " + e.getMessage());
 		}
