@@ -52,4 +52,9 @@ public class AuthServiceImpl implements AuthService {
     public boolean isEmailInUse(String email, int excludeUserId) {
         return authRepository.isEmailInUse(email, excludeUserId);
     }
+
+    @Override
+    public boolean verifyCurrentPassword(int userId, String oldPassword) {
+        return authRepository.verifyCurrentPassword(userId, oldPassword);
+    }
 }

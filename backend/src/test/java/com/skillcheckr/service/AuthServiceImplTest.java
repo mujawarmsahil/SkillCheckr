@@ -114,4 +114,12 @@ class AuthServiceImplTest {
         assertThat(authService.isEmailInUse("user1@test.com", 1)).isFalse();
         verify(authRepository).isEmailInUse("user1@test.com", 1);
     }
+
+    @Test
+    void verifyCurrentPassword_delegatesToRepository() {
+        when(authRepository.verifyCurrentPassword(1, "secret")).thenReturn(true);
+
+        assertThat(authService.verifyCurrentPassword(1, "secret")).isTrue();
+        verify(authRepository).verifyCurrentPassword(1, "secret");
+    }
 }

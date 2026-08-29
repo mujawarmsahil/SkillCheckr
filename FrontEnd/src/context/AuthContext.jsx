@@ -57,7 +57,8 @@ export function AuthProvider({ children }) {
     const userToken = data.token || "session-token-" + userId;
     const resolvedUsername = data.username || username.trim();
     const resolvedName = data.name || resolvedUsername;
-    const resolvedEmail = data.email || "";
+    const resolvedEmail = data.email || data.student_email || data.teacher_email || data.admin_email || "";
+    const resolvedContact = data.contact || data.student_contact || data.teacher_contact || data.admin_contact || "";
     const resolvedProfileImage = data.profile_image || data.profileImage || null;
 
     localStorage.setItem("username", resolvedUsername);
@@ -66,6 +67,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem("user_id", userId);
     localStorage.setItem("token", userToken);
     if (resolvedEmail) localStorage.setItem("email", resolvedEmail);
+    if (resolvedContact) localStorage.setItem("contact", resolvedContact);
     if (resolvedProfileImage) {
       localStorage.setItem("profile_image", resolvedProfileImage);
     } else {
@@ -82,10 +84,13 @@ export function AuthProvider({ children }) {
       username: resolvedUsername,
       name: resolvedName,
       email: resolvedEmail,
+      contact: resolvedContact,
       profileImage: resolvedProfileImage,
       role: userRole,
       userId,
+      user_id: userId,
       roleId,
+      role_id: roleId,
     });
     setRole(userRole);
     setToken(userToken);

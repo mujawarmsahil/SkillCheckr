@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { PieChart, Pie, Tooltip, Legend, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import apiClient from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
@@ -61,6 +61,8 @@ export default function TotalUsers() {
   ];
   const COLORS = ["#ea580c", "#3b82f6"];
 
+  const totalUsers = students.length + teachers.length;
+
   const filteredList = (activeTab === "STUDENTS" ? students : teachers).filter((u) => {
     const name = (u.student_name || u.studentName || u.teacher_name || u.teacherName || u.name || "").toLowerCase();
     const email = (u.student_email || u.studentEmail || u.teacher_email || u.teacherEmail || u.email || "").toLowerCase();
@@ -82,8 +84,8 @@ export default function TotalUsers() {
 
       {/* Summary Cards & Chart */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 min-h-[120px]">
+          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
             <Icon name="book" className="w-6 h-6" />
           </div>
           <div>
@@ -92,8 +94,8 @@ export default function TotalUsers() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 min-h-[120px]">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
             <Icon name="users" className="w-6 h-6" />
           </div>
           <div>
@@ -102,26 +104,73 @@ export default function TotalUsers() {
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center h-28">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={25}
-                outerRadius={45}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend verticalAlign="middle" align="right" layout="vertical" iconSize={8} />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center min-h-[120px]">
+          {totalUsers === 0 ? (
+            <div className="w-full flex flex-col items-center justify-center text-slate-400 py-2">
+              <Icon name="users" className="w-6 h-6 mb-1 text-slate-300" />
+              <span className="text-xs font-medium">No users registered yet</span>
+            </div>
+          ) : (
+            <div className="w-full flex items-center justify-between gap-3">
+              {/* Donut Chart */}
+              <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                    <Pie
+                      data={chartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={24}
+                      outerRadius={42}
+                      paddingAngle={chartData.filter((d) => d.value > 0).length > 1 ? 4 : 0}
+                      dataKey="value"
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0];
+                          return (
+                            <div className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs shadow-md font-medium">
+                              <span>{data.name}: </span>
+                              <span className="font-bold">{data.value}</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Breakdown Legend */}
+              <div className="flex flex-col justify-center gap-1.5 flex-1 min-w-0">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ratio</span>
+                  <span className="text-[11px] font-bold text-slate-700">{totalUsers} Total</span>
+                </div>
+                {chartData.map((item, idx) => {
+                  const pct = totalUsers > 0 ? Math.round((item.value / totalUsers) * 100) : 0;
+                  return (
+                    <div key={item.name} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[idx] }} />
+                        <span className="text-slate-600 font-medium truncate text-xs">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 pl-1 flex-shrink-0">
+                        <span className="font-bold text-slate-900">{item.value}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">({pct}%)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
