@@ -48,6 +48,10 @@ public class QuestionDTO {
 	@JsonAlias({"subjectId"})
 	private int subjectId;
 
+	@JsonProperty("subject_name")
+	@JsonAlias({"subjectName"})
+	private String subjectName;
+
 	@JsonProperty("exam_id")
 	@JsonAlias({"examId"})
 	private Integer examId;

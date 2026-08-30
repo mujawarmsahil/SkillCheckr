@@ -8,7 +8,7 @@ export default function AcceptExam() {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("ALL"); // "ALL", "PENDING", "UPCOMING", "COMPLETED"
+  const [filterStatus, setFilterStatus] = useState("ALL"); // "ALL", "PENDING", "UPCOMING", "COMPLETED", "CANCELLED"
   const { showSuccess, showError } = useToast();
 
   const fetchExams = useCallback(async () => {
@@ -29,15 +29,39 @@ export default function AcceptExam() {
 
   const handleApproveExam = async (examId) => {
     try {
-      await apiClient.post(`/api/exams/upComingExamStatus/${examId}`);
-      showSuccess("Exam approved & activated for student access!");
+      await apiClient.post(`/api/exams/approve/${examId}`);
+      showSuccess("Exam approved & scheduled for student registration!");
       setExams((prev) =>
-        prev.map((e) =>
-          (e.exam_id === examId || e.examId === examId) ? { ...e, status: "Upcoming" } : e
-        )
+        prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Upcoming" } : e))
       );
     } catch (err) {
       showError(err.message || "Failed to approve exam");
+    }
+  };
+
+  const handleRejectExam = async (examId) => {
+    if (!window.confirm("Are you sure you want to reject this proposed examination?")) return;
+    try {
+      await apiClient.post(`/api/exams/reject/${examId}`);
+      showSuccess("Exam marked as rejected");
+      setExams((prev) =>
+        prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Rejected" } : e))
+      );
+    } catch (err) {
+      showError(err.message || "Failed to reject exam");
+    }
+  };
+
+  const handleCancelExam = async (examId) => {
+    if (!window.confirm("Are you sure you want to cancel this scheduled exam? Enrolled students will not be able to attend.")) return;
+    try {
+      await apiClient.post(`/api/exams/cancel/${examId}`);
+      showSuccess("Exam cancelled successfully");
+      setExams((prev) =>
+        prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Cancelled" } : e))
+      );
+    } catch (err) {
+      showError(err.message || "Failed to cancel exam");
     }
   };
 
@@ -55,6 +79,8 @@ export default function AcceptExam() {
   const getComputedExamStatus = (exam) => {
     const rawStatus = (exam.status || "Pending").trim();
     if (rawStatus.toLowerCase() === "pending") return "Pending";
+    if (rawStatus.toLowerCase() === "rejected") return "Rejected";
+    if (rawStatus.toLowerCase() === "cancelled") return "Cancelled";
     if (rawStatus.toLowerCase() === "completed") return "Completed";
     if (isExamDateTimePassed(exam)) return "Completed";
     return "Upcoming";
@@ -67,7 +93,10 @@ export default function AcceptExam() {
     const matchesSearch = !query || title.includes(query) || sub.includes(query);
 
     const computedStatus = getComputedExamStatus(e).toUpperCase();
-    const matchesFilter = filterStatus === "ALL" || computedStatus === filterStatus;
+    let matchesFilter = filterStatus === "ALL" || computedStatus === filterStatus;
+    if (filterStatus === "CANCELLED") {
+      matchesFilter = computedStatus === "CANCELLED" || computedStatus === "REJECTED";
+    }
 
     return matchesSearch && matchesFilter;
   });
@@ -77,11 +106,11 @@ export default function AcceptExam() {
       {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <Icon name="check" className="w-5 h-5 text-orange-500" />
-          Examination Approval & Management
+          <Icon name="clock" className="w-5 h-5 text-orange-500" />
+          Examination Approvals & Lifecycle Management
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Review educator-created assessments, approve upcoming exams, and audit schedule statuses
+          Review educator-created assessments, approve schedules, cancel ongoing/upcoming tests, and manage statuses
         </p>
       </div>
 
@@ -102,9 +131,10 @@ export default function AcceptExam() {
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           {[
             { id: "ALL", label: "All Exams" },
-            { id: "PENDING", label: "Pending" },
+            { id: "PENDING", label: "Pending Review" },
             { id: "UPCOMING", label: "Upcoming" },
             { id: "COMPLETED", label: "Completed" },
+            { id: "CANCELLED", label: "Cancelled / Rejected" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -131,7 +161,7 @@ export default function AcceptExam() {
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3 shadow-sm">
           <Icon name="check-circle" className="w-10 h-10 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-700">No exams match your criteria</h3>
-          <p className="text-xs text-slate-400">All submitted assessments have been updated.</p>
+          <p className="text-xs text-slate-400">All submitted assessments have been updated or filtered.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -145,7 +175,7 @@ export default function AcceptExam() {
                   <th className="py-3.5 px-4">Schedule</th>
                   <th className="py-3.5 px-4">Duration</th>
                   <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Approval Actions</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -155,6 +185,7 @@ export default function AcceptExam() {
                   const isPending = computedStatus === "Pending";
                   const isUpcoming = computedStatus === "Upcoming";
                   const isCompleted = computedStatus === "Completed";
+                  const isCancelled = computedStatus === "Cancelled" || computedStatus === "Rejected";
 
                   return (
                     <tr key={examId} className="hover:bg-slate-50/70 transition-colors">
@@ -181,39 +212,47 @@ export default function AcceptExam() {
                               ? "bg-emerald-100 text-emerald-800"
                               : isCompleted
                               ? "bg-slate-100 text-slate-700"
+                              : isCancelled
+                              ? "bg-rose-100 text-rose-800"
                               : "bg-amber-100 text-amber-800"
                           }`}
                         >
                           {isUpcoming && <Icon name="clock" className="w-3 h-3 text-emerald-600" />}
                           {isCompleted && <Icon name="check-circle" className="w-3 h-3 text-slate-600" />}
                           {isPending && <Icon name="alert" className="w-3 h-3 text-amber-600" />}
+                          {isCancelled && <Icon name="x" className="w-3 h-3 text-rose-600" />}
                           {computedStatus}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {isPending && (
-                            <button
-                              onClick={() => handleApproveExam(examId)}
-                              className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1"
-                            >
-                              <Icon name="check" className="w-3.5 h-3.5" />
-                              Approve
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleApproveExam(examId)}
+                                className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1"
+                              >
+                                <Icon name="check" className="w-3.5 h-3.5" />
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleRejectExam(examId)}
+                                className="py-1 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg transition-all"
+                              >
+                                Reject
+                              </button>
+                            </>
                           )}
 
                           {isUpcoming && (
-                            <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                              <Icon name="check-circle" className="w-4 h-4" />
-                              Scheduled
-                            </span>
-                          )}
-
-                          {isCompleted && (
-                            <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
-                              <Icon name="check-circle" className="w-4 h-4 text-slate-400" />
-                              Concluded
-                            </span>
+                            <button
+                              onClick={() => handleCancelExam(examId)}
+                              className="py-1 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1"
+                              title="Cancel Scheduled Exam"
+                            >
+                              <Icon name="alert" className="w-3.5 h-3.5" />
+                              Cancel
+                            </button>
                           )}
 
                           <button

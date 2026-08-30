@@ -18,11 +18,19 @@ public class AdminServiceImpl implements AdminService {
 
 	@Override
 	public boolean addTeacherFromRequest(int requestId) {
+		String username = adminRepository.getUsernameByRequestId(requestId);
+		if (username != null && isUsernameExist(username)) {
+			return false;
+		}
 		return adminRepository.addTeacherFromRequest(requestId);
 	}
 
 	@Override
 	public boolean addStudentFromRequest(int requestId) {
+		String username = adminRepository.getUsernameByRequestId(requestId);
+		if (username != null && isUsernameExist(username)) {
+			return false;
+		}
 		return adminRepository.addStudentFromRequest(requestId);
 	}
 
@@ -49,6 +57,16 @@ public class AdminServiceImpl implements AdminService {
 	@Override
 	public boolean deleteStudentById(int studentId) {
 		return adminRepository.deleteStudentById(studentId);
+	}
+
+	@Override
+	public boolean toggleTeacherStatus(int teacherId, String status) {
+		return adminRepository.toggleTeacherStatus(teacherId, status);
+	}
+
+	@Override
+	public boolean toggleStudentStatus(int studentId, String status) {
+		return adminRepository.toggleStudentStatus(studentId, status);
 	}
 
 	@Override

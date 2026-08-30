@@ -86,13 +86,41 @@ public class ExamController {
         return ResponseEntity.ok("Exam deleted successfully.");
     }
 
-    @PostMapping({"/upComingExamStatus/{exam_id}", "/accept/{exam_id}"})
-    @PutMapping("/status/{exam_id}")
-    public ResponseEntity<String> acceptExam(@PathVariable("exam_id") Integer examId) {
+    @PostMapping({"/upComingExamStatus/{exam_id}", "/accept/{exam_id}", "/approve/{exam_id}", "/{exam_id}/approve"})
+    public ResponseEntity<?> acceptExam(@PathVariable("exam_id") Integer examId) {
         if (examService.acceptExam(examId)) {
-            return ResponseEntity.ok("Accepted");
+            return ResponseEntity.ok(Map.of("message", "Exam approved and scheduled successfully", "success", true));
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Exam not found.");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found", "success", false));
+    }
+
+    @PostMapping({"/reject/{exam_id}", "/{exam_id}/reject"})
+    public ResponseEntity<?> rejectExam(@PathVariable("exam_id") Integer examId) {
+        if (examService.updateExamStatus(examId, "Rejected")) {
+            return ResponseEntity.ok(Map.of("message", "Exam rejected successfully", "success", true));
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found", "success", false));
+    }
+
+    @PostMapping({"/cancel/{exam_id}", "/{exam_id}/cancel"})
+    public ResponseEntity<?> cancelExam(@PathVariable("exam_id") Integer examId) {
+        if (examService.updateExamStatus(examId, "Cancelled")) {
+            return ResponseEntity.ok(Map.of("message", "Exam cancelled successfully", "success", true));
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found", "success", false));
+    }
+
+    @PutMapping({"/status/{exam_id}", "/{exam_id}/status"})
+    public ResponseEntity<?> updateStatus(
+            @PathVariable("exam_id") Integer examId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
+                ? body.get("status").trim()
+                : "Upcoming";
+        if (examService.updateExamStatus(examId, status)) {
+            return ResponseEntity.ok(Map.of("message", "Exam status updated to " + status, "success", true));
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found or status update failed", "success", false));
     }
 
     @GetMapping({"/viewAllUpComingExam", "/upcoming"})

@@ -36,6 +36,11 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	public boolean updateExamStatus(int examId, String status) {
+		return examRepository.updateExamStatus(examId, status);
+	}
+
+	@Override
 	public List<Exam> viewAllUpcomingExam() {
 		return examRepository.viewAllUpcomingExam();
 	}

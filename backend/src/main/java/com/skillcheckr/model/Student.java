@@ -37,7 +37,12 @@ public class Student {
 	@JsonAlias({"profile_image", "profileImage"})
 	private String profileImage;
 
+	@JsonProperty("status")
+	@JsonAlias({"status", "is_active", "isActive"})
+	private String status;
+
 	// Backward compatibility accessors
+	@JsonProperty("student_name")
 	public String getStudentName() {
 		return name;
 	}
@@ -46,6 +51,7 @@ public class Student {
 		this.name = studentName;
 	}
 
+	@JsonProperty("student_contact")
 	public String getStudentContact() {
 		return contact;
 	}
@@ -54,6 +60,7 @@ public class Student {
 		this.contact = studentContact;
 	}
 
+	@JsonProperty("student_email")
 	public String getStudentEmail() {
 		return email;
 	}
