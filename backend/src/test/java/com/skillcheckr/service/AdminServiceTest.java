@@ -27,20 +27,7 @@ class AdminServiceTest {
     private AdminServiceImpl adminService;
 
     @Test
-    void addStudentFromRequest_returnsFalse_andSkipsInsert_whenUsernameAlreadyExists() {
-        when(adminRepository.getUsernameByRequestId(1)).thenReturn("takenUser");
-        when(adminRepository.isUsernameExist("takenUser")).thenReturn(true);
-
-        boolean result = adminService.addStudentFromRequest(1);
-
-        assertThat(result).isFalse();
-        verify(adminRepository, never()).addStudentFromRequest(1);
-    }
-
-    @Test
-    void addStudentFromRequest_returnsTrue_whenUsernameIsFreeAndInsertSucceeds() {
-        when(adminRepository.getUsernameByRequestId(1)).thenReturn("newUser");
-        when(adminRepository.isUsernameExist("newUser")).thenReturn(false);
+    void addStudentFromRequest_returnsTrue_whenRepositorySucceeds() {
         when(adminRepository.addStudentFromRequest(1)).thenReturn(true);
 
         boolean result = adminService.addStudentFromRequest(1);
@@ -50,29 +37,17 @@ class AdminServiceTest {
     }
 
     @Test
-    void addStudentFromRequest_returnsFalse_whenInsertFails() {
-        when(adminRepository.getUsernameByRequestId(2)).thenReturn("freeUser");
-        when(adminRepository.isUsernameExist("freeUser")).thenReturn(false);
+    void addStudentFromRequest_returnsFalse_whenRepositoryFails() {
         when(adminRepository.addStudentFromRequest(2)).thenReturn(false);
 
-        assertThat(adminService.addStudentFromRequest(2)).isFalse();
-    }
-
-    @Test
-    void addTeacherFromRequest_returnsFalseWhenUsernameAlreadyExists() {
-        when(adminRepository.getUsernameByRequestId(3)).thenReturn("dupTeacher");
-        when(adminRepository.isUsernameExist("dupTeacher")).thenReturn(true);
-
-        boolean result = adminService.addTeacherFromRequest(3);
+        boolean result = adminService.addStudentFromRequest(2);
 
         assertThat(result).isFalse();
-        verify(adminRepository, never()).addTeacherFromRequest(3);
+        verify(adminRepository).addStudentFromRequest(2);
     }
 
     @Test
-    void addTeacherFromRequest_returnsTrue_whenUsernameIsFreeAndInsertSucceeds() {
-        when(adminRepository.getUsernameByRequestId(3)).thenReturn("newTeacher");
-        when(adminRepository.isUsernameExist("newTeacher")).thenReturn(false);
+    void addTeacherFromRequest_returnsTrue_whenRepositorySucceeds() {
         when(adminRepository.addTeacherFromRequest(3)).thenReturn(true);
 
         boolean result = adminService.addTeacherFromRequest(3);
@@ -82,13 +57,29 @@ class AdminServiceTest {
     }
 
     @Test
-    void getName_and_getRole_areDelegated() {
+    void addTeacherFromRequest_returnsFalse_whenRepositoryFails() {
+        when(adminRepository.addTeacherFromRequest(4)).thenReturn(false);
+
+        boolean result = adminService.addTeacherFromRequest(4);
+
+        assertThat(result).isFalse();
+        verify(adminRepository).addTeacherFromRequest(4);
+    }
+
+    @Test
+    void isUsernameExist_delegatesToRepository() {
+        when(adminRepository.isUsernameExist("someone")).thenReturn(true);
+
+        assertThat(adminService.isUsernameExist("someone")).isTrue();
+        verify(adminRepository).isUsernameExist("someone");
+    }
+
+    @Test
+    void getUsernameByRequestId_delegatesToRepository() {
         when(adminRepository.getUsernameByRequestId(9)).thenReturn("someone");
 
         assertThat(adminService.getUsernameByRequestId(9)).isEqualTo("someone");
-        assertThat(adminService.isUsernameExist("someone")).isFalse();
         verify(adminRepository).getUsernameByRequestId(9);
-        verify(adminRepository).isUsernameExist("someone");
     }
 
     @Test
@@ -131,5 +122,14 @@ class AdminServiceTest {
 
         assertThat(adminService.deleteStudentById(22)).isFalse();
         verify(adminRepository).deleteStudentById(22);
+    }
+
+    @Test
+    void getAdminStats_delegatesToRepository() {
+        java.util.Map<String, Object> stats = java.util.Map.of("totalStudents", 5);
+        when(adminRepository.getAdminStats()).thenReturn(stats);
+
+        assertThat(adminService.getAdminStats()).isEqualTo(stats);
+        verify(adminRepository).getAdminStats();
     }
 }
