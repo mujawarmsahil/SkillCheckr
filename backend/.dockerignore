@@ -1,0 +1,35 @@
+# Git & Version Control
+.git
+.gitignore
+.gitattributes
+
+# Build outputs
+target/
+build/
+*.jar
+*.war
+
+# IDE & Editor files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.DS_Store
+
+# Local Secrets & Environment Files
+.env
+.env.*
+*.env
+*.env.local
+
+# Documentation & Development Specifications
+*.md
+product-spec.json
+
+# Logs
+*.log
+logs/

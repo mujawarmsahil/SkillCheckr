@@ -38,3 +38,12 @@ build/
 !.env.example
 *.env
 *.env.local
+
+# Logs
+logs/
+*.log
+
+# OS Generated
+.DS_Store
+Thumbs.db
+

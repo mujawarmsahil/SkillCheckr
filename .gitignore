@@ -1,42 +1,48 @@
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-npm-debug.log*
 lerna-debug.log*
 
-# JVM / crash dumps
+# JVM / Crash dumps
 hs_err_pid*.log
 
 # Build outputs
-node_modules
-dist
-dist-ssr
+node_modules/
+dist/
+dist-ssr/
+target/
+build/
 *.local
 
-# Editor / IDE files (intellij)
-.idea
+# Editor & IDE files
+.idea/
 *.iml
-
-# Eclipse workspace metadata
+*.iws
+*.ipr
 .metadata/
 .settings/
 .classpath
 .project
-
-# Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-target/
+
+# Operating System & Temporary Files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Local Tooling & AI assistant caches
+.claude/
 
 # Environment & Local Secrets
 .env
