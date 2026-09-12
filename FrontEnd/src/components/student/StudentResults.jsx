@@ -15,38 +15,14 @@ export default function StudentResults() {
     try {
       const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
       const res = await apiClient.get(`/api/results/student/${studentId}`);
-      let data = Array.isArray(res.data) ? res.data : [];
-
-      if (data.length === 0) {
-        // Sample baseline results if none yet in DB
-        data = [
-          {
-            resultId: 1,
-            examName: "Computer Networks Assessment",
-            subjectName: "Networking",
-            examType: "MCQ",
-            marksObtained: 42,
-            totalMarks: 50,
-            percentage: 84.0,
-            status: "Pass",
-            submittedAt: "2026-08-15 14:30:00",
-          },
-          {
-            resultId: 2,
-            examName: "Database Systems Midterm",
-            subjectName: "DBMS",
-            examType: "QUESTION_ANSWER",
-            marksObtained: 78,
-            totalMarks: 100,
-            percentage: 78.0,
-            status: "Pass",
-            submittedAt: "2026-08-10 11:15:00",
-          },
-        ];
-      }
+      const data = Array.isArray(res.data) ? res.data : [];
       setResults(data);
     } catch (err) {
-      showError(err.message || "Failed to load examination results");
+      if (err.status === 404 || err.response?.status === 404) {
+        setResults([]);
+      } else {
+        showError(err.message || "Failed to load examination results");
+      }
     } finally {
       setLoading(false);
     }

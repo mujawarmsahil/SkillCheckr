@@ -6,7 +6,6 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,7 +19,6 @@ import com.skillcheckr.service.AdminService;
 
 @RestController
 @RequestMapping({"/api/Admin", "/api/admin"})
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"})
 public class AdminController {
 
 	@Autowired
@@ -29,31 +27,31 @@ public class AdminController {
 	@GetMapping({"/viewAllTeacher", "/teachers"})
 	public ResponseEntity<?> viewAllTeacher() {
 		List<Teacher> list = adminService.getAllTeacher();
-		if (list == null || list.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
-		}
-		return ResponseEntity.ok(list);
+		return ResponseEntity.ok(list != null ? list : List.of());
 	}
 
 	@GetMapping({"/viewAllStudent", "/students"})
 	public ResponseEntity<?> viewAllStudent() {
 		List<Student> list = adminService.getAllStudent();
-		if (list == null || list.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
-		}
-		return ResponseEntity.ok(list);
+		return ResponseEntity.ok(list != null ? list : List.of());
 	}
 
 	@PostMapping({"/addStudent/{request_id}", "/students/from-request/{request_id}"})
 	public ResponseEntity<Object> addStudentFromRequest(@PathVariable("request_id") Integer requestId) {
 		boolean success = adminService.addStudentFromRequest(requestId);
-		return ResponseEntity.ok(success);
+		if (success) {
+			return ResponseEntity.ok(Map.of("message", "Student added successfully", "success", true));
+		}
+		return ResponseEntity.badRequest().body(Map.of("message", "Failed to add student from request", "success", false));
 	}
 
 	@PostMapping({"/addTeacher/{request_id}", "/teachers/from-request/{request_id}"})
 	public ResponseEntity<Object> addTeacherFromRequest(@PathVariable("request_id") Integer requestId) {
 		boolean success = adminService.addTeacherFromRequest(requestId);
-		return ResponseEntity.ok(success);
+		if (success) {
+			return ResponseEntity.ok(Map.of("message", "Teacher added successfully", "success", true));
+		}
+		return ResponseEntity.badRequest().body(Map.of("message", "Failed to add teacher from request", "success", false));
 	}
 
 	@DeleteMapping({"/teacherDeleteById/{teacher_id}", "/teachers/{teacher_id}"})

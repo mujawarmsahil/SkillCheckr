@@ -23,6 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 
+# Test coverage
+coverage/
+.nyc_output/
+
+# Tooling & AI assistant caches
+.claude/
+.gemini/
+.antigravity/
+.cursor/
+
 # Environment & Local Secrets
 .env
 .env.*

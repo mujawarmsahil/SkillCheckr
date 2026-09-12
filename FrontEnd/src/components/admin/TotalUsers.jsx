@@ -17,10 +17,15 @@ export default function TotalUsers() {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const [tRes, sRes] = await Promise.all([
-        apiClient.get("/api/admin/viewAllTeacher"),
-        apiClient.get("/api/admin/viewAllStudent"),
-      ]);
+      const tPromise = apiClient.get("/api/admin/viewAllTeacher").catch((err) => {
+        if (err.status === 404 || err.response?.status === 404) return { data: [] };
+        throw err;
+      });
+      const sPromise = apiClient.get("/api/admin/viewAllStudent").catch((err) => {
+        if (err.status === 404 || err.response?.status === 404) return { data: [] };
+        throw err;
+      });
+      const [tRes, sRes] = await Promise.all([tPromise, sPromise]);
       setTeachers(Array.isArray(tRes.data) ? tRes.data : []);
       setStudents(Array.isArray(sRes.data) ? sRes.data : []);
     } catch (err) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import apiClient from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
-import { isExamDateTimePassed } from "./TotalExams";
+import { isExamDateTimePassed } from "../../utils/examUtils";
 
 export default function AcceptExam() {
   const [exams, setExams] = useState([]);
@@ -17,7 +17,11 @@ export default function AcceptExam() {
       const res = await apiClient.get("/api/exams/viewAllExams");
       setExams(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      showError(err.message || "Failed to load exams");
+      if (err.status === 404 || err.response?.status === 404) {
+        setExams([]);
+      } else {
+        showError(err.message || "Failed to load exams");
+      }
     } finally {
       setLoading(false);
     }

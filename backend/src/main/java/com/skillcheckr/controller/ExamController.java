@@ -9,7 +9,6 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +28,6 @@ import com.skillcheckr.service.QuestionService;
 
 @RestController
 @RequestMapping({"/api/Exams", "/api/exams"})
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"})
 public class ExamController {
 
     @Autowired
@@ -89,7 +87,7 @@ public class ExamController {
     @PostMapping({"/upComingExamStatus/{exam_id}", "/accept/{exam_id}", "/approve/{exam_id}", "/{exam_id}/approve"})
     public ResponseEntity<?> acceptExam(@PathVariable("exam_id") Integer examId) {
         if (examService.acceptExam(examId)) {
-            return ResponseEntity.ok(Map.of("message", "Exam approved and scheduled successfully", "success", true));
+            return ResponseEntity.ok("Accepted");
         }
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found", "success", false));
     }

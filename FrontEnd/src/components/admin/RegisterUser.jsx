@@ -18,7 +18,7 @@ export default function RegisterUser() {
       const res = await apiClient.get("/api/requests/viewAllRegisterUsers");
       setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      if (err.response?.status === 404) {
+      if (err.status === 404 || err.response?.status === 404) {
         setRequests([]);
       } else {
         showError(err.message || "Failed to load registration requests");

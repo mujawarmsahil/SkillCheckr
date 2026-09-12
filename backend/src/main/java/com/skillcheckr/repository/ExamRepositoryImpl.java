@@ -326,10 +326,13 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 
-	@Override
-	public boolean registerStudentForExam(int studentId, int examId) {
+	private volatile boolean registrationTableInitialized = false;
+
+	private synchronized void ensureRegistrationTableExists() {
+		if (registrationTableInitialized) {
+			return;
+		}
 		try {
-			// Ensure exam_registration table exists
 			String ensureTableSql = "CREATE TABLE IF NOT EXISTS exam_registration ("
 					+ "registration_id INT AUTO_INCREMENT PRIMARY KEY, "
 					+ "student_id INT NOT NULL, "
@@ -340,9 +343,17 @@ public class ExamRepositoryImpl implements ExamRepository {
 					+ "FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE, "
 					+ "FOREIGN KEY (exam_id) REFERENCES exam(exam_id) ON DELETE CASCADE"
 					+ ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-			try {
-				jdbcTemplate.execute(ensureTableSql);
-			} catch (Exception ignored) {}
+			jdbcTemplate.execute(ensureTableSql);
+		} catch (Exception ignored) {
+		} finally {
+			registrationTableInitialized = true;
+		}
+	}
+
+	@Override
+	public boolean registerStudentForExam(int studentId, int examId) {
+		try {
+			ensureRegistrationTableExists();
 
 			// Check if already registered
 			if (isStudentRegisteredForExam(studentId, examId)) {

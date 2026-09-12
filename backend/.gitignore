@@ -47,3 +47,13 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Test coverage & Reports
+coverage/
+jacoco.exec
+
+# Tooling & AI assistant caches
+.claude/
+.gemini/
+.antigravity/
+.cursor/
+

@@ -29,7 +29,11 @@ apiClient.interceptors.response.use(
       error.response?.data ||
       error.message ||
       "An unexpected error occurred";
-    return Promise.reject(new Error(typeof message === "string" ? message : JSON.stringify(message)));
+    const customError = new Error(typeof message === "string" ? message : JSON.stringify(message));
+    customError.response = error.response;
+    customError.status = error.response?.status;
+    customError.code = error.code;
+    return Promise.reject(customError);
   }
 );
 

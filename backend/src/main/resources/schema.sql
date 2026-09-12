@@ -119,6 +119,18 @@ CREATE TABLE IF NOT EXISTS `result` (
     `submitted_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 11. Exam Registrations Table
+CREATE TABLE IF NOT EXISTS `exam_registration` (
+    `registration_id` INT AUTO_INCREMENT PRIMARY KEY,
+    `student_id` INT NOT NULL,
+    `exam_id` INT NOT NULL,
+    `registered_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `status` VARCHAR(50) DEFAULT 'Registered',
+    UNIQUE KEY `unique_student_exam` (`student_id`, `exam_id`),
+    FOREIGN KEY (`student_id`) REFERENCES `student`(`student_id`) ON DELETE CASCADE,
+    FOREIGN KEY (`exam_id`) REFERENCES `exam`(`exam_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Initial Seed Data: Default Admin User
 -- Password: Admin@1234
 INSERT IGNORE INTO `user` (`user_id`, `username`, `password`, `user_role`) 
