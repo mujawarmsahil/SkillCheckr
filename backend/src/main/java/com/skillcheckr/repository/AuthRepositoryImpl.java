@@ -309,6 +309,21 @@ public class AuthRepositoryImpl implements AuthRepository {
         }
     }
 
+    private volatile boolean profileImageColumnsChecked = false;
+
+    private synchronized void ensureProfileImageColumnsExist() {
+        if (profileImageColumnsChecked) {
+            return;
+        }
+        for (String table : new String[]{"user", "student", "teacher", "admin"}) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN profile_image VARCHAR(1000) NULL");
+            } catch (Exception ignored) {
+            }
+        }
+        profileImageColumnsChecked = true;
+    }
+
     @Override
     public UserProfileDTO updateUserProfile(UserProfileDTO profile) {
         if (profile == null || profile.getUserId() <= 0) {
@@ -316,11 +331,7 @@ public class AuthRepositoryImpl implements AuthRepository {
         }
 
         try {
-            // Ensure profile_image column exists in user table if not already added
-            try {
-                jdbcTemplate.execute("ALTER TABLE user ADD COLUMN profile_image VARCHAR(1000) NULL");
-            } catch (Exception ignored) {
-            }
+            ensureProfileImageColumnsExist();
 
             // Update user table
             if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
@@ -340,10 +351,6 @@ public class AuthRepositoryImpl implements AuthRepository {
             String roleStr = role != null ? role.trim().toLowerCase() : "";
 
             if ("student".equals(roleStr)) {
-                try {
-                    jdbcTemplate.execute("ALTER TABLE student ADD COLUMN profile_image VARCHAR(1000) NULL");
-                } catch (Exception ignored) {
-                }
                 int updated = 0;
                 try {
                     updated = jdbcTemplate.update(
@@ -364,10 +371,6 @@ public class AuthRepositoryImpl implements AuthRepository {
                     } catch (Exception ignored) {}
                 }
             } else if ("teacher".equals(roleStr)) {
-                try {
-                    jdbcTemplate.execute("ALTER TABLE teacher ADD COLUMN profile_image VARCHAR(1000) NULL");
-                } catch (Exception ignored) {
-                }
                 int updated = 0;
                 try {
                     updated = jdbcTemplate.update(
@@ -388,10 +391,6 @@ public class AuthRepositoryImpl implements AuthRepository {
                     } catch (Exception ignored) {}
                 }
             } else if ("admin".equals(roleStr)) {
-                try {
-                    jdbcTemplate.execute("ALTER TABLE admin ADD COLUMN profile_image VARCHAR(1000) NULL");
-                } catch (Exception ignored) {
-                }
                 int updated = 0;
                 try {
                     updated = jdbcTemplate.update(

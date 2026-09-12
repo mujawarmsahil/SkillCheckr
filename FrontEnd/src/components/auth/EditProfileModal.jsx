@@ -147,16 +147,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
     return () => {
       isMounted = false;
     };
-  }, [
-    isOpen,
-    user?.userId,
-    user?.user_id,
-    user?.name,
-    user?.username,
-    user?.email,
-    user?.contact,
-    user?.profileImage,
-  ]);
+  }, [isOpen, user]);
 
   if (!isOpen) return null;
 

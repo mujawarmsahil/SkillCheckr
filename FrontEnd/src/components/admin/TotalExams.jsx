@@ -3,25 +3,7 @@ import { PieChart, Pie, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import apiClient from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
-
-export const isExamDateTimePassed = (exam) => {
-  if (!exam) return false;
-  if (exam.status === "Completed") return true;
-  const dateStr = (exam.date || exam.exam_date || "").split("T")[0];
-  if (!dateStr) return false;
-  const endTimeStr = exam.end_time || exam.endTime || "23:59:59";
-  try {
-    const [year, month, day] = dateStr.split("-").map(Number);
-    const timeParts = endTimeStr.split(":").map(Number);
-    const hours = timeParts[0] || 0;
-    const minutes = timeParts[1] || 0;
-    const seconds = timeParts[2] || 0;
-    const examEndTime = new Date(year, month - 1, day, hours, minutes, seconds);
-    return examEndTime < new Date();
-  } catch {
-    return false;
-  }
-};
+import { isExamDateTimePassed } from "../../utils/examUtils";
 
 export default function TotalExams() {
   const [upcomingExams, setUpcomingExams] = useState([]);
@@ -33,10 +15,15 @@ export default function TotalExams() {
   const fetchExamsData = useCallback(async () => {
     setLoading(true);
     try {
-      const [upRes, compRes] = await Promise.all([
-        apiClient.get("/api/exams/viewAllUpComingExam"),
-        apiClient.get("/api/exams/viewAllCompletedExam"),
-      ]);
+      const upPromise = apiClient.get("/api/exams/viewAllUpComingExam").catch((err) => {
+        if (err.status === 404 || err.response?.status === 404) return { data: [] };
+        throw err;
+      });
+      const compPromise = apiClient.get("/api/exams/viewAllCompletedExam").catch((err) => {
+        if (err.status === 404 || err.response?.status === 404) return { data: [] };
+        throw err;
+      });
+      const [upRes, compRes] = await Promise.all([upPromise, compPromise]);
 
       const rawUpcoming = Array.isArray(upRes.data) ? upRes.data : [];
       const rawCompleted = Array.isArray(compRes.data) ? compRes.data : [];

@@ -28,7 +28,11 @@ export default function ManageExams({ onAddNew }) {
       const res = await apiClient.get(url);
       setExams(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      showError(err.message || "Failed to load exams");
+      if (err.status === 404 || err.response?.status === 404) {
+        setExams([]);
+      } else {
+        showError(err.message || "Failed to load exams");
+      }
     } finally {
       setLoading(false);
     }
