@@ -20,3 +20,16 @@ export const isExamDateTimePassed = (exam) => {
     return false;
   }
 };
+
+export const getOptionAnswerId = (question, optionKey) => {
+  const optionIndex = Number(optionKey.replace("option", "")) - 1;
+  const option = question?.options?.[optionIndex];
+  return (
+    option?.answerId ||
+    option?.answer_id ||
+    question?.[`${optionKey}AnswerId`] ||
+    question?.[`${optionKey}_answer_id`] ||
+    question?.[`${optionKey}Id`] ||
+    question?.[`${optionKey}_id`]
+  );
+};
