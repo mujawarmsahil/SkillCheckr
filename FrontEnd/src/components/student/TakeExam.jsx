@@ -1,9 +1,15 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import apiClient from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
+import { registerForExam } from "../../api/examApi";
+import { submitExamAttempt } from "../../api/attemptApi";
+import { QUESTION_TYPES } from "../../constants/examConstants";
+import { RESULT_STATUS } from "../../constants/resultConstants";
+import { useExamAttempt } from "../../hooks/useExamAttempt";
+import { useExamTimer } from "../../hooks/useExamTimer";
+import { useAttemptAnswers } from "../../hooks/useAttemptAnswers";
 
 export default function TakeExam() {
   const { examId } = useParams();
@@ -12,33 +18,20 @@ export default function TakeExam() {
   const { user } = useAuth();
   const { showSuccess, showError, showWarning } = useToast();
 
-  const [exam, setExam] = useState(null);
-  const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(true);
-
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [mcqAnswers, setMcqAnswers] = useState({});
-  const [textAnswers, setTextAnswers] = useState({});
   const [flagged, setFlagged] = useState(new Set());
-
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState(3600);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [resultData, setResultData] = useState(null);
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const [accessBlocked, setAccessBlocked] = useState(null);
 
   // -------------------------------------------------------------
   // ANTI-CHEATING & PROCTORING STATE
   // -------------------------------------------------------------
   const [copyStrikes, setCopyStrikes] = useState(0);
   const [tabStrikes, setTabStrikes] = useState(0);
-  const [totalViolations, setTotalViolations] = useState(0);
-  const [isDisqualified, setIsDisqualified] = useState(false);
-  const [disqualificationReason, setDisqualificationReason] = useState("");
+  const [, setTotalViolations] = useState(0);
+  const [isDisqualified] = useState(false);
   const [activeViolationModal, setActiveViolationModal] = useState(null);
 
-  // MULTI-PERSON DETECTION (ACCURATE & DEBOUNCED)
   const [detectedPersonsCount, setDetectedPersonsCount] = useState(1);
   const [multiplePersonsDurationSeconds, setMultiplePersonsDurationSeconds] = useState(0);
 
@@ -56,10 +49,34 @@ export default function TakeExam() {
   const consecutiveMultiPersonFramesRef = useRef(0);
   const isTabHiddenRef = useRef(false);
 
-  const isMcq = (exam?.exam_type || exam?.examType || questions[currentIndex]?.questionType || "MCQ").toUpperCase() === "MCQ";
+  // -------------------------------------------------------------
+  // 1. ATTEMPT LIFECYCLE HOOK
+  // -------------------------------------------------------------
+  const {
+    exam,
+    questions,
+    attemptSession,
+    loading,
+    alreadySubmitted,
+    resultData,
+    setResultData,
+    accessBlocked,
+    setAccessBlocked,
+    initialAnswers,
+    loadExamAndAttempt,
+  } = useExamAttempt({
+    examId,
+    user,
+    locationState: location.state,
+    showError,
+  });
+
+  const isMcq =
+    (exam?.exam_type || exam?.examType || questions[currentIndex]?.questionType || QUESTION_TYPES.MCQ).toUpperCase() ===
+    QUESTION_TYPES.MCQ;
 
   // -------------------------------------------------------------
-  // 1. WEBCAM PROCTORING SHUTDOWN & INITIALIZATION
+  // 2. WEBCAM PROCTORING CONTROL
   // -------------------------------------------------------------
   const stopWebcam = useCallback(() => {
     if (streamRef.current) {
@@ -130,11 +147,120 @@ export default function TakeExam() {
     }
   }, []);
 
+  // -------------------------------------------------------------
+  // 3. FINAL SUBMISSION HANDLER
+  // -------------------------------------------------------------
+  const submitFinalExam = useCallback(
+    async () => {
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
+      setShowSubmitModal(false);
+
+      stopWebcam();
+
+      try {
+        const activeAttemptId = attemptSession?.attemptId;
+        if (!activeAttemptId) {
+          throw new Error("Your exam attempt is not ready. Please reload the exam and try again.");
+        }
+
+        const result = await submitExamAttempt(examId, activeAttemptId);
+
+        const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
+        localStorage.removeItem(draftKey);
+
+        setResultData(result);
+        showSuccess("Exam submitted successfully! Scorecard generated.");
+      } catch (err) {
+        showError(err.message || "Unable to submit exam. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+        stopWebcam();
+      }
+    },
+    [attemptSession?.attemptId, examId, stopWebcam, showError, showSuccess, setResultData, user?.userId]
+  );
+
+  // -------------------------------------------------------------
+  // 4. SERVER-AUTHORITATIVE TIMER HOOK
+  // -------------------------------------------------------------
+  const { timeLeftSeconds, isAttemptExpired, formattedTime } = useExamTimer({
+    expiresAt: attemptSession?.expiresAt,
+    onExpire: submitFinalExam,
+    active: !resultData && !loading,
+    showWarning,
+  });
+
+  // -------------------------------------------------------------
+  // 5. ANSWERS MANAGEMENT HOOK
+  // -------------------------------------------------------------
+  const {
+    mcqAnswers,
+    textAnswers,
+    setMcqAnswers,
+    setTextAnswers,
+    restoreSavedAnswers,
+    handleSelectOption,
+    handleTextAnswerChange,
+    answeredCount,
+  } = useAttemptAnswers({
+    examId,
+    attemptId: attemptSession?.attemptId,
+    questions,
+    isAttemptExpired,
+    showError,
+    isMcqExam: isMcq,
+  });
+
+  // Restore initial answers when loaded
   useEffect(() => {
-    if (resultData || isDisqualified || alreadySubmitted) {
+    if (initialAnswers.length > 0 && questions.length > 0) {
+      restoreSavedAnswers(initialAnswers, questions);
+    }
+  }, [initialAnswers, questions, restoreSavedAnswers]);
+
+  // Restore draft if any
+  useEffect(() => {
+    const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
+    const savedDraft = localStorage.getItem(draftKey);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.mcqAnswers) setMcqAnswers(parsed.mcqAnswers);
+        if (parsed.textAnswers) setTextAnswers(parsed.textAnswers);
+      } catch {
+        console.warn("Could not parse draft");
+      }
+    }
+  }, [examId, setMcqAnswers, setTextAnswers, user?.userId]);
+
+  // Persist draft
+  useEffect(() => {
+    if (questions.length > 0 && !resultData) {
+      const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({ mcqAnswers, textAnswers, timestamp: Date.now() })
+      );
+    }
+  }, [mcqAnswers, textAnswers, examId, user, questions, resultData]);
+
+  // Initialize Exam & Proctoring
+  useEffect(() => {
+    loadExamAndAttempt();
+    return () => {
+      stopWebcam();
+    };
+  }, [loadExamAndAttempt, stopWebcam]);
+
+  useEffect(() => {
+    if (!loading && !accessBlocked && !resultData && !alreadySubmitted) {
+      startWebcam();
+    } else if (resultData || isDisqualified || alreadySubmitted || accessBlocked) {
       stopWebcam();
     }
-  }, [resultData, isDisqualified, alreadySubmitted, stopWebcam]);
+  }, [loading, accessBlocked, resultData, isDisqualified, alreadySubmitted, startWebcam, stopWebcam]);
 
   useEffect(() => {
     const handleUnload = () => {
@@ -150,391 +276,7 @@ export default function TakeExam() {
   }, [stopWebcam]);
 
   // -------------------------------------------------------------
-  // 2. FETCH EXAM AND PREVENT DUPLICATE SUBMISSIONS
-  // -------------------------------------------------------------
-  const fetchExamAndQuestions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
-
-      // Check if student already submitted this exam
-      try {
-        const checkRes = await apiClient.get(`/api/results/check/${examId}/${studentId}`);
-        if (checkRes.data?.hasSubmitted && checkRes.data?.result) {
-          stopWebcam();
-          setResultData(checkRes.data.result);
-          setAlreadySubmitted(true);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // Fallback: check local storage completed results
-        try {
-          const localKey = `submitted_results_${studentId}`;
-          const localResults = JSON.parse(localStorage.getItem(localKey) || "{}");
-          if (localResults[examId]) {
-            stopWebcam();
-            setResultData(localResults[examId]);
-            setAlreadySubmitted(true);
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // continue
-        }
-      }
-
-      let examDetails = location.state;
-      if (!examDetails?.examName || !examDetails?.date) {
-        try {
-          const res = await apiClient.get(`/api/exams/${examId}`);
-          examDetails = res.data;
-        } catch {
-          console.warn("Using fallback exam data");
-        }
-      }
-      setExam(examDetails || { exam_name: "Examination", exam_type: "MCQ" });
-
-      // Registration & Valid Window Verification
-      const userRole = user?.role || localStorage.getItem("role") || "Student";
-      if (userRole === "Student") {
-        let isRegistered = false;
-        try {
-          const regRes = await apiClient.get(`/api/exams/${examId}/isRegistered/${studentId}`);
-          isRegistered = !!regRes.data?.isRegistered;
-        } catch {
-          try {
-            const localRegs = JSON.parse(localStorage.getItem(`student_${studentId}_registered_exams`) || "{}");
-            isRegistered = !!localRegs[examId];
-          } catch {
-            isRegistered = false;
-          }
-        }
-
-        const rawDate = examDetails?.date || examDetails?.exam_date || examDetails?.examDate || "";
-        let datePart = "";
-        if (rawDate) {
-          const trimmed = String(rawDate).trim();
-          if (trimmed.includes(" ")) {
-            datePart = trimmed.split(" ")[0];
-          } else if (trimmed.includes("T")) {
-            datePart = trimmed.split("T")[0];
-          } else {
-            datePart = trimmed;
-          }
-        } else {
-          datePart = new Date().toISOString().split("T")[0];
-        }
-
-        let year = 2026;
-        let month = 1;
-        let day = 1;
-        if (datePart.includes("-")) {
-          const parts = datePart.split("-").map((v) => parseInt(v, 10));
-          year = parts[0] || 2026;
-          month = parts[1] || 1;
-          day = parts[2] || 1;
-        }
-
-        const startTimeStr = examDetails?.start_time || examDetails?.startTime || "00:00";
-        const endTimeStr = examDetails?.end_time || examDetails?.endTime || "23:59";
-
-        const [sh, sm] = String(startTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
-        const [eh, em] = String(endTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
-
-        const startDateTime = new Date(year, month - 1, day, sh, sm, 0, 0);
-        const endDateTime = new Date(year, month - 1, day, eh, em, 0, 0);
-        if (endDateTime < startDateTime) {
-          endDateTime.setDate(endDateTime.getDate() + 1);
-        }
-
-        const now = new Date();
-        const isRegistrationOpen = now < startDateTime;
-        const isExamUpcoming = now < startDateTime;
-        const isExamExpired = now > endDateTime;
-
-        if (!isRegistered) {
-          stopWebcam();
-          setAccessBlocked({
-            reason: "NOT_REGISTERED",
-            message: "You are not registered for this examination. Registered candidate access only.",
-            datePart,
-            startTimeStr,
-            endTimeStr,
-            isRegistrationOpen,
-          });
-          setLoading(false);
-          return;
-        }
-
-        if (isExamUpcoming) {
-          stopWebcam();
-          setAccessBlocked({
-            reason: "NOT_STARTED",
-            message: `This examination has not started yet. The examination window opens on ${datePart} at ${startTimeStr}.`,
-            datePart,
-            startTimeStr,
-            endTimeStr,
-            startDateTime,
-          });
-          setLoading(false);
-          return;
-        }
-
-        if (isExamExpired) {
-          stopWebcam();
-          setAccessBlocked({
-            reason: "EXPIRED",
-            message: `The scheduled testing window for this examination has ended (${datePart} ${endTimeStr}).`,
-            datePart,
-            startTimeStr,
-            endTimeStr,
-          });
-          setLoading(false);
-          return;
-        }
-      }
-
-      const initialDuration = (examDetails?.duration_minutes || examDetails?.durationMinutes || 60) * 60;
-      setTimeLeftSeconds(initialDuration);
-
-      const qRes = await apiClient.get(`/api/exams/${examId}/questions`);
-      let fetchedQuestions = Array.isArray(qRes.data) ? qRes.data : [];
-
-      if (fetchedQuestions.length === 0) {
-        const isMcqExam = (examDetails?.exam_type || examDetails?.examType || "MCQ") === "MCQ";
-        if (isMcqExam) {
-          fetchedQuestions = [
-            {
-              questionId: 101,
-              question_id: 101,
-              question: "What is the primary function of an operating system kernel?",
-              option1: "Manage hardware resources and provide essential services to applications",
-              option2: "Compile high-level programming language code into machine binaries",
-              option3: "Provide a web browsing interface for end users",
-              option4: "Design user interface graphics and typography",
-              correctOption: "Manage hardware resources and provide essential services to applications",
-              questionType: "MCQ",
-            },
-            {
-              questionId: 102,
-              question_id: 102,
-              question: "Which of the following data structures operates on a Last-In, First-Out (LIFO) principle?",
-              option1: "Queue",
-              option2: "Stack",
-              option3: "Linked List",
-              option4: "Binary Search Tree",
-              correctOption: "Stack",
-              questionType: "MCQ",
-            },
-            {
-              questionId: 103,
-              question_id: 103,
-              question: "What is the time complexity of searching an element in a balanced Binary Search Tree?",
-              option1: "O(1)",
-              option2: "O(n)",
-              option3: "O(log n)",
-              option4: "O(n log n)",
-              correctOption: "O(log n)",
-              questionType: "MCQ",
-            },
-          ];
-        } else {
-          fetchedQuestions = [
-            {
-              questionId: 201,
-              question_id: 201,
-              question: "Explain the concept of Polymorphism in Object-Oriented Programming with real-world examples.",
-              sampleAnswer: "Polymorphism allows objects of different classes to be treated as instances of a common superclass.",
-              marks: 10,
-              wordLimit: 250,
-              questionType: "QUESTION_ANSWER",
-            },
-            {
-              questionId: 202,
-              question_id: 202,
-              question: "Describe ACID properties in database management systems and why they are essential for data consistency.",
-              sampleAnswer: "Atomicity, Consistency, Isolation, and Durability ensure transaction reliability.",
-              marks: 10,
-              wordLimit: 200,
-              questionType: "QUESTION_ANSWER",
-            },
-          ];
-        }
-      }
-
-      setQuestions(fetchedQuestions);
-
-      const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        try {
-          const parsed = JSON.parse(savedDraft);
-          if (parsed.mcqAnswers) setMcqAnswers(parsed.mcqAnswers);
-          if (parsed.textAnswers) setTextAnswers(parsed.textAnswers);
-        } catch {
-          console.warn("Could not parse draft");
-        }
-      }
-
-      // Start Proctoring
-      startWebcam();
-    } catch (err) {
-      showError(err.message || "Failed to load examination data");
-    } finally {
-      setLoading(false);
-    }
-  }, [examId, location.state, user?.userId, user?.roleId, user?.role, showError, startWebcam, stopWebcam]);
-
-  useEffect(() => {
-    fetchExamAndQuestions();
-    return () => {
-      stopWebcam();
-    };
-  }, [fetchExamAndQuestions, stopWebcam]);
-
-  // -------------------------------------------------------------
-  // 3. FINAL SUBMISSION (INSTANT SCORING + SERVER FALLBACK)
-  // -------------------------------------------------------------
-  const submitFinalExam = useCallback(
-    async (disqualified = false, reason = "") => {
-      if (isSubmittingRef.current) return;
-      isSubmittingRef.current = true;
-      setIsSubmitting(true);
-      setShowSubmitModal(false);
-
-      // ALWAYS completely stop camera hardware immediately
-      stopWebcam();
-
-      const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
-      const studentName = user?.username || "Student";
-
-      // 1. Calculate Instant Scorecard using questions and answers
-      const totalMarks = exam?.total_marks || exam?.totalMarks || (questions.length > 0 ? questions.length : 100);
-      const passMarks = exam?.passing_marks || exam?.passingMarks || Math.ceil(totalMarks * 0.4);
-      let calculatedMarks = 0;
-      const breakdown = [];
-
-      if (isMcq) {
-        const pointsPerQ = questions.length > 0 ? Math.max(1, Math.floor(totalMarks / questions.length)) : 1;
-        questions.forEach((q, idx) => {
-          const qId = q.question_id || q.questionId || idx + 1;
-          const chosen = mcqAnswers[qId];
-          const correct = q.correctOption;
-          const isCorrect = chosen && correct && chosen.trim().toLowerCase() === correct.trim().toLowerCase();
-          if (isCorrect) {
-            calculatedMarks += pointsPerQ;
-          }
-          breakdown.push({
-            questionId: qId,
-            question: q.question,
-            selectedAnswer: chosen || "Not Answered",
-            correctAnswer: correct,
-            isCorrect: !!isCorrect,
-          });
-        });
-        if (calculatedMarks > totalMarks) calculatedMarks = totalMarks;
-      }
-
-      if (disqualified) {
-        calculatedMarks = 0;
-      }
-
-      const calculatedPercentage = totalMarks > 0 ? Math.round(((calculatedMarks / totalMarks) * 100) * 10) / 10 : 0;
-      const calculatedStatus = disqualified
-        ? "Disqualified: " + (reason || "Academic Integrity Violation")
-        : isMcq
-        ? calculatedMarks >= passMarks
-          ? "Pass"
-          : "Fail"
-        : "Submitted for Evaluation";
-
-      const fallbackResult = {
-        resultId: Date.now(),
-        examId: parseInt(examId, 10),
-        examName: exam?.exam_name || exam?.examName || `Exam #${examId}`,
-        examType: isMcq ? "MCQ" : "QUESTION_ANSWER",
-        subjectName: exam?.subject?.subject_name || exam?.subject?.subjectName || "General",
-        studentId: parseInt(studentId, 10),
-        studentName: studentName,
-        marksObtained: calculatedMarks,
-        totalMarks: totalMarks,
-        passingMarks: passMarks,
-        percentage: calculatedPercentage,
-        status: calculatedStatus,
-        disqualified: !!disqualified,
-        is_disqualified: !!disqualified,
-        disqualificationReason: reason || "",
-        violationsCount: totalViolations + (disqualified ? 1 : 0),
-        questionBreakdown: breakdown,
-        isServerSyncPending: false,
-      };
-
-      const submissionPayload = {
-        exam_id: parseInt(examId, 10),
-        examId: parseInt(examId, 10),
-        student_id: parseInt(studentId, 10),
-        studentId: parseInt(studentId, 10),
-        student_name: studentName,
-        exam_type: isMcq ? "MCQ" : "QUESTION_ANSWER",
-        mcq_answers: mcqAnswers,
-        text_answers: textAnswers,
-        violations_count: totalViolations + (disqualified ? 1 : 0),
-        is_disqualified: disqualified,
-        disqualification_reason: reason,
-      };
-
-      try {
-        const res = await apiClient.post("/api/results/submit", submissionPayload);
-        const result = res.data;
-
-        // Clean local draft
-        const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
-        localStorage.removeItem(draftKey);
-
-        setResultData(result || fallbackResult);
-        if (disqualified) {
-          setIsDisqualified(true);
-          setDisqualificationReason(reason);
-          showError(`Exam Terminated: ${reason}`);
-        } else {
-          showSuccess("Exam submitted successfully! Scorecard generated.");
-        }
-      } catch (err) {
-        console.warn("Backend submit error, using client-evaluated scorecard:", err);
-        fallbackResult.isServerSyncPending = true;
-
-        // Cache completed result locally
-        try {
-          const localKey = `submitted_results_${studentId}`;
-          const currentLocal = JSON.parse(localStorage.getItem(localKey) || "{}");
-          currentLocal[examId] = fallbackResult;
-          localStorage.setItem(localKey, JSON.stringify(currentLocal));
-        } catch {
-          // ignore
-        }
-
-        const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
-        localStorage.removeItem(draftKey);
-
-        setResultData(fallbackResult);
-        if (disqualified) {
-          setIsDisqualified(true);
-          setDisqualificationReason(reason);
-          showError(`Exam Terminated: ${reason}`);
-        } else {
-          showSuccess("Exam submitted! Scorecard calculated.");
-        }
-      } finally {
-        setIsSubmitting(false);
-        stopWebcam();
-      }
-    },
-    [examId, exam, questions, isMcq, mcqAnswers, textAnswers, totalViolations, user?.roleId, user?.username, user?.userId, stopWebcam, showError, showSuccess]
-  );
-
-  // -------------------------------------------------------------
-  // 4. COPY PROTECTION WITH 3-STRIKE RULE
+  // 6. PROCTORING VIOLATION HANDLERS
   // -------------------------------------------------------------
   const handleCopyViolation = useCallback(
     (actionType = "Copying") => {
@@ -567,7 +309,7 @@ export default function TakeExam() {
             strike: 3,
             isDisqualified: true,
           });
-          submitFinalExam(true, "Disqualified: Exceeded maximum allowed content copy violations (3 strikes)");
+          submitFinalExam();
         }
 
         return newStrikes;
@@ -576,29 +318,25 @@ export default function TakeExam() {
     [resultData, isDisqualified, submitFinalExam, showError, showWarning]
   );
 
-  // -------------------------------------------------------------
-  // 5. SECONDARY DEVICE & SCREENSHOT PROTECTION
-  // -------------------------------------------------------------
   const handleSecondaryDeviceDetected = useCallback(
-    (reason = "Secondary device photo capture or unauthorized screen capture detected") => {
+    (_reason = "Secondary device photo capture or unauthorized screen capture detected") => {
       if (resultData || isDisqualified || isSubmittingRef.current) return;
 
       setScreenShieldActive(true);
       setTotalViolations((t) => t + 1);
       setActiveViolationModal({
         title: "🚫 Exam Terminated: Secondary Device Detected",
-        message: "An attempt to photograph questions or capture the screen using a secondary device was detected by the proctoring shield. The examination has been immediately locked and submitted.",
+        message:
+          "An attempt to photograph questions or capture the screen using a secondary device was detected by the proctoring shield. The examination has been immediately locked and submitted.",
         strike: 3,
         isDisqualified: true,
       });
-      submitFinalExam(true, `Disqualified: ${reason}`);
+      submitFinalExam();
     },
     [resultData, isDisqualified, submitFinalExam]
   );
 
-  // -------------------------------------------------------------
-  // 6. GLOBAL SECURITY EVENT LISTENERS
-  // -------------------------------------------------------------
+  // Global Security Event Listeners
   useEffect(() => {
     if (resultData) return;
 
@@ -630,7 +368,11 @@ export default function TakeExam() {
         return false;
       }
 
-      if (key === "f12" || (isCmdOrCtrl && e.shiftKey && key === "i") || (e.altKey && isCmdOrCtrl && key === "i")) {
+      if (
+        key === "f12" ||
+        (isCmdOrCtrl && e.shiftKey && key === "i") ||
+        (e.altKey && isCmdOrCtrl && key === "i")
+      ) {
         e.preventDefault();
         e.stopPropagation();
         handleCopyViolation("Developer tools inspection");
@@ -702,9 +444,7 @@ export default function TakeExam() {
     };
   }, [resultData, handleCopyViolation, handleSecondaryDeviceDetected, showWarning]);
 
-  // -------------------------------------------------------------
-  // 7. ACCURATE MULTI-PERSON DETECTION & MONITORING
-  // -------------------------------------------------------------
+  // Multi-person presence detection
   useEffect(() => {
     if (!isCameraActive || resultData || isDisqualified) return;
 
@@ -717,7 +457,6 @@ export default function TakeExam() {
       if (video.readyState >= 2) {
         let personsDetectedThisFrame = 1;
 
-        // A. Native FaceDetector
         if (faceDetectorRef.current) {
           try {
             const faces = await faceDetectorRef.current.detect(video);
@@ -738,7 +477,6 @@ export default function TakeExam() {
             personsDetectedThisFrame = 1;
           }
         } else {
-          // B. Canvas Spatial Fallback
           canvas.width = 96;
           canvas.height = 72;
           ctx.drawImage(video, 0, 0, 96, 72);
@@ -766,7 +504,14 @@ export default function TakeExam() {
               const x = pixelIndex % 96;
 
               if (y < 40) {
-                const isSkin = r > 110 && g > 55 && b > 35 && (Math.max(r, g, b) - Math.min(r, g, b) > 18) && Math.abs(r - g) > 15 && r > g && r > b;
+                const isSkin =
+                  r > 110 &&
+                  g > 55 &&
+                  b > 35 &&
+                  Math.max(r, g, b) - Math.min(r, g, b) > 18 &&
+                  Math.abs(r - g) > 15 &&
+                  r > g &&
+                  r > b;
                 if (isSkin) {
                   if (x < 28) leftUpperFace++;
                   else if (x >= 34 && x <= 62) centerUpperFace++;
@@ -775,7 +520,10 @@ export default function TakeExam() {
               }
             }
 
-            const isMultiHeadDetected = (leftUpperFace > 70 && centerUpperFace > 70) || (centerUpperFace > 70 && rightUpperFace > 70) || (leftUpperFace > 60 && rightUpperFace > 60);
+            const isMultiHeadDetected =
+              (leftUpperFace > 70 && centerUpperFace > 70) ||
+              (centerUpperFace > 70 && rightUpperFace > 70) ||
+              (leftUpperFace > 60 && rightUpperFace > 60);
 
             if (isMultiHeadDetected) {
               consecutiveMultiPersonFramesRef.current += 1;
@@ -785,7 +533,10 @@ export default function TakeExam() {
                 personsDetectedThisFrame = 1;
               }
             } else {
-              consecutiveMultiPersonFramesRef.current = Math.max(0, consecutiveMultiPersonFramesRef.current - 1);
+              consecutiveMultiPersonFramesRef.current = Math.max(
+                0,
+                consecutiveMultiPersonFramesRef.current - 1
+              );
               personsDetectedThisFrame = 1;
             }
 
@@ -800,7 +551,6 @@ export default function TakeExam() {
 
         setDetectedPersonsCount(personsDetectedThisFrame);
 
-        // Accumulate Multiple Persons Duration (3-4 Minutes Rule)
         if (personsDetectedThisFrame > 1) {
           setMultiplePersonsDurationSeconds((prevDuration) => {
             const nextDuration = prevDuration + 2.5;
@@ -808,7 +558,8 @@ export default function TakeExam() {
             if (nextDuration >= 180 && prevDuration < 180) {
               setActiveViolationModal({
                 title: "⚠️ Security Warning: Multiple Persons Detected",
-                message: "Proctoring has detected multiple people present in your camera frame for over 3 minutes. Please ensure you are alone in a private room. Continued presence of others will lead to disqualification.",
+                message:
+                  "Proctoring has detected multiple people present in your camera frame for over 3 minutes. Please ensure you are alone in a private room. Continued presence of others will lead to disqualification.",
                 strike: 1,
                 isDisqualified: false,
               });
@@ -817,11 +568,12 @@ export default function TakeExam() {
             } else if (nextDuration >= 240 && prevDuration < 240) {
               setActiveViolationModal({
                 title: "🚫 Exam Terminated: Unauthorized Persons Present",
-                message: "Multiple persons remained in the examination room for over 4 minutes. In accordance with academic integrity standards, this session is terminated.",
+                message:
+                  "Multiple persons remained in the examination room for over 4 minutes. In accordance with academic integrity standards, this session is terminated.",
                 strike: 3,
                 isDisqualified: true,
               });
-              submitFinalExam(true, "Disqualified: Multiple persons present in room for over 4 minutes");
+              submitFinalExam();
             }
 
             return nextDuration;
@@ -835,37 +587,6 @@ export default function TakeExam() {
     return () => clearInterval(interval);
   }, [isCameraActive, resultData, isDisqualified, submitFinalExam, showWarning]);
 
-  // -------------------------------------------------------------
-  // 8. TIMER & AUTOSAVE
-  // -------------------------------------------------------------
-  useEffect(() => {
-    if (resultData || loading) return;
-
-    const timer = setInterval(() => {
-      setTimeLeftSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          showWarning("Time expired! Automatically submitting your examination.");
-          submitFinalExam(false, "Time expired");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [resultData, loading, submitFinalExam, showWarning]);
-
-  useEffect(() => {
-    if (questions.length > 0 && !resultData) {
-      const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
-      localStorage.setItem(
-        draftKey,
-        JSON.stringify({ mcqAnswers, textAnswers, timestamp: Date.now() })
-      );
-    }
-  }, [mcqAnswers, textAnswers, examId, user, questions, resultData]);
-
   const requestFullscreen = () => {
     try {
       if (document.documentElement.requestFullscreen) {
@@ -876,28 +597,8 @@ export default function TakeExam() {
     }
   };
 
-  const formatTimer = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
-
   const currentQ = questions[currentIndex];
   const currentQId = currentQ?.question_id || currentQ?.questionId || currentIndex + 1;
-
-  const handleSelectOption = (optionText) => {
-    setMcqAnswers((prev) => ({
-      ...prev,
-      [currentQId]: optionText,
-    }));
-  };
-
-  const handleTextAnswerChange = (val) => {
-    setTextAnswers((prev) => ({
-      ...prev,
-      [currentQId]: val,
-    }));
-  };
 
   const toggleFlag = () => {
     setFlagged((prev) => {
@@ -910,14 +611,6 @@ export default function TakeExam() {
       return next;
     });
   };
-
-  const answeredCount = useMemo(() => {
-    if (isMcq) {
-      return Object.keys(mcqAnswers).filter((k) => mcqAnswers[k] && mcqAnswers[k].trim() !== "").length;
-    } else {
-      return Object.keys(textAnswers).filter((k) => textAnswers[k] && textAnswers[k].trim() !== "").length;
-    }
-  }, [isMcq, mcqAnswers, textAnswers]);
 
   if (loading) {
     return (
@@ -970,7 +663,9 @@ export default function TakeExam() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-slate-500">Time Window:</span>
-                <span className="font-mono font-bold text-slate-800">{accessBlocked.startTimeStr} - {accessBlocked.endTimeStr}</span>
+                <span className="font-mono font-bold text-slate-800">
+                  {accessBlocked.startTimeStr} - {accessBlocked.endTimeStr}
+                </span>
               </div>
             </div>
 
@@ -981,13 +676,10 @@ export default function TakeExam() {
                   onClick={async () => {
                     const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
                     try {
-                      await apiClient.post(`/api/exams/${examId}/register`, {
-                        studentId: parseInt(studentId, 10),
-                        examId: parseInt(examId, 10),
-                      });
+                      await registerForExam(examId, studentId);
                       showSuccess("Successfully registered! Launching exam hall...");
                       setAccessBlocked(null);
-                      fetchExamAndQuestions();
+                      loadExamAndAttempt();
                     } catch (err) {
                       showError(err.response?.data?.message || "Failed to register for exam");
                     }
@@ -1017,36 +709,16 @@ export default function TakeExam() {
   }
 
   // -------------------------------------------------------------
-  // -------------------------------------------------------------
   // POST-SUBMISSION / ALREADY SUBMITTED RESULT VIEW
   // -------------------------------------------------------------
   if (resultData) {
     const isDisq = !!(resultData.disqualified || resultData.is_disqualified || isDisqualified);
-    const isPass = !isDisq && resultData.status === "Pass";
+    const isPass = !isDisq && resultData.status === RESULT_STATUS.PASS;
+    const isPendingEvaluation = resultData.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION;
 
-    const marksObtained =
-      resultData.marks_obtained !== undefined
-        ? resultData.marks_obtained
-        : resultData.marksObtained !== undefined
-        ? resultData.marksObtained
-        : resultData.score !== undefined
-        ? resultData.score
-        : 0;
-
-    const totalMarks =
-      resultData.total_marks ||
-      resultData.totalMarks ||
-      resultData.total ||
-      exam?.total_marks ||
-      exam?.totalMarks ||
-      (questions.length > 0 ? questions.length : 100);
-
-    const percentage =
-      resultData.percentage !== undefined
-        ? resultData.percentage
-        : totalMarks > 0
-        ? Math.round(((marksObtained / totalMarks) * 100) * 10) / 10
-        : 0;
+    const marksObtained = resultData.marks_obtained ?? resultData.marksObtained ?? resultData.score;
+    const totalMarks = resultData.total_marks ?? resultData.totalMarks ?? resultData.total;
+    const percentage = resultData.percentage;
 
     const examName =
       resultData.exam_name ||
@@ -1065,7 +737,6 @@ export default function TakeExam() {
     const disqReason =
       resultData.disqualification_reason ||
       resultData.disqualificationReason ||
-      disqualificationReason ||
       "Academic Integrity Violation";
 
     const violationsCount =
@@ -1073,7 +744,7 @@ export default function TakeExam() {
         ? resultData.violations_count
         : resultData.violationsCount !== undefined
         ? resultData.violationsCount
-        : totalViolations;
+        : null;
 
     const breakdownList =
       resultData.question_breakdown ||
@@ -1084,7 +755,6 @@ export default function TakeExam() {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 select-none">
         <div className="w-full max-w-2xl bg-white text-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
-          {/* Header */}
           <div
             className={`p-8 text-center ${
               isDisq ? "bg-rose-600 text-white" : isPass ? "bg-emerald-600 text-white" : "bg-slate-900 text-white"
@@ -1107,7 +777,6 @@ export default function TakeExam() {
             </p>
           </div>
 
-          {/* Already Submitted Notice */}
           {alreadySubmitted && (
             <div className="bg-amber-50 border-b border-amber-200 p-4 text-center">
               <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Single Attempt Policy</p>
@@ -1117,19 +786,15 @@ export default function TakeExam() {
             </div>
           )}
 
-          {/* Server Sync Delay Notice */}
-          {resultData?.isServerSyncPending && (
+          {isPendingEvaluation && (
             <div className="bg-blue-50 border-b border-blue-200 p-4 text-center">
-              <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">
-                ℹ️ Provisional Scorecard (Sync Pending)
-              </p>
-              <p className="text-xs text-blue-900 mt-1">
-                Your paper was submitted and graded. Due to a temporary server connection delay, your results are saved locally. Please come back after some time under <strong>'My Results & Scorecards'</strong> to check your verified server records.
+              <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">Evaluation Pending</p>
+              <p className="text-sm font-semibold text-blue-900 mt-1">
+                Your descriptive answers require teacher evaluation. The backend result will be updated after grading.
               </p>
             </div>
           )}
 
-          {/* Disqualification Banner */}
           {isDisq && (
             <div className="bg-rose-50 border-b border-rose-200 p-4 text-center">
               <p className="text-xs font-bold text-rose-800 uppercase tracking-wide">Academic Integrity Violation</p>
@@ -1142,20 +807,19 @@ export default function TakeExam() {
             </div>
           )}
 
-          {/* Overview */}
           <div className="p-6 sm:p-8 space-y-6">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Score</span>
                 <p className="text-2xl font-extrabold text-slate-900 mt-1">
-                  {marksObtained} <span className="text-xs font-normal text-slate-400">/ {totalMarks}</span>
+                  {marksObtained ?? "-"} <span className="text-xs font-normal text-slate-400">/ {totalMarks ?? "-"}</span>
                 </p>
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Percentage</span>
                 <p className={`text-2xl font-extrabold mt-1 ${isDisq ? "text-rose-600" : "text-orange-600"}`}>
-                  {percentage}%
+                  {percentage ?? "-"}{percentage !== undefined && "%"}
                 </p>
               </div>
 
@@ -1167,7 +831,6 @@ export default function TakeExam() {
               </div>
             </div>
 
-            {/* MCQ Breakdown */}
             {!isDisq && breakdownList.length > 0 && (
               <div className="space-y-3 pt-2">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -1182,13 +845,17 @@ export default function TakeExam() {
                         ? !!item.is_correct
                         : item.isCorrect !== undefined
                         ? !!item.isCorrect
-                        : !!(selectedAns && correctAns && selectedAns.trim().toLowerCase() === correctAns.trim().toLowerCase());
+                        : null;
 
                     return (
                       <div
                         key={idx}
                         className={`p-3 rounded-xl border text-xs space-y-1 ${
-                          isItemCorrect ? "bg-emerald-50/70 border-emerald-200" : "bg-rose-50/70 border-rose-200"
+                          isItemCorrect === true
+                            ? "bg-emerald-50/70 border-emerald-200"
+                            : isItemCorrect === false
+                            ? "bg-rose-50/70 border-rose-200"
+                            : "bg-slate-50 border-slate-200"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -1197,16 +864,20 @@ export default function TakeExam() {
                           </p>
                           <span
                             className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                              isItemCorrect ? "bg-emerald-200 text-emerald-800" : "bg-rose-200 text-rose-800"
+                              isItemCorrect === true
+                                ? "bg-emerald-200 text-emerald-800"
+                                : isItemCorrect === false
+                                ? "bg-rose-200 text-rose-800"
+                                : "bg-slate-200 text-slate-700"
                             }`}
                           >
-                            {isItemCorrect ? "Correct (+1)" : "Incorrect (0)"}
+                            {isItemCorrect === true ? "Correct" : isItemCorrect === false ? "Incorrect" : "Reviewed"}
                           </span>
                         </div>
                         <p className="text-slate-600">
                           Your answer: <strong className="text-slate-900">{selectedAns}</strong>
                         </p>
-                        {!isItemCorrect && correctAns && (
+                        {isItemCorrect === false && correctAns && (
                           <p className="text-emerald-700 font-medium">Correct answer: {correctAns}</p>
                         )}
                       </div>
@@ -1216,7 +887,6 @@ export default function TakeExam() {
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
               <button
                 onClick={() => {
@@ -1239,10 +909,8 @@ export default function TakeExam() {
   // -------------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col select-none relative overflow-x-hidden">
-      {/* Hidden processing canvas */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* PRIVACY SCREEN SHIELD */}
       {screenShieldActive && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center">
           <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4 border border-amber-500/30 animate-pulse">
@@ -1261,7 +929,7 @@ export default function TakeExam() {
         </div>
       )}
 
-      {/* DYNAMIC ANTI-PHOTO WATERMARK MATRIX */}
+      {/* Dynamic Watermark */}
       <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden opacity-[0.045] flex flex-wrap gap-16 p-8 rotate-[-12deg] select-none">
         {Array.from({ length: 48 }).map((_, idx) => (
           <div key={idx} className="text-white text-xs font-mono font-black tracking-widest whitespace-nowrap">
@@ -1270,7 +938,7 @@ export default function TakeExam() {
         ))}
       </div>
 
-      {/* TOP PROCTORING HEADER BAR */}
+      {/* Proctoring Header */}
       <header className="h-20 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-4">
           <button
@@ -1301,9 +969,7 @@ export default function TakeExam() {
           </div>
         </div>
 
-        {/* Live Webcam Preview, Timer & Submit */}
         <div className="flex items-center gap-3 sm:gap-5">
-          {/* Webcam Proctor Badge with Person Count */}
           <div className="relative group flex items-center gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700">
             <div className="w-9 h-7 sm:w-11 sm:h-8 rounded-lg overflow-hidden bg-slate-950 relative border border-slate-700 flex items-center justify-center">
               <video
@@ -1331,7 +997,6 @@ export default function TakeExam() {
             </div>
           </div>
 
-          {/* Copy Strikes Indicator */}
           <div
             className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
               copyStrikes === 0
@@ -1346,19 +1011,17 @@ export default function TakeExam() {
             <span className="font-mono font-black">{copyStrikes} / 3</span>
           </div>
 
-          {/* Timer */}
           <div
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-black border transition-colors ${
-              timeLeftSeconds < 300
+              isAttemptExpired || timeLeftSeconds < 300
                 ? "bg-rose-950/80 border-rose-500 text-rose-400 animate-pulse"
                 : "bg-slate-800 border-slate-700 text-orange-400"
             }`}
           >
             <Icon name="clock" className="w-4 h-4" />
-            <span>{formatTimer(timeLeftSeconds)}</span>
+            <span>{isAttemptExpired ? "Expired" : formattedTime}</span>
           </div>
 
-          {/* Finish & Submit */}
           <button
             onClick={() => setShowSubmitModal(true)}
             className="py-2.5 px-4 sm:px-5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs sm:text-sm font-black rounded-xl shadow-lg transition-all"
@@ -1368,7 +1031,6 @@ export default function TakeExam() {
         </div>
       </header>
 
-      {/* FULLSCREEN PROMPT BANNER */}
       {(!isFullscreen || fullscreenWarning) && (
         <div className="bg-orange-500/15 border-b border-orange-500/30 px-4 py-2 text-center text-xs font-semibold text-orange-300 flex items-center justify-center gap-3">
           <span>🔒 For maximum test integrity, full-screen examination mode is recommended.</span>
@@ -1381,11 +1043,9 @@ export default function TakeExam() {
         </div>
       )}
 
-      {/* MAIN EXAM BODY */}
+      {/* Main Examination Area */}
       <main className="flex-1 max-w-[1536px] w-full mx-auto p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Question Panel */}
         <div className="lg:col-span-3 flex flex-col justify-between bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-10 backdrop-blur-sm space-y-8 relative">
-          {/* Question Header */}
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
@@ -1413,13 +1073,11 @@ export default function TakeExam() {
               </button>
             </div>
 
-            {/* Question Text */}
             <h2 className="text-lg sm:text-xl font-bold text-slate-100 leading-relaxed">
               {currentQ?.question}
             </h2>
           </div>
 
-          {/* Options / Answer Input Area */}
           <div className="flex-1 py-2">
             {isMcq ? (
               <div className="space-y-3.5">
@@ -1436,7 +1094,8 @@ export default function TakeExam() {
                       <button
                         key={opt.key}
                         type="button"
-                        onClick={() => handleSelectOption(opt.text)}
+                        disabled={isAttemptExpired}
+                        onClick={() => handleSelectOption(currentQ, opt.key, opt.text)}
                         className={`w-full text-left p-4 sm:p-5 rounded-2xl border transition-all flex items-start gap-4 ${
                           isSelected
                             ? "bg-orange-500/20 border-orange-500 text-white shadow-md ring-1 ring-orange-500/50"
@@ -1466,7 +1125,8 @@ export default function TakeExam() {
                 <textarea
                   rows={8}
                   value={textAnswers[currentQId] || ""}
-                  onChange={(e) => handleTextAnswerChange(e.target.value)}
+                  disabled={isAttemptExpired}
+                  onChange={(e) => handleTextAnswerChange(currentQId, e.target.value)}
                   placeholder="Type your comprehensive descriptive answer here..."
                   className="w-full bg-slate-950/80 border border-slate-700 rounded-2xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all resize-y"
                 />
@@ -1474,7 +1134,6 @@ export default function TakeExam() {
             )}
           </div>
 
-          {/* Navigation Controls */}
           <div className="flex items-center justify-between pt-6 border-t border-slate-800">
             <button
               onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
@@ -1506,9 +1165,7 @@ export default function TakeExam() {
           </div>
         </div>
 
-        {/* Sidebar Palette & Proctor Status */}
         <div className="space-y-6">
-          {/* Proctoring Shield Card */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 backdrop-blur-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <span className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
@@ -1558,7 +1215,6 @@ export default function TakeExam() {
             </ul>
           </div>
 
-          {/* Question Palette */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm space-y-5">
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
               Question Navigator ({questions.length})
@@ -1593,7 +1249,6 @@ export default function TakeExam() {
               })}
             </div>
 
-            {/* Legend */}
             <div className="pt-4 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px] text-slate-400 font-medium">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
@@ -1616,7 +1271,7 @@ export default function TakeExam() {
         </div>
       </main>
 
-      {/* VIOLATION MODAL */}
+      {/* Violation Modal */}
       {activeViolationModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
@@ -1660,7 +1315,7 @@ export default function TakeExam() {
         </div>
       )}
 
-      {/* CONFIRM FINAL SUBMIT MODAL */}
+      {/* Confirmation Modal */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 text-center">
@@ -1687,7 +1342,7 @@ export default function TakeExam() {
               </button>
               <button
                 type="button"
-                onClick={() => submitFinalExam(false)}
+                onClick={() => submitFinalExam()}
                 disabled={isSubmitting}
                 className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2"
               >
