@@ -24,6 +24,30 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public int getStudentIdFromAuthorization(String authorizationHeader) {
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            return 0;
+        }
+
+        String token = authorizationHeader.trim();
+        if (token.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            token = token.substring(7).trim();
+        }
+
+        String[] parts = token.split("-");
+        if (parts.length < 3) {
+            return 0;
+        }
+
+        try {
+            int userId = Integer.parseInt(parts[parts.length - 2]);
+            return getStudentIdByUserId(userId);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    @Override
     public int getTeacherIdByUserId(int userId) {
         return authRepository.getTeacherIdByUserId(userId);
     }

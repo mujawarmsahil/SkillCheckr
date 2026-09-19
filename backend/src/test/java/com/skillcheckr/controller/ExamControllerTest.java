@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,11 +23,19 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.skillcheckr.model.Exam;
+import com.skillcheckr.model.AttemptStartResult;
+import com.skillcheckr.model.ExamAttempt;
+import com.skillcheckr.model.AttemptAnswerResponse;
+import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.service.ExamService;
+import com.skillcheckr.service.AttemptStartException;
+import com.skillcheckr.service.AuthService;
+import com.skillcheckr.service.AttemptAnswerService;
+import com.skillcheckr.service.ExamSubmissionService;
 import com.skillcheckr.service.QuestionService;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +46,15 @@ class ExamControllerTest {
 
     @Mock
     private QuestionService questionService;
+
+    @Mock
+    private AuthService authService;
+
+    @Mock
+    private AttemptAnswerService attemptAnswerService;
+
+    @Mock
+    private ExamSubmissionService examSubmissionService;
 
     @InjectMocks
     private ExamController examController;
@@ -95,6 +113,173 @@ class ExamControllerTest {
         mockMvc.perform(get("/api/Exams/99"))
                 .andExpect(status().isNotFound());
     }
+
+            @Test
+            void startAttempt_returns201_forNewAttempt() throws Exception {
+            ExamAttempt attempt = ExamAttempt.builder()
+                .attemptId(1)
+                .startedAt(LocalDateTime.of(2026, 9, 17, 18, 0))
+                .expiresAt(LocalDateTime.of(2026, 9, 17, 19, 0))
+                .status("IN_PROGRESS")
+                .build();
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(examService.startAttempt(1, 7)).thenReturn(new AttemptStartResult(attempt, false));
+
+            mockMvc.perform(post("/api/exams/1/attempts")
+                            .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.attemptId").value(1))
+                .andExpect(jsonPath("$.examId").value(1))
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+            }
+
+            @Test
+            void startAttempt_returns200_forExistingActiveAttempt() throws Exception {
+            ExamAttempt attempt = ExamAttempt.builder()
+                .attemptId(2)
+                .startedAt(LocalDateTime.of(2026, 9, 17, 18, 0))
+                .expiresAt(LocalDateTime.of(2026, 9, 17, 19, 0))
+                .status("IN_PROGRESS")
+                .build();
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(examService.startAttempt(1, 7)).thenReturn(new AttemptStartResult(attempt, true));
+
+            mockMvc.perform(post("/api/exams/1/attempts")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attemptId").value(2));
+            }
+
+            @Test
+            void startAttempt_returnsBusinessErrorResponse() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(examService.startAttempt(1, 7))
+                .thenThrow(new AttemptStartException(403, "Student is not registered for this exam"));
+
+            mockMvc.perform(post("/api/exams/1/attempts")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("Student is not registered for this exam"));
+            }
+
+            @Test
+            void saveAttemptAnswer_returns200WithAnswerResponse() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(attemptAnswerService.saveAnswer(any(Integer.class), any(Integer.class), any(Integer.class),
+                any(Integer.class), any()))
+                .thenReturn(AttemptAnswerResponse.builder()
+                    .attemptAnswerId(5).attemptId(1).questionId(10).selectedAnswerId(12).build());
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                    "/api/exams/1/attempts/1/answers/10")
+                    .header("Authorization", "Bearer jwt-mock-42-1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"selectedAnswerId\":12}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attemptAnswerId").value(5))
+                .andExpect(jsonPath("$.selectedAnswerId").value(12));
+            }
+
+            @Test
+            void saveAttemptAnswer_returnsStandardizedBusinessError() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(attemptAnswerService.saveAnswer(any(Integer.class), any(Integer.class), any(Integer.class),
+                any(Integer.class), any()))
+                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(409,
+                    "Exam attempt has expired"));
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                    "/api/exams/1/attempts/1/answers/10")
+                    .header("Authorization", "Bearer jwt-mock-42-1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("Exam attempt has expired"));
+            }
+
+            @Test
+            void getAttemptAnswers_returnsPersistedAnswersForOwner() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(attemptAnswerService.getAnswers(1, 2, 7)).thenReturn(List.of(
+                AttemptAnswerResponse.builder().attemptAnswerId(5).attemptId(2).questionId(10)
+                    .selectedAnswerId(12).build()));
+
+            mockMvc.perform(get("/api/exams/1/attempts/2/answers")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].attemptAnswerId").value(5))
+                .andExpect(jsonPath("$[0].selectedAnswerId").value(12))
+                .andExpect(jsonPath("$[0].is_correct").doesNotExist());
+            }
+
+            @Test
+            void getAttemptAnswers_returnsNotFoundWhenAttemptIsMissing() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(attemptAnswerService.getAnswers(1, 2, 7))
+                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(404, "Exam attempt not found"));
+
+            mockMvc.perform(get("/api/exams/1/attempts/2/answers")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+            }
+
+            @Test
+            void getAttemptAnswers_rejectsUnauthorizedAttempt() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(attemptAnswerService.getAnswers(1, 2, 7))
+                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(403,
+                    "You are not authorized to view this attempt"));
+
+            mockMvc.perform(get("/api/exams/1/attempts/2/answers")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+            }
+
+            @Test
+            void getAttemptAnswers_rejectsExamMismatch() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(attemptAnswerService.getAnswers(1, 2, 7))
+                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(409,
+                    "Attempt does not belong to this exam"));
+
+            mockMvc.perform(get("/api/exams/1/attempts/2/answers")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+            }
+
+            @Test
+            void submitAttempt_returnsResult() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(examSubmissionService.submit(1, 2, 7)).thenReturn(ExamResultDTO.builder()
+                .resultId(4).attemptId(2).examId(1).studentId(7)
+                .marksObtained(7).totalMarks(10).passingMarks(4)
+                .percentage(70).status("Pass").build());
+
+            mockMvc.perform(post("/api/exams/1/attempts/2/submit")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attempt_id").value(2))
+                .andExpect(jsonPath("$.marks_obtained").value(7))
+                .andExpect(jsonPath("$.status").value("Pass"));
+            }
+
+            @Test
+            void submitAttempt_returnsStandardizedError() throws Exception {
+            when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
+            when(examSubmissionService.submit(1, 2, 7))
+                .thenThrow(new com.skillcheckr.service.ExamSubmissionException(403,
+                    "You are not authorized to submit this attempt"));
+
+            mockMvc.perform(post("/api/exams/1/attempts/2/submit")
+                    .header("Authorization", "Bearer jwt-mock-42-1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+            }
 
     @Test
     void getExamsByTeacherId_returnsList() throws Exception {
