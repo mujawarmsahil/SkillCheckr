@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import apiClient from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
+import { getStudentResults } from "../../api/resultApi";
+import { RESULT_STATUS } from "../../constants/resultConstants";
+import { QUESTION_TYPES } from "../../constants/examConstants";
 
 export default function StudentResults() {
   const { user } = useAuth();
@@ -14,8 +16,7 @@ export default function StudentResults() {
     setLoading(true);
     try {
       const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
-      const res = await apiClient.get(`/api/results/student/${studentId}`);
-      const data = Array.isArray(res.data) ? res.data : [];
+      const data = await getStudentResults(studentId);
       setResults(data);
     } catch (err) {
       if (err.status === 404 || err.response?.status === 404) {
@@ -33,7 +34,7 @@ export default function StudentResults() {
   }, [fetchResults]);
 
   const totalExams = results.length;
-  const passedExams = results.filter((r) => r.status === "Pass").length;
+  const passedExams = results.filter((r) => r.status === RESULT_STATUS.PASS).length;
   const avgPercentage = totalExams > 0 ? (results.reduce((acc, r) => acc + (r.percentage || 0), 0) / totalExams).toFixed(1) : 0;
 
   return (
@@ -111,11 +112,11 @@ export default function StudentResults() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {results.map((r, idx) => {
-                  const isPass = r.status === "Pass";
-                  const isMcq = (r.exam_type || r.examType || "MCQ").toUpperCase() === "MCQ";
-                  const marksObtained = r.marks_obtained !== undefined ? r.marks_obtained : r.marksObtained !== undefined ? r.marksObtained : 0;
-                  const totalMarks = r.total_marks || r.totalMarks || 100;
-                  const percentage = r.percentage !== undefined ? r.percentage : totalMarks > 0 ? Math.round(((marksObtained / totalMarks) * 100) * 10) / 10 : 0;
+                  const isPass = r.status === RESULT_STATUS.PASS;
+                  const isMcq = (r.exam_type || r.examType || QUESTION_TYPES.MCQ).toUpperCase() === QUESTION_TYPES.MCQ;
+                  const marksObtained = r.marks_obtained ?? r.marksObtained;
+                  const totalMarks = r.total_marks ?? r.totalMarks;
+                  const percentage = r.percentage;
                   const examName = r.exam_name || r.examName || "Exam";
                   const subjectName = r.subject_name || r.subjectName || "General";
                   const submittedAt = r.submitted_at || r.submittedAt || "Recent";
@@ -144,17 +145,21 @@ export default function StudentResults() {
                         <div className="flex items-center gap-2">
                           <div className="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full ${isPass ? "bg-emerald-500" : "bg-rose-500"}`}
-                              style={{ width: `${Math.min(100, percentage)}%` }}
+                              className={`h-full rounded-full ${isPass ? "bg-emerald-500" : r.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION ? "bg-blue-500" : "bg-rose-500"}`}
+                              style={{ width: `${typeof percentage === "number" ? Math.min(100, percentage) : 0}%` }}
                             ></div>
                           </div>
-                          <span className="text-xs font-bold text-slate-800">{percentage}%</span>
+                          <span className="text-xs font-bold text-slate-800">{percentage ?? "-"}{percentage !== undefined && "%"}</span>
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
                         <span
                           className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                            isPass ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                            isPass
+                              ? "bg-emerald-100 text-emerald-800"
+                              : r.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-rose-100 text-rose-800"
                           }`}
                         >
                           {r.status}
