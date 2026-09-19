@@ -29,6 +29,22 @@ public class QuestionDTO {
 	private String option3;
 	private String option4;
 
+	@JsonProperty("option1Id")
+	@JsonAlias({"option1_id"})
+	private Integer option1Id;
+
+	@JsonProperty("option2Id")
+	@JsonAlias({"option2_id"})
+	private Integer option2Id;
+
+	@JsonProperty("option3Id")
+	@JsonAlias({"option3_id"})
+	private Integer option3Id;
+
+	@JsonProperty("option4Id")
+	@JsonAlias({"option4_id"})
+	private Integer option4Id;
+
 	@JsonProperty("correct_option")
 	@JsonAlias({"correctOption"})
 	private String correctOption;

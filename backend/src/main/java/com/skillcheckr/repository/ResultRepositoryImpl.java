@@ -2,6 +2,8 @@ package com.skillcheckr.repository;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,12 +14,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.model.ExamSubmissionDTO;
 import com.skillcheckr.model.QuestionDTO;
+import com.skillcheckr.repository.mapper.ExamResultRowMapper;
 
 @Repository
 public class ResultRepositoryImpl implements ResultRepository {
@@ -35,36 +41,11 @@ public class ResultRepositoryImpl implements ResultRepository {
 	private final List<ExamResultDTO> allResultsCache = Collections.synchronizedList(new ArrayList<>());
 	private final AtomicInteger resultIdSequence = new AtomicInteger(100);
 
-	private boolean tableInitialized = false;
-
-	private synchronized void ensureResultTableExists() {
-		if (tableInitialized) return;
-		try {
-			String createTableSql = "CREATE TABLE IF NOT EXISTS result ("
-					+ "result_id INT AUTO_INCREMENT PRIMARY KEY, "
-					+ "exam_id INT, "
-					+ "student_id INT, "
-					+ "marks_obtained INT, "
-					+ "total_marks INT, "
-					+ "passing_marks INT, "
-					+ "percentage DOUBLE, "
-					+ "status VARCHAR(50), "
-					+ "submitted_at DATETIME"
-					+ ")";
-			jdbcTemplate.execute(createTableSql);
-			tableInitialized = true;
-		} catch (Exception e) {
-			System.err.println("Note: Result table creation skipped or in-memory fallback used: " + e.getMessage());
-			tableInitialized = true;
-		}
-	}
-
 	@Override
 	public ExamResultDTO submitExam(ExamSubmissionDTO submission) {
-		ensureResultTableExists();
-
 		int examId = submission.getExamId();
 		int studentId = submission.getStudentId();
+		int attemptId = submission.getAttemptId() > 0 ? submission.getAttemptId() : createSubmittedAttempt(examId, studentId);
 
 		Exam exam = examRepository.getExamById(examId);
 		List<QuestionDTO> questions = questionRepository.getQuestionsByExamId(examId);
@@ -75,8 +56,8 @@ public class ResultRepositoryImpl implements ResultRepository {
 		int marksObtained = 0;
 		List<Map<String, Object>> breakdown = new ArrayList<>();
 
-		boolean isMcq = "MCQ".equalsIgnoreCase(submission.getExamType()) 
-				|| (exam != null && "MCQ".equalsIgnoreCase(exam.getExamType()))
+		boolean isMcq = ExamConstants.QUESTION_TYPE_MCQ.equalsIgnoreCase(submission.getExamType()) 
+				|| (exam != null && ExamConstants.QUESTION_TYPE_MCQ.equalsIgnoreCase(exam.getExamType()))
 				|| (submission.getMcqAnswers() != null && !submission.getMcqAnswers().isEmpty());
 
 		if (isMcq) {
@@ -133,7 +114,8 @@ public class ResultRepositoryImpl implements ResultRepository {
 			status = "Disqualified: " + (submission.getDisqualificationReason() != null ? submission.getDisqualificationReason() : "Academic Integrity Violation");
 		} else {
 			percentage = totalMarks > 0 ? ((double) marksObtained / totalMarks) * 100.0 : 0.0;
-			status = isMcq ? (marksObtained >= passingMarks ? "Pass" : "Fail") : "Submitted for Evaluation";
+			status = isMcq ? (marksObtained >= passingMarks ? ExamConstants.RESULT_STATUS_PASS : ExamConstants.RESULT_STATUS_FAIL)
+					: ExamConstants.RESULT_STATUS_SUBMITTED_FOR_EVALUATION;
 		}
 
 		String nowFormatted = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -141,9 +123,9 @@ public class ResultRepositoryImpl implements ResultRepository {
 
 		// Try DB save
 		try {
-			String insertSql = "INSERT INTO result (exam_id, student_id, marks_obtained, total_marks, passing_marks, percentage, status, submitted_at) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
-			jdbcTemplate.update(insertSql, examId, studentId, marksObtained, totalMarks, passingMarks, percentage, status);
+			String insertSql = "INSERT INTO result (exam_id, student_id, marks_obtained, total_marks, passing_marks, percentage, status, submitted_at, attempt_id) "
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
+			jdbcTemplate.update(insertSql, examId, studentId, marksObtained, totalMarks, passingMarks, percentage, status, attemptId);
 		} catch (Exception e) {
 			System.err.println("Could not insert result into database, cached in-memory: " + e.getMessage());
 		}
@@ -152,10 +134,11 @@ public class ResultRepositoryImpl implements ResultRepository {
 				.resultId(resultId)
 				.examId(examId)
 				.examName(exam != null ? exam.getExamName() : "Exam #" + examId)
-				.examType(isMcq ? "MCQ" : "QUESTION_ANSWER")
+				.examType(isMcq ? ExamConstants.QUESTION_TYPE_MCQ : ExamConstants.QUESTION_TYPE_QUESTION_ANSWER)
 				.subjectName(exam != null && exam.getSubject() != null ? exam.getSubject().getSubjectName() : "General")
 				.subjectId(exam != null && exam.getSubject() != null ? exam.getSubject().getSubjectId() : 0)
 				.studentId(studentId)
+				.attemptId(attemptId)
 				.studentName(submission.getStudentName() != null ? submission.getStudentName() : "Student #" + studentId)
 				.marksObtained(marksObtained)
 				.totalMarks(totalMarks)
@@ -182,28 +165,13 @@ public class ResultRepositoryImpl implements ResultRepository {
 			return new ArrayList<>(cached);
 		}
 
-		// Try loading from database
 		try {
-			ensureResultTableExists();
 			String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name "
 					+ "FROM result r "
 					+ "LEFT JOIN exam e ON r.exam_id = e.exam_id "
 					+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 					+ "WHERE r.student_id = ? ORDER BY r.result_id DESC";
-			List<ExamResultDTO> dbResults = jdbcTemplate.query(sql, (rs, rowNum) -> ExamResultDTO.builder()
-					.resultId(rs.getInt("result_id"))
-					.examId(rs.getInt("exam_id"))
-					.examName(rs.getString("exam_name"))
-					.examType(rs.getString("exam_type") != null ? rs.getString("exam_type") : "MCQ")
-					.subjectName(rs.getString("subject_name"))
-					.studentId(rs.getInt("student_id"))
-					.marksObtained(rs.getInt("marks_obtained"))
-					.totalMarks(rs.getInt("total_marks"))
-					.passingMarks(rs.getInt("passing_marks"))
-					.percentage(rs.getDouble("percentage"))
-					.status(rs.getString("status"))
-					.submittedAt(rs.getString("submitted_at"))
-					.build(), studentId);
+			List<ExamResultDTO> dbResults = jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE, studentId);
 
 			if (!dbResults.isEmpty()) {
 				return dbResults;
@@ -227,26 +195,12 @@ public class ResultRepositoryImpl implements ResultRepository {
 		}
 
 		try {
-			ensureResultTableExists();
 			String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name "
 					+ "FROM result r "
 					+ "LEFT JOIN exam e ON r.exam_id = e.exam_id "
 					+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 					+ "WHERE r.exam_id = ? AND r.student_id = ? ORDER BY r.result_id DESC LIMIT 1";
-			List<ExamResultDTO> list = jdbcTemplate.query(sql, (rs, rowNum) -> ExamResultDTO.builder()
-					.resultId(rs.getInt("result_id"))
-					.examId(rs.getInt("exam_id"))
-					.examName(rs.getString("exam_name"))
-					.examType(rs.getString("exam_type") != null ? rs.getString("exam_type") : "MCQ")
-					.subjectName(rs.getString("subject_name"))
-					.studentId(rs.getInt("student_id"))
-					.marksObtained(rs.getInt("marks_obtained"))
-					.totalMarks(rs.getInt("total_marks"))
-					.passingMarks(rs.getInt("passing_marks"))
-					.percentage(rs.getDouble("percentage"))
-					.status(rs.getString("status"))
-					.submittedAt(rs.getString("submitted_at"))
-					.build(), examId, studentId);
+			List<ExamResultDTO> list = jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE, examId, studentId);
 
 			if (!list.isEmpty()) {
 				return list.get(0);
@@ -265,30 +219,72 @@ public class ResultRepositoryImpl implements ResultRepository {
 		}
 
 		try {
-			ensureResultTableExists();
 			String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name, stu.name AS student_name "
 					+ "FROM result r "
 					+ "LEFT JOIN exam e ON r.exam_id = e.exam_id "
 					+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 					+ "LEFT JOIN student stu ON r.student_id = stu.student_id "
 					+ "ORDER BY r.result_id DESC";
-			return jdbcTemplate.query(sql, (rs, rowNum) -> ExamResultDTO.builder()
-					.resultId(rs.getInt("result_id"))
-					.examId(rs.getInt("exam_id"))
-					.examName(rs.getString("exam_name"))
-					.examType(rs.getString("exam_type") != null ? rs.getString("exam_type") : "MCQ")
-					.subjectName(rs.getString("subject_name"))
-					.studentId(rs.getInt("student_id"))
-					.studentName(rs.getString("student_name") != null ? rs.getString("student_name") : "Student #" + rs.getInt("student_id"))
-					.marksObtained(rs.getInt("marks_obtained"))
-					.totalMarks(rs.getInt("total_marks"))
-					.passingMarks(rs.getInt("passing_marks"))
-					.percentage(rs.getDouble("percentage"))
-					.status(rs.getString("status"))
-					.submittedAt(rs.getString("submitted_at"))
-					.build());
+			return jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE);
 		} catch (Exception e) {
 			return new ArrayList<>();
+		}
+	}
+
+	@Override
+	public ExamResultDTO findByAttemptId(int attemptId) {
+		String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name "
+				+ "FROM result r LEFT JOIN exam e ON e.exam_id = r.exam_id "
+				+ "LEFT JOIN subject s ON s.subject_id = e.subject_id "
+				+ "WHERE r.attempt_id = ?";
+		List<ExamResultDTO> results = jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE, attemptId);
+		return results.isEmpty() ? null : results.get(0);
+	}
+
+	@Override
+	public ExamResultDTO insertSubmissionResult(ExamResultDTO result) {
+		String sql = "INSERT INTO result (exam_id, student_id, marks_obtained, total_marks, passing_marks, "
+				+ "percentage, status, submitted_at, attempt_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		KeyHolder keyHolder = new GeneratedKeyHolder();
+		jdbcTemplate.update(connection -> {
+			PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+			statement.setInt(1, result.getExamId());
+			statement.setInt(2, result.getStudentId());
+			statement.setInt(3, result.getMarksObtained());
+			statement.setInt(4, result.getTotalMarks());
+			statement.setInt(5, result.getPassingMarks());
+			statement.setDouble(6, result.getPercentage());
+			statement.setString(7, result.getStatus());
+			statement.setTimestamp(8, java.sql.Timestamp.valueOf(result.getSubmittedAt()));
+			statement.setInt(9, result.getAttemptId());
+			return statement;
+		}, keyHolder);
+		Number key = keyHolder.getKey();
+		if (key != null) result.setResultId(key.intValue());
+		return result;
+	}
+
+	private int createSubmittedAttempt(int examId, int studentId) {
+		String sql = "INSERT INTO exam_attempt (exam_id, student_id, started_at, expires_at, submitted_at, status) "
+				+ "VALUES (?, ?, ?, ?, ?, ?)";
+		LocalDateTime now = LocalDateTime.now();
+		KeyHolder keyHolder = new GeneratedKeyHolder();
+		try {
+			jdbcTemplate.update(connection -> {
+				PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+				statement.setInt(1, examId);
+				statement.setInt(2, studentId);
+				statement.setObject(3, now);
+				statement.setObject(4, now);
+				statement.setObject(5, now);
+				statement.setString(6, ExamConstants.ATTEMPT_STATUS_SUBMITTED);
+				return statement;
+			}, keyHolder);
+			Number key = keyHolder.getKey();
+			return key == null ? 0 : key.intValue();
+		} catch (Exception e) {
+			System.err.println("Could not create exam attempt for result: " + e.getMessage());
+			return 0;
 		}
 	}
 }

@@ -3,6 +3,7 @@ package com.skillcheckr.repository;
 import java.util.List;
 
 import com.skillcheckr.model.QuestionDTO;
+import com.skillcheckr.model.Question;
 
 public interface QuestionRepository {
 
@@ -11,6 +12,8 @@ public interface QuestionRepository {
 	List<QuestionDTO> getAllQuestions();
 
 	QuestionDTO getQuestionById(int questionId);
+
+	Question findQuestionDetailsById(int questionId);
 
 	List<QuestionDTO> getQuestionsBySubjectId(int subjectId);
 
