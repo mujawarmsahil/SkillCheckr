@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import apiClient from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
+import { getUpcomingExams, getStudentRegistrations, registerForExam } from "../../api/examApi";
+import { getStudentResults } from "../../api/resultApi";
+import { parseExamSchedule } from "../../utils/dateUtils";
+import { QUESTION_TYPES } from "../../constants/examConstants";
 
 export default function AvailableExams() {
   const [exams, setExams] = useState([]);
@@ -33,14 +36,12 @@ export default function AvailableExams() {
       const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
 
       // 1. Fetch upcoming exams
-      const res = await apiClient.get("/api/exams/viewAllUpComingExam");
-      const fetchedExams = Array.isArray(res.data) ? res.data : [];
+      const fetchedExams = await getUpcomingExams();
       setExams(fetchedExams);
 
       // 2. Fetch student's registrations
       try {
-        const regRes = await apiClient.get(`/api/exams/registrations/student/${studentId}`);
-        const regIds = Array.isArray(regRes.data) ? regRes.data : [];
+        const regIds = await getStudentRegistrations(studentId);
         const regMap = {};
         regIds.forEach((id) => {
           if (typeof id === "number" || typeof id === "string") {
@@ -62,8 +63,7 @@ export default function AvailableExams() {
 
       // 3. Fetch student's completed results to enforce single attempt policy
       try {
-        const resultsRes = await apiClient.get(`/api/results/student/${studentId}`);
-        const results = Array.isArray(resultsRes.data) ? resultsRes.data : [];
+        const results = await getStudentResults(studentId);
         const map = {};
         results.forEach((r) => {
           const eId = r.exam_id || r.examId;
@@ -72,14 +72,9 @@ export default function AvailableExams() {
           }
         });
         setSubmittedExamsMap(map);
-      } catch {
-        try {
-          const localKey = `submitted_results_${studentId}`;
-          const localResults = JSON.parse(localStorage.getItem(localKey) || "{}");
-          setSubmittedExamsMap(localResults);
-        } catch {
-          // ignore fallback error
-        }
+      } catch (err) {
+        showError(err.message || "Failed to load examination results");
+        setSubmittedExamsMap({});
       }
     } catch (err) {
       showError(err.message || "Failed to fetch upcoming exams");
@@ -97,12 +92,9 @@ export default function AvailableExams() {
     setRegisteringId(examId);
 
     try {
-      const res = await apiClient.post(`/api/exams/${examId}/register`, {
-        studentId: parseInt(studentId, 10),
-        examId: parseInt(examId, 10),
-      });
+      const res = await registerForExam(examId, studentId);
 
-      showSuccess(res.data?.message || `Successfully registered for ${examName}!`);
+      showSuccess(res?.message || `Successfully registered for ${examName}!`);
       setRegisteredExamsMap((prev) => {
         const updated = { ...prev, [examId]: true };
         try {
@@ -120,65 +112,7 @@ export default function AvailableExams() {
     }
   };
 
-  // Helper to parse exam timing details
-  const getExamTimingInfo = (exam) => {
-    const rawDate = exam.date || exam.exam_date || exam.examDate || "";
-    let datePart = "";
-    if (rawDate) {
-      const trimmed = String(rawDate).trim();
-      if (trimmed.includes(" ")) {
-        datePart = trimmed.split(" ")[0];
-      } else if (trimmed.includes("T")) {
-        datePart = trimmed.split("T")[0];
-      } else {
-        datePart = trimmed;
-      }
-    } else {
-      datePart = new Date().toISOString().split("T")[0];
-    }
-
-    let year = 2026;
-    let month = 1;
-    let day = 1;
-    if (datePart.includes("-")) {
-      const parts = datePart.split("-").map((v) => parseInt(v, 10));
-      year = parts[0] || 2026;
-      month = parts[1] || 1;
-      day = parts[2] || 1;
-    }
-
-    const startTimeStr = exam.start_time || exam.startTime || "00:00";
-    const endTimeStr = exam.end_time || exam.endTime || "23:59";
-
-    const [sh, sm] = String(startTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
-    const [eh, em] = String(endTimeStr).split(":").map((v) => parseInt(v, 10) || 0);
-
-    const startDateTime = new Date(year, month - 1, day, sh, sm, 0, 0);
-    const endDateTime = new Date(year, month - 1, day, eh, em, 0, 0);
-
-    // If end time is before start time (e.g. overnight test), advance end time by 1 day
-    if (endDateTime < startDateTime) {
-      endDateTime.setDate(endDateTime.getDate() + 1);
-    }
-
-    const now = currentTime;
-    const isRegistrationClosed = now >= startDateTime;
-    const isExamUpcoming = now < startDateTime;
-    const isExamActive = now >= startDateTime && now <= endDateTime;
-    const isExamExpired = now > endDateTime;
-
-    return {
-      datePart,
-      startTimeStr,
-      endTimeStr,
-      startDateTime,
-      endDateTime,
-      isRegistrationClosed,
-      isExamUpcoming,
-      isExamActive,
-      isExamExpired,
-    };
-  };
+  const getExamTimingInfo = (exam) => parseExamSchedule(exam, currentTime);
 
   const filteredExams = exams.filter((e) => {
     const examId = e.exam_id || e.examId;
@@ -186,15 +120,15 @@ export default function AvailableExams() {
     const subName = (e.subject?.subject_name || e.subject?.subjectName || "").toLowerCase();
     const matchesSearch = title.includes(search.toLowerCase()) || subName.includes(search.toLowerCase());
 
-    const type = (e.exam_type || e.examType || "MCQ").toUpperCase();
+    const type = (e.exam_type || e.examType || QUESTION_TYPES.MCQ).toUpperCase();
     const isRegistered = !!registeredExamsMap[examId];
 
     if (!matchesSearch) return false;
 
     if (filterType === "ALL") return true;
     if (filterType === "REGISTERED") return isRegistered;
-    if (filterType === "MCQ") return type === "MCQ";
-    if (filterType === "QUESTION_ANSWER") return type === "QUESTION_ANSWER";
+    if (filterType === QUESTION_TYPES.MCQ) return type === QUESTION_TYPES.MCQ;
+    if (filterType === QUESTION_TYPES.QUESTION_ANSWER) return type === QUESTION_TYPES.QUESTION_ANSWER;
 
     return true;
   });
