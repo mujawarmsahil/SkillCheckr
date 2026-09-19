@@ -45,6 +45,10 @@ public class ExamResultDTO {
 	@JsonAlias({"studentId"})
 	private int studentId;
 
+	@JsonProperty("attempt_id")
+	@JsonAlias({"attemptId"})
+	private int attemptId;
+
 	@JsonProperty("student_name")
 	@JsonAlias({"studentName"})
 	private String studentName;

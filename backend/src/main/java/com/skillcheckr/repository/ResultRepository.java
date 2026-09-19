@@ -14,4 +14,8 @@ public interface ResultRepository {
 	ExamResultDTO getResultByExamAndStudent(int examId, int studentId);
 
 	List<ExamResultDTO> getAllResults();
+
+	ExamResultDTO findByAttemptId(int attemptId);
+
+	ExamResultDTO insertSubmissionResult(ExamResultDTO result);
 }

@@ -107,6 +107,8 @@ class QuestionRepositoryImplTest {
         assertThat(dto.getQuestionType()).isEqualTo("MCQ");
         assertThat(dto.getOption1()).isEqualTo("A language");
         assertThat(dto.getOption2()).isEqualTo("An island");
+        assertThat(dto.getOption1Id()).isEqualTo(10);
+        assertThat(dto.getOption2Id()).isEqualTo(11);
         assertThat(dto.getCorrectOption()).isEqualTo("A language");
     }
 
