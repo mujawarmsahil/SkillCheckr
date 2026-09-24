@@ -12,7 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 
@@ -223,21 +224,21 @@ class AdminRepositoryImplTest {
     void getUsernameByRequestId_returnsUsername() {
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), eq(10))).thenReturn("john_doe");
 
-        String username = repository.getUsernameByRequestId(10);
+        Optional<String> username = repository.getUsernameByRequestId(10);
 
-        assertThat(username).isEqualTo("john_doe");
+        assertThat(username).contains("john_doe");
     }
 
     @Test
     void getAdminStats_returnsGatheredCounts() {
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(10);
 
-        Map<String, Object> stats = repository.getAdminStats();
+        AdminStatsResponse stats = repository.getAdminStats();
 
-        assertThat(stats).containsEntry("totalStudents", 10);
-        assertThat(stats).containsEntry("totalTeachers", 10);
-        assertThat(stats).containsEntry("totalExams", 10);
-        assertThat(stats).containsEntry("pendingExams", 10);
-        assertThat(stats).containsEntry("pendingRequests", 10);
+        assertThat(stats.getTotalStudents()).isEqualTo(10);
+        assertThat(stats.getTotalTeachers()).isEqualTo(10);
+        assertThat(stats.getTotalExams()).isEqualTo(10);
+        assertThat(stats.getPendingExams()).isEqualTo(10);
+        assertThat(stats.getPendingRequests()).isEqualTo(10);
     }
 }

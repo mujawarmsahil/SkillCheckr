@@ -4,9 +4,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 import javax.sql.DataSource;
 
@@ -16,6 +15,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;
 
+import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 
@@ -345,18 +345,18 @@ public class AdminRepositoryImpl implements AdminRepository {
 	}
 
 	@Override
-	public String getUsernameByRequestId(int requestId) {
+	public Optional<String> getUsernameByRequestId(int requestId) {
 		try {
 			String sql = "SELECT username FROM request WHERE request_id = ?";
-			return jdbcTemplate.queryForObject(sql, String.class, requestId);
+			return Optional.ofNullable(jdbcTemplate.queryForObject(sql, String.class, requestId));
 		} catch (Exception e) {
-			return null;
+			return Optional.empty();
 		}
 	}
 
 	@Override
-	public Map<String, Object> getAdminStats() {
-		Map<String, Object> stats = new HashMap<>();
+	public AdminStatsResponse getAdminStats() {
+		AdminStatsResponse stats = new AdminStatsResponse();
 		try {
 			try {
 				String syncSql = "UPDATE exam SET status = 'Completed' "
@@ -395,16 +395,16 @@ public class AdminRepositoryImpl implements AdminRepository {
 				totalResults = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM result", Integer.class);
 			} catch (Exception ignored) {}
 
-			stats.put("totalStudents", totalStudents != null ? totalStudents : 0);
-			stats.put("totalTeachers", totalTeachers != null ? totalTeachers : 0);
-			stats.put("totalExams", totalExams != null ? totalExams : 0);
-			stats.put("pendingExams", pendingExams != null ? pendingExams : 0);
-			stats.put("upcomingExams", upcomingExams != null ? upcomingExams : 0);
-			stats.put("completedExams", completedExams != null ? completedExams : 0);
-			stats.put("pendingRequests", pendingRequests != null ? pendingRequests : 0);
-			stats.put("totalSubjects", totalSubjects != null ? totalSubjects : 0);
-			stats.put("totalQuestions", totalQuestions != null ? totalQuestions : 0);
-			stats.put("totalResults", totalResults != null ? totalResults : 0);
+			stats.setTotalStudents(totalStudents != null ? totalStudents : 0);
+			stats.setTotalTeachers(totalTeachers != null ? totalTeachers : 0);
+			stats.setTotalExams(totalExams != null ? totalExams : 0);
+			stats.setPendingExams(pendingExams != null ? pendingExams : 0);
+			stats.setUpcomingExams(upcomingExams != null ? upcomingExams : 0);
+			stats.setCompletedExams(completedExams != null ? completedExams : 0);
+			stats.setPendingRequests(pendingRequests != null ? pendingRequests : 0);
+			stats.setTotalSubjects(totalSubjects != null ? totalSubjects : 0);
+			stats.setTotalQuestions(totalQuestions != null ? totalQuestions : 0);
+			stats.setTotalResults(totalResults != null ? totalResults : 0);
 		} catch (Exception e) {
 			System.err.println("Error gathering admin stats: " + e.getMessage());
 		}

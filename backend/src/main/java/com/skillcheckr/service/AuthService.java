@@ -1,11 +1,13 @@
 package com.skillcheckr.service;
 
+import java.util.Optional;
+
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
 
 public interface AuthService {
 
-    User login(String username, String password);
+    Optional<User> login(String username, String password);
 
     int getStudentIdByUserId(int userId);
 
@@ -15,9 +17,9 @@ public interface AuthService {
 
     int getAdminIdByUserId(int userId);
 
-    UserProfileDTO getUserProfile(int userId);
+    Optional<UserProfileDTO> getUserProfile(int userId);
 
-    UserProfileDTO updateUserProfile(UserProfileDTO profile);
+    Optional<UserProfileDTO> updateUserProfile(UserProfileDTO profile);
 
     boolean isUsernameInUse(String username, int excludeUserId);
 

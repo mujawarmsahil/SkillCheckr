@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,19 +49,19 @@ class ResultRepositoryImplTest {
         ExamResultDTO dto = ExamResultDTO.builder().resultId(1).examId(50).studentId(99).build();
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(50), eq(99))).thenReturn(List.of(dto));
 
-        ExamResultDTO result = repository.getResultByExamAndStudent(50, 99);
+        Optional<ExamResultDTO> result = repository.getResultByExamAndStudent(50, 99);
 
-        assertThat(result).isSameAs(dto);
+        assertThat(result).containsSame(dto);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void getResultByExamAndStudent_returnsNull_whenNotPresent() {
+    void getResultByExamAndStudent_returnsEmpty_whenNotPresent() {
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(50), eq(99))).thenReturn(List.of());
 
-        ExamResultDTO result = repository.getResultByExamAndStudent(50, 99);
+        Optional<ExamResultDTO> result = repository.getResultByExamAndStudent(50, 99);
 
-        assertThat(result).isNull();
+        assertThat(result).isEmpty();
     }
 
     @Test

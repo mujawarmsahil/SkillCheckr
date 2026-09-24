@@ -1,6 +1,7 @@
 package com.skillcheckr.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.Subject;
@@ -21,7 +22,7 @@ public interface ExamRepository {
 
 	List<Exam> viewAllCompletedExam();
 
-	Exam getExamById(int examId);
+	Optional<Exam> getExamById(int examId);
 
 	List<Exam> getExamsByTeacherId(int teacherId);
 

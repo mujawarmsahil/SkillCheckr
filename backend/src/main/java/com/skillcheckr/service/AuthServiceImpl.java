@@ -1,5 +1,7 @@
 package com.skillcheckr.service;
 
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -14,7 +16,7 @@ public class AuthServiceImpl implements AuthService {
     private AuthRepository authRepository;
 
     @Override
-    public User login(String username, String password) {
+    public Optional<User> login(String username, String password) {
         return authRepository.login(username, password);
     }
 
@@ -58,12 +60,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public UserProfileDTO getUserProfile(int userId) {
+    public Optional<UserProfileDTO> getUserProfile(int userId) {
         return authRepository.getUserProfile(userId);
     }
 
     @Override
-    public UserProfileDTO updateUserProfile(UserProfileDTO profile) {
+    public Optional<UserProfileDTO> updateUserProfile(UserProfileDTO profile) {
         return authRepository.updateUserProfile(profile);
     }
 

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ResourceNotFoundException;
+import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.AttemptStartResult;
 import com.skillcheckr.model.ExamAttempt;
@@ -26,7 +30,10 @@ import com.skillcheckr.model.ExamAttemptResponse;
 import com.skillcheckr.model.AttemptAnswerRequest;
 import com.skillcheckr.model.AttemptAnswerResponse;
 import com.skillcheckr.model.ExamRegistration;
+import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.model.QuestionDTO;
+import com.skillcheckr.model.RegistrationCountResponse;
+import com.skillcheckr.model.RegistrationStatusResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.service.ExamService;
@@ -55,16 +62,16 @@ public class ExamController {
     private ExamSubmissionService examSubmissionService;
 
     @PostMapping({"/addExams", ""})
-    public ResponseEntity<?> addExams(@RequestBody Exam exam) {
+    public ResponseEntity<Subject> addExams(@RequestBody Exam exam) {
         Subject subject = examService.saveExam(exam);
-        if (subject != null) {
-            return ResponseEntity.ok(subject);
+        if (subject == null) {
+            throw new IllegalStateException("Unable to add exam.");
         }
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unable to add exam.");
+        return ResponseEntity.ok(subject);
     }
 
     @GetMapping({"/viewAllExams", ""})
-    public ResponseEntity<?> viewAllExams() {
+    public ResponseEntity<List<Exam>> viewAllExams() {
         List<Exam> list = examService.viewAllExams();
         if (list == null || list.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
@@ -73,20 +80,18 @@ public class ExamController {
     }
 
     @GetMapping("/{exam_id}")
-    public ResponseEntity<?> getExamById(@PathVariable("exam_id") Integer examId) {
-        Exam exam = examService.getExamById(examId);
-        if (exam != null) {
-            return ResponseEntity.ok(exam);
-        }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Exam not found with id: " + examId);
+    public ResponseEntity<Exam> getExamById(@PathVariable("exam_id") Integer examId) {
+        Exam exam = examService.getExamById(examId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
+        return ResponseEntity.ok(exam);
     }
 
     @PostMapping("/{exam_id}/attempts")
-    public ResponseEntity<?> startAttempt(
+    public ResponseEntity<ExamAttemptResponse> startAttempt(
             @PathVariable("exam_id") Integer examId,
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
         if (examId == null || examId <= 0) {
-            return error(HttpStatus.BAD_REQUEST, "Invalid examId");
+            throw new BadRequestException("Invalid examId");
         }
 
         int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
@@ -102,12 +107,8 @@ public class ExamController {
         return ResponseEntity.status(result.isExisting() ? HttpStatus.OK : HttpStatus.CREATED).body(response);
     }
 
-    private ResponseEntity<?> error(HttpStatus status, String message) {
-        return ResponseEntity.status(status.value()).body(Map.of("status", status.value(), "message", message));
-    }
-
     @PutMapping("/{exam_id}/attempts/{attempt_id}/answers/{question_id}")
-    public ResponseEntity<?> saveAttemptAnswer(
+    public ResponseEntity<AttemptAnswerResponse> saveAttemptAnswer(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
             @PathVariable("question_id") Integer questionId,
@@ -115,7 +116,7 @@ public class ExamController {
             @RequestBody(required = false) AttemptAnswerRequest request) {
         if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0
                 || questionId == null || questionId <= 0) {
-            return error(HttpStatus.BAD_REQUEST, "Invalid examId, attemptId, or questionId");
+            throw new BadRequestException("Invalid examId, attemptId, or questionId");
         }
         int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
         AttemptAnswerResponse response = attemptAnswerService.saveAnswer(
@@ -124,43 +125,43 @@ public class ExamController {
     }
 
     @GetMapping("/{exam_id}/attempts/{attempt_id}/answers")
-    public ResponseEntity<?> getAttemptAnswers(
+    public ResponseEntity<List<AttemptAnswerResponse>> getAttemptAnswers(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
         if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0) {
-            return error(HttpStatus.BAD_REQUEST, "Invalid examId or attemptId");
+            throw new BadRequestException("Invalid examId or attemptId");
         }
         int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
         return ResponseEntity.ok(attemptAnswerService.getAnswers(examId, attemptId, studentId));
     }
 
     @PostMapping("/{exam_id}/attempts/{attempt_id}/submit")
-    public ResponseEntity<?> submitAttempt(
+    public ResponseEntity<ExamResultDTO> submitAttempt(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
         if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0) {
-            return error(HttpStatus.BAD_REQUEST, "Invalid examId or attemptId");
+            throw new BadRequestException("Invalid examId or attemptId");
         }
         int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
         return ResponseEntity.ok(examSubmissionService.submit(examId, attemptId, studentId));
     }
 
     @GetMapping("/teacher/{teacher_id}")
-    public ResponseEntity<?> getExamsByTeacherId(@PathVariable("teacher_id") Integer teacherId) {
+    public ResponseEntity<List<Exam>> getExamsByTeacherId(@PathVariable("teacher_id") Integer teacherId) {
         List<Exam> list = examService.getExamsByTeacherId(teacherId);
         return ResponseEntity.ok(list != null ? list : List.of());
     }
 
     @GetMapping({"/{exam_id}/questions", "/questions/{exam_id}"})
-    public ResponseEntity<?> getQuestionsForExam(@PathVariable("exam_id") Integer examId) {
+    public ResponseEntity<List<QuestionDTO>> getQuestionsForExam(@PathVariable("exam_id") Integer examId) {
         List<QuestionDTO> questions = questionService.getQuestionsByExamId(examId);
         return ResponseEntity.ok(questions != null ? questions : List.of());
     }
 
     @DeleteMapping({"/deleteExamById/{exam_id}", "/{exam_id}"})
-    public ResponseEntity<?> deleteExam(@PathVariable("exam_id") Integer examId) {
+    public ResponseEntity<String> deleteExam(@PathVariable("exam_id") Integer examId) {
         boolean deleted = examService.deleteExamById(examId);
         if (!deleted) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Exam not found or could not be deleted.");
@@ -169,50 +170,51 @@ public class ExamController {
     }
 
     @PostMapping({"/upComingExamStatus/{exam_id}", "/accept/{exam_id}", "/approve/{exam_id}", "/{exam_id}/approve"})
-    public ResponseEntity<?> acceptExam(@PathVariable("exam_id") Integer examId) {
-        if (examService.acceptExam(examId)) {
-            return ResponseEntity.ok("Accepted");
+    public ResponseEntity<String> acceptExam(@PathVariable("exam_id") Integer examId) {
+        if (!examService.acceptExam(examId)) {
+            throw new ResourceNotFoundException("Exam not found");
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found", "success", false));
+        return ResponseEntity.ok("Accepted");
     }
 
     @PostMapping({"/reject/{exam_id}", "/{exam_id}/reject"})
-    public ResponseEntity<?> rejectExam(@PathVariable("exam_id") Integer examId) {
-        if (examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_REJECTED)) {
-            return ResponseEntity.ok(Map.of("message", "Exam rejected successfully", "success", true));
+    public ResponseEntity<ApiResponse> rejectExam(@PathVariable("exam_id") Integer examId) {
+        if (!examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_REJECTED)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Exam not found"));
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found", "success", false));
+        return ResponseEntity.ok(new ApiResponse(true, "Exam rejected successfully"));
     }
 
     @PostMapping({"/cancel/{exam_id}", "/{exam_id}/cancel"})
-    public ResponseEntity<?> cancelExam(@PathVariable("exam_id") Integer examId) {
-        if (examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_CANCELLED)) {
-            return ResponseEntity.ok(Map.of("message", "Exam cancelled successfully", "success", true));
+    public ResponseEntity<ApiResponse> cancelExam(@PathVariable("exam_id") Integer examId) {
+        if (!examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_CANCELLED)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Exam not found"));
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found", "success", false));
+        return ResponseEntity.ok(new ApiResponse(true, "Exam cancelled successfully"));
     }
 
     @PutMapping({"/status/{exam_id}", "/{exam_id}/status"})
-    public ResponseEntity<?> updateStatus(
+    public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("exam_id") Integer examId,
             @RequestBody(required = false) Map<String, String> body) {
         String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
                 ? body.get("status").trim()
                 : ExamConstants.EXAM_STATUS_UPCOMING;
-        if (examService.updateExamStatus(examId, status)) {
-            return ResponseEntity.ok(Map.of("message", "Exam status updated to " + status, "success", true));
+        if (!examService.updateExamStatus(examId, status)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse(false, "Exam not found or status update failed"));
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Exam not found or status update failed", "success", false));
+        return ResponseEntity.ok(new ApiResponse(true, "Exam status updated to " + status));
     }
 
     @GetMapping({"/viewAllUpComingExam", "/upcoming"})
-    public ResponseEntity<?> viewAllUpcomingExam() {
+    public ResponseEntity<List<Exam>> viewAllUpcomingExam() {
         List<Exam> list = examService.viewAllUpcomingExam();
         return ResponseEntity.ok(list != null ? list : List.of());
     }
 
     @GetMapping({"/viewAllCompletedExam", "/completed"})
-    public ResponseEntity<?> viewAllCompletedExams() {
+    public ResponseEntity<List<Exam>> viewAllCompletedExams() {
         List<Exam> list = examService.viewAllCompletedExam();
         if (list == null || list.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
@@ -222,7 +224,7 @@ public class ExamController {
 
 
     @PostMapping({"/register", "/{exam_id}/register", "/{exam_id}/register/{student_id}"})
-    public ResponseEntity<?> registerForExam(
+    public ResponseEntity<ApiResponse> registerForExam(
             @PathVariable(value = "exam_id", required = false) Integer pathExamId,
             @PathVariable(value = "student_id", required = false) Integer pathStudentId,
             @RequestBody(required = false) Map<String, Object> body) {
@@ -244,13 +246,12 @@ public class ExamController {
         }
 
         if (examId == null || studentId == null) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Both examId and studentId are required."));
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse(false, "Both examId and studentId are required."));
         }
 
-        Exam exam = examService.getExamById(examId);
-        if (exam == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "message", "Exam not found."));
-        }
+        Exam exam = examService.getExamById(examId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exam not found."));
 
         // Validate registration deadline (exam start date & time)
         try {
@@ -262,9 +263,9 @@ public class ExamController {
                 LocalDateTime startDateTime = LocalDateTime.of(date, startTime);
 
                 if (LocalDateTime.now().isAfter(startDateTime)) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                            "success", false,
-                            "message", "Registration closed: The registration deadline for this examination has passed."
+                    return ResponseEntity.badRequest().body(new ApiResponse(
+                            false,
+                            "Registration closed: The registration deadline for this examination has passed."
                     ));
                 }
             }
@@ -274,58 +275,65 @@ public class ExamController {
 
         boolean registered = examService.registerStudentForExam(studentId, examId);
         if (registered) {
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Successfully registered for " + exam.getExamName() + "! You may attend when the exam window starts."
+            return ResponseEntity.ok(new ApiResponse(
+                    true,
+                    "Successfully registered for " + exam.getExamName() + "! You may attend when the exam window starts."
             ));
         } else {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "success", false,
-                    "message", "Failed to register for exam. Please try again."
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(
+                    false,
+                    "Failed to register for exam. Please try again."
             ));
         }
     }
 
     @GetMapping("/registrations/student/{student_id}")
-    public ResponseEntity<?> getRegistrationsForStudent(@PathVariable("student_id") Integer studentId) {
+    public ResponseEntity<List<Integer>> getRegistrationsForStudent(@PathVariable("student_id") Integer studentId) {
         List<Integer> registeredExamIds = examService.getRegisteredExamIdsForStudent(studentId);
         return ResponseEntity.ok(registeredExamIds != null ? registeredExamIds : List.of());
     }
 
     @GetMapping("/registrations/student/{student_id}/detailed")
-    public ResponseEntity<?> getDetailedRegistrationsForStudent(@PathVariable("student_id") Integer studentId) {
+    public ResponseEntity<List<ExamRegistration>> getDetailedRegistrationsForStudent(@PathVariable("student_id") Integer studentId) {
         List<ExamRegistration> list = examService.getRegistrationsByStudentId(studentId);
         return ResponseEntity.ok(list != null ? list : List.of());
     }
 
     @GetMapping({"/{exam_id}/isRegistered/{student_id}", "/isRegistered/{exam_id}/{student_id}"})
-    public ResponseEntity<?> isRegistered(
+    public ResponseEntity<RegistrationStatusResponse> isRegistered(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("student_id") Integer studentId) {
         boolean registered = examService.isStudentRegisteredForExam(studentId, examId);
-        return ResponseEntity.ok(Map.of("isRegistered", registered, "examId", examId, "studentId", studentId));
+        return ResponseEntity.ok(RegistrationStatusResponse.builder()
+                .isRegistered(registered)
+                .examId(examId)
+                .studentId(studentId)
+                .build());
     }
 
     @GetMapping("/{exam_id}/registeredStudents")
-    public ResponseEntity<?> getRegisteredStudents(@PathVariable("exam_id") Integer examId) {
+    public ResponseEntity<List<Student>> getRegisteredStudents(@PathVariable("exam_id") Integer examId) {
         List<Student> students = examService.getRegisteredStudentsByExamId(examId);
         return ResponseEntity.ok(students != null ? students : List.of());
     }
 
     @GetMapping("/{exam_id}/registrationCount")
-    public ResponseEntity<?> getRegistrationCount(@PathVariable("exam_id") Integer examId) {
+    public ResponseEntity<RegistrationCountResponse> getRegistrationCount(@PathVariable("exam_id") Integer examId) {
         int count = examService.getRegistrationCountByExamId(examId);
-        return ResponseEntity.ok(Map.of("examId", examId, "registrationCount", count));
+        return ResponseEntity.ok(RegistrationCountResponse.builder()
+                .examId(examId)
+                .registrationCount(count)
+                .build());
     }
 
     @DeleteMapping({"/{exam_id}/unregister/{student_id}", "/unregister/{exam_id}/{student_id}"})
-    public ResponseEntity<?> unregisterStudent(
+    public ResponseEntity<ApiResponse> unregisterStudent(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("student_id") Integer studentId) {
         boolean success = examService.unregisterStudentFromExam(studentId, examId);
         if (success) {
-            return ResponseEntity.ok(Map.of("success", true, "message", "Unregistered from exam successfully."));
+            return ResponseEntity.ok(new ApiResponse(true, "Unregistered from exam successfully."));
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "message", "Registration not found."));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Registration not found."));
     }
 }

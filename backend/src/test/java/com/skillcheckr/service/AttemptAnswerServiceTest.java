@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,7 +72,7 @@ class AttemptAnswerServiceTest {
     @Test
     void savesMcqAnswerWithoutCalculatingMarks() {
         when(questionRepository.findQuestionDetailsById(100))
-                .thenReturn(Question.builder().questionId(100).questionType("MCQ").build());
+                .thenReturn(Optional.of(Question.builder().questionId(100).questionType("MCQ").build()));
         when(attemptAnswerRepository.answerBelongsToQuestion(12, 100)).thenReturn(true);
 
         var response = service.saveAnswer(10, 1, 100, 20, new AttemptAnswerRequest(12, null));
@@ -84,7 +85,7 @@ class AttemptAnswerServiceTest {
     @Test
     void acceptsEmptyRequestAndPersistsBlankRow() {
         when(questionRepository.findQuestionDetailsById(100))
-                .thenReturn(Question.builder().questionId(100).questionType("MCQ").build());
+                .thenReturn(Optional.of(Question.builder().questionId(100).questionType("MCQ").build()));
 
         var response = service.saveAnswer(10, 1, 100, 20, new AttemptAnswerRequest());
 
@@ -96,7 +97,7 @@ class AttemptAnswerServiceTest {
     @Test
     void trimsTextAndStoresWhitespaceOnlyAsNull() {
         when(questionRepository.findQuestionDetailsById(100))
-                .thenReturn(Question.builder().questionId(100).questionType("QUESTION_ANSWER").wordLimit(3).build());
+                .thenReturn(Optional.of(Question.builder().questionId(100).questionType("QUESTION_ANSWER").wordLimit(3).build()));
 
         var response = service.saveAnswer(10, 1, 100, 20, new AttemptAnswerRequest(null, "  "));
         assertThat(response.getTextAnswer()).isNull();
@@ -108,7 +109,7 @@ class AttemptAnswerServiceTest {
     @Test
     void rejectsInvalidTypeAndWordLimit() {
         when(questionRepository.findQuestionDetailsById(100))
-                .thenReturn(Question.builder().questionId(100).questionType("QUESTION_ANSWER").wordLimit(2).build());
+                .thenReturn(Optional.of(Question.builder().questionId(100).questionType("QUESTION_ANSWER").wordLimit(2).build()));
 
         assertThatThrownBy(() -> service.saveAnswer(10, 1, 100, 20,
                 new AttemptAnswerRequest(12, null)))

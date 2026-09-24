@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.service.RegistrationRequestService;
 
@@ -26,24 +27,23 @@ public class RegistrationRequestController {
     private RegistrationRequestService registrationRequestService;
 
     @PostMapping({"/save", ""})
-    public ResponseEntity<?> saveRequest(@RequestBody RegistrationRequest request) {
+    public ResponseEntity<ApiResponse> saveRequest(@RequestBody RegistrationRequest request) {
         if (request.getStatus() == null || request.getStatus().isEmpty()) {
             request.setStatus("Pending");
         }
         boolean result = registrationRequestService.saveRequest(request);
         if (result) {
-            return ResponseEntity.ok(Map.of(
-                    "message", "Registration request submitted successfully! Awaiting Admin approval.",
-                    "success", true
+            return ResponseEntity.ok(new ApiResponse(
+                    true,
+                    "Registration request submitted successfully! Awaiting Admin approval."
             ));
-        } else {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to submit registration request", "success", false));
         }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiResponse(false, "Failed to submit registration request"));
     }
 
     @GetMapping({"/viewAllRegisterUsers", ""})
-    public ResponseEntity<?> getAllRequests() {
+    public ResponseEntity<List<RegistrationRequest>> getAllRequests() {
         List<RegistrationRequest> list = registrationRequestService.getAllRequests();
         if (list == null || list.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
@@ -52,7 +52,7 @@ public class RegistrationRequestController {
     }
 
     @PutMapping({"/status/{request_id}", "/{request_id}/status"})
-    public ResponseEntity<?> updateStatus(
+    public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("request_id") Integer requestId,
             @RequestBody(required = false) Map<String, String> body) {
         String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
@@ -60,38 +60,29 @@ public class RegistrationRequestController {
                 : "Rejected";
         boolean updated = registrationRequestService.updateRequestStatus(requestId, status);
         if (updated) {
-            return ResponseEntity.ok(Map.of(
-                    "message", "Request status updated to " + status,
-                    "success", true
-            ));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", "Request not found or could not be updated", "success", false));
+            return ResponseEntity.ok(new ApiResponse(true, "Request status updated to " + status));
         }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse(false, "Request not found or could not be updated"));
     }
 
     @PostMapping({"/reject/{request_id}", "/rejectById/{request_id}"})
-    public ResponseEntity<?> rejectRequest(@PathVariable("request_id") Integer requestId) {
+    public ResponseEntity<ApiResponse> rejectRequest(@PathVariable("request_id") Integer requestId) {
         boolean updated = registrationRequestService.updateRequestStatus(requestId, "Rejected");
         if (updated) {
-            return ResponseEntity.ok(Map.of(
-                    "message", "Request rejected and moved to archive",
-                    "success", true
-            ));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", "Request not found or could not be rejected", "success", false));
+            return ResponseEntity.ok(new ApiResponse(true, "Request rejected and moved to archive"));
         }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse(false, "Request not found or could not be rejected"));
     }
 
     @DeleteMapping({"/deleteById/{request_id}", "/{request_id}"})
-    public ResponseEntity<?> deleteRequest(@PathVariable("request_id") Integer requestId) {
-        boolean b = registrationRequestService.deleteRequest(requestId);
-        if (b) {
-            return ResponseEntity.ok(Map.of("message", "Request deleted successfully", "success", true));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", "Request not found or could not be deleted", "success", false));
+    public ResponseEntity<ApiResponse> deleteRequest(@PathVariable("request_id") Integer requestId) {
+        boolean deleted = registrationRequestService.deleteRequest(requestId);
+        if (deleted) {
+            return ResponseEntity.ok(new ApiResponse(true, "Request deleted successfully"));
         }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse(false, "Request not found or could not be deleted"));
     }
 }

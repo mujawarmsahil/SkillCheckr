@@ -18,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.skillcheckr.exception.GlobalExceptionHandler;
+import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 import com.skillcheckr.service.AdminService;
@@ -35,7 +37,9 @@ class AdminControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(adminController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(adminController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
@@ -154,7 +158,7 @@ class AdminControllerTest {
 
     @Test
     void getAdminStats_returnsOk_withStats() throws Exception {
-        when(adminService.getAdminStats()).thenReturn(java.util.Map.of("totalStudents", 5));
+        when(adminService.getAdminStats()).thenReturn(AdminStatsResponse.builder().totalStudents(5).build());
 
         mockMvc.perform(get("/api/Admin/stats"))
                 .andExpect(status().isOk())

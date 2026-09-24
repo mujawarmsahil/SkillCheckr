@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ResourceNotFoundException;
+import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.service.SubjectService;
 
@@ -26,60 +29,56 @@ public class SubjectController {
     private SubjectService subjectService;
 
     @GetMapping({"", "/all"})
-    public ResponseEntity<?> getAllSubjects() {
+    public ResponseEntity<List<Subject>> getAllSubjects() {
         List<Subject> list = subjectService.getAllSubjects();
         return ResponseEntity.ok(list != null ? list : List.of());
     }
 
     @GetMapping("/with-stats")
-    public ResponseEntity<?> getAllSubjectsWithStats() {
+    public ResponseEntity<List<Map<String, Object>>> getAllSubjectsWithStats() {
         List<Map<String, Object>> list = subjectService.getAllSubjectsWithStats();
         return ResponseEntity.ok(list != null ? list : List.of());
     }
 
     @GetMapping("/{subjectId}")
-    public ResponseEntity<?> getSubjectById(@PathVariable("subjectId") Integer subjectId) {
-        Subject subject = subjectService.getSubjectById(subjectId);
-        if (subject != null) {
-            return ResponseEntity.ok(subject);
-        }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Subject not found", "success", false));
+    public ResponseEntity<Subject> getSubjectById(@PathVariable("subjectId") Integer subjectId) {
+        Subject subject = subjectService.getSubjectById(subjectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+        return ResponseEntity.ok(subject);
     }
 
     @PostMapping({"", "/add"})
-    public ResponseEntity<?> addSubject(@RequestBody Subject subject) {
+    public ResponseEntity<Subject> addSubject(@RequestBody Subject subject) {
         if (subject == null || subject.getSubjectName() == null || subject.getSubjectName().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Subject name is required", "success", false));
+            throw new BadRequestException("Subject name is required");
         }
         Subject saved = subjectService.addSubject(subject);
-        if (saved != null) {
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        if (saved == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", "Failed to create subject", "success", false));
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/{subjectId}")
-    public ResponseEntity<?> updateSubject(@PathVariable("subjectId") Integer subjectId, @RequestBody Subject subject) {
+    public ResponseEntity<Subject> updateSubject(@PathVariable("subjectId") Integer subjectId,
+            @RequestBody Subject subject) {
         if (subject == null || subject.getSubjectName() == null || subject.getSubjectName().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Subject name is required", "success", false));
+            throw new BadRequestException("Subject name is required");
         }
         boolean updated = subjectService.updateSubject(subjectId, subject);
-        if (updated) {
-            Subject saved = subjectService.getSubjectById(subjectId);
-            return ResponseEntity.ok(saved != null ? saved : Map.of("message", "Subject updated successfully", "success", true));
+        if (!updated) {
+            throw new ResourceNotFoundException("Subject not found or update failed");
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("message", "Subject not found or update failed", "success", false));
+        return ResponseEntity.ok(subjectService.getSubjectById(subjectId).orElse(subject));
     }
 
     @DeleteMapping("/{subjectId}")
-    public ResponseEntity<?> deleteSubject(@PathVariable("subjectId") Integer subjectId) {
+    public ResponseEntity<ApiResponse> deleteSubject(@PathVariable("subjectId") Integer subjectId) {
         boolean deleted = subjectService.deleteSubjectById(subjectId);
         if (deleted) {
-            return ResponseEntity.ok(Map.of("message", "Subject and associated data deleted successfully", "success", true));
+            return ResponseEntity.ok(new ApiResponse(true, "Subject and associated data deleted successfully"));
         }
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("message", "Subject not found or could not be deleted", "success", false));
+                .body(new ApiResponse(false, "Subject not found or could not be deleted"));
     }
 }

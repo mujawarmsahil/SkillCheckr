@@ -19,9 +19,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.Optional;
+
 import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.User;
 import com.skillcheckr.service.AuthService;
+import com.skillcheckr.model.UserProfileDTO;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
@@ -54,7 +57,7 @@ class AuthControllerTest {
 
     @Test
     void login_returnsUnauthorized_whenUserDoesNotExist() throws Exception {
-        when(authService.login("ghost", "wrong")).thenReturn(null);
+        when(authService.login("ghost", "wrong")).thenReturn(Optional.empty());
 
         mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,7 +78,8 @@ class AuthControllerTest {
 
     @Test
     void login_returnsStudentPayload_whenRoleIsStudent() throws Exception {
-        when(authService.login("student1", "pass")).thenReturn(userWith("student1", "Student", 10));
+        when(authService.login("student1", "pass")).thenReturn(Optional.of(userWith("student1", "Student", 10)));
+        when(authService.getUserProfile(10)).thenReturn(Optional.empty());
         when(authService.getStudentIdByUserId(10)).thenReturn(7);
 
         mockMvc.perform(post(LOGIN_URL)
@@ -94,7 +98,8 @@ class AuthControllerTest {
 
     @Test
     void login_returnsTeacherPayload_whenRoleIsTeacher() throws Exception {
-        when(authService.login("teacher1", "pass")).thenReturn(userWith("teacher1", "Teacher", 20));
+        when(authService.login("teacher1", "pass")).thenReturn(Optional.of(userWith("teacher1", "Teacher", 20)));
+        when(authService.getUserProfile(20)).thenReturn(Optional.empty());
         when(authService.getTeacherIdByUserId(20)).thenReturn(5);
 
         mockMvc.perform(post(LOGIN_URL)
@@ -112,7 +117,8 @@ class AuthControllerTest {
 
     @Test
     void login_returnsAdminPayload_whenRoleIsAdmin() throws Exception {
-        when(authService.login("admin1", "pass")).thenReturn(userWith("admin1", "Admin", 30));
+        when(authService.login("admin1", "pass")).thenReturn(Optional.of(userWith("admin1", "Admin", 30)));
+        when(authService.getUserProfile(30)).thenReturn(Optional.empty());
         when(authService.getAdminIdByUserId(30)).thenReturn(1);
 
         mockMvc.perform(post(LOGIN_URL)
@@ -130,7 +136,8 @@ class AuthControllerTest {
 
     @Test
     void login_returnsZeroRoleId_whenRoleIsUnknown() throws Exception {
-        when(authService.login("mystery", "pass")).thenReturn(userWith("mystery", "Supervisor", 40));
+        when(authService.login("mystery", "pass")).thenReturn(Optional.of(userWith("mystery", "Supervisor", 40)));
+        when(authService.getUserProfile(40)).thenReturn(Optional.empty());
 
         mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -154,7 +161,7 @@ class AuthControllerTest {
                 .role("Student")
                 .roleId(7)
                 .build();
-        when(authService.getUserProfile(10)).thenReturn(profile);
+        when(authService.getUserProfile(10)).thenReturn(Optional.of(profile));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/10"))
                 .andExpect(status().isOk())
@@ -166,7 +173,7 @@ class AuthControllerTest {
 
     @Test
     void getUserProfile_returns404_whenUserDoesNotExist() throws Exception {
-        when(authService.getUserProfile(999)).thenReturn(null);
+        when(authService.getUserProfile(999)).thenReturn(Optional.empty());
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/999"))
                 .andExpect(status().isNotFound());
@@ -184,7 +191,7 @@ class AuthControllerTest {
 
         when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
         when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
-        when(authService.updateUserProfile(org.mockito.ArgumentMatchers.any(com.skillcheckr.model.UserProfileDTO.class))).thenReturn(updated);
+        when(authService.updateUserProfile(org.mockito.ArgumentMatchers.any(com.skillcheckr.model.UserProfileDTO.class))).thenReturn(Optional.of(updated));
 
         String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\"}";
 
@@ -210,7 +217,7 @@ class AuthControllerTest {
         when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
         when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
         when(authService.verifyCurrentPassword(10, "oldSecret123")).thenReturn(true);
-        when(authService.updateUserProfile(org.mockito.ArgumentMatchers.any(com.skillcheckr.model.UserProfileDTO.class))).thenReturn(updated);
+        when(authService.updateUserProfile(org.mockito.ArgumentMatchers.any(com.skillcheckr.model.UserProfileDTO.class))).thenReturn(Optional.of(updated));
 
         String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"old_password\":\"oldSecret123\",\"password\":\"newSecret123\"}";
 

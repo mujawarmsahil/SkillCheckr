@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.skillcheckr.model.AdminStatsResponse;
+import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 import com.skillcheckr.service.AdminService;
@@ -25,59 +27,57 @@ public class AdminController {
 	private AdminService adminService;
 
 	@GetMapping({"/viewAllTeacher", "/teachers"})
-	public ResponseEntity<?> viewAllTeacher() {
+	public ResponseEntity<List<Teacher>> viewAllTeacher() {
 		List<Teacher> list = adminService.getAllTeacher();
 		return ResponseEntity.ok(list != null ? list : List.of());
 	}
 
 	@GetMapping({"/viewAllStudent", "/students"})
-	public ResponseEntity<?> viewAllStudent() {
+	public ResponseEntity<List<Student>> viewAllStudent() {
 		List<Student> list = adminService.getAllStudent();
 		return ResponseEntity.ok(list != null ? list : List.of());
 	}
 
 	@PostMapping({"/addStudent/{request_id}", "/students/from-request/{request_id}"})
-	public ResponseEntity<Object> addStudentFromRequest(@PathVariable("request_id") Integer requestId) {
+	public ResponseEntity<ApiResponse> addStudentFromRequest(@PathVariable("request_id") Integer requestId) {
 		boolean success = adminService.addStudentFromRequest(requestId);
 		if (success) {
-			return ResponseEntity.ok(Map.of("message", "Student added successfully", "success", true));
+			return ResponseEntity.ok(new ApiResponse(true, "Student added successfully"));
 		}
-		return ResponseEntity.badRequest().body(Map.of("message", "Failed to add student from request", "success", false));
+		return ResponseEntity.badRequest().body(new ApiResponse(false, "Failed to add student from request"));
 	}
 
 	@PostMapping({"/addTeacher/{request_id}", "/teachers/from-request/{request_id}"})
-	public ResponseEntity<Object> addTeacherFromRequest(@PathVariable("request_id") Integer requestId) {
+	public ResponseEntity<ApiResponse> addTeacherFromRequest(@PathVariable("request_id") Integer requestId) {
 		boolean success = adminService.addTeacherFromRequest(requestId);
 		if (success) {
-			return ResponseEntity.ok(Map.of("message", "Teacher added successfully", "success", true));
+			return ResponseEntity.ok(new ApiResponse(true, "Teacher added successfully"));
 		}
-		return ResponseEntity.badRequest().body(Map.of("message", "Failed to add teacher from request", "success", false));
+		return ResponseEntity.badRequest().body(new ApiResponse(false, "Failed to add teacher from request"));
 	}
 
 	@DeleteMapping({"/teacherDeleteById/{teacher_id}", "/teachers/{teacher_id}"})
-	public ResponseEntity<?> deleteTeacher(@PathVariable("teacher_id") Integer teacherId) {
+	public ResponseEntity<ApiResponse> deleteTeacher(@PathVariable("teacher_id") Integer teacherId) {
 		boolean deleted = adminService.deleteTeacherById(teacherId);
 		if (deleted) {
-			return ResponseEntity.ok(Map.of("message", "Teacher deleted successfully", "success", true));
-		} else {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND)
-					.body(Map.of("message", "Teacher not found or could not be deleted", "success", false));
+			return ResponseEntity.ok(new ApiResponse(true, "Teacher deleted successfully"));
 		}
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiResponse(false, "Teacher not found or could not be deleted"));
 	}
 
 	@DeleteMapping({"/studentDelteteById/{student_id}", "/studentDeleteById/{student_id}", "/students/{student_id}"})
-	public ResponseEntity<?> deleteStudent(@PathVariable("student_id") Integer studentId) {
+	public ResponseEntity<ApiResponse> deleteStudent(@PathVariable("student_id") Integer studentId) {
 		boolean deleted = adminService.deleteStudentById(studentId);
 		if (deleted) {
-			return ResponseEntity.ok(Map.of("message", "Student account updated/removed successfully", "success", true));
-		} else {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND)
-					.body(Map.of("message", "Student not found or could not be processed", "success", false));
+			return ResponseEntity.ok(new ApiResponse(true, "Student account updated/removed successfully"));
 		}
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiResponse(false, "Student not found or could not be processed"));
 	}
 
 	@org.springframework.web.bind.annotation.PutMapping({"/student/{student_id}/status", "/students/{student_id}/status"})
-	public ResponseEntity<?> toggleStudentStatus(
+	public ResponseEntity<ApiResponse> toggleStudentStatus(
 			@PathVariable("student_id") Integer studentId,
 			@org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body) {
 		String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
@@ -85,14 +85,14 @@ public class AdminController {
 				: "Active";
 		boolean updated = adminService.toggleStudentStatus(studentId, status);
 		if (updated) {
-			return ResponseEntity.ok(Map.of("message", "Student status updated to " + status, "success", true));
+			return ResponseEntity.ok(new ApiResponse(true, "Student status updated to " + status));
 		}
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
-				.body(Map.of("message", "Student not found or status update failed", "success", false));
+				.body(new ApiResponse(false, "Student not found or status update failed"));
 	}
 
 	@org.springframework.web.bind.annotation.PutMapping({"/teacher/{teacher_id}/status", "/teachers/{teacher_id}/status"})
-	public ResponseEntity<?> toggleTeacherStatus(
+	public ResponseEntity<ApiResponse> toggleTeacherStatus(
 			@PathVariable("teacher_id") Integer teacherId,
 			@org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body) {
 		String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
@@ -100,15 +100,14 @@ public class AdminController {
 				: "Active";
 		boolean updated = adminService.toggleTeacherStatus(teacherId, status);
 		if (updated) {
-			return ResponseEntity.ok(Map.of("message", "Teacher status updated to " + status, "success", true));
+			return ResponseEntity.ok(new ApiResponse(true, "Teacher status updated to " + status));
 		}
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
-				.body(Map.of("message", "Teacher not found or status update failed", "success", false));
+				.body(new ApiResponse(false, "Teacher not found or status update failed"));
 	}
 
 	@GetMapping("/stats")
-	public ResponseEntity<?> getAdminStats() {
-		Map<String, Object> stats = adminService.getAdminStats();
-		return ResponseEntity.ok(stats);
+	public ResponseEntity<AdminStatsResponse> getAdminStats() {
+		return ResponseEntity.ok(adminService.getAdminStats());
 	}
 }

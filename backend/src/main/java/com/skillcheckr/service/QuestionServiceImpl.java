@@ -1,6 +1,7 @@
 package com.skillcheckr.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,7 +30,7 @@ public class QuestionServiceImpl implements QuestionService {
 	}
 
 	@Override
-	public QuestionDTO getQuestionById(int questionId) {
+	public Optional<QuestionDTO> getQuestionById(int questionId) {
 		return questionRepository.getQuestionById(questionId);
 	}
 

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,7 @@ class ResultControllerTest {
                 .studentId(2)
                 .marksObtained(80)
                 .build();
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(existing);
+        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.of(existing));
 
         mockMvc.perform(post("/api/results/submit")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -71,7 +72,7 @@ class ResultControllerTest {
 
     @Test
     void submitExam_returnsNewResult_whenSubmissionSucceeds() throws Exception {
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(null);
+        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.empty());
         ExamResultDTO submitted = ExamResultDTO.builder()
                 .resultId(102)
                 .examId(5)
@@ -107,7 +108,7 @@ class ResultControllerTest {
                 .examId(5)
                 .studentId(2)
                 .build();
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(existing);
+        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.of(existing));
 
         mockMvc.perform(get("/api/results/check/5/2"))
                 .andExpect(status().isOk())
@@ -117,7 +118,7 @@ class ResultControllerTest {
 
     @Test
     void checkStudentExamStatus_returnsHasSubmittedFalse_whenNoResult() throws Exception {
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(null);
+        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/results/check/5/2"))
                 .andExpect(status().isOk())
@@ -125,12 +126,12 @@ class ResultControllerTest {
     }
 
     @Test
-    void checkStudentExamStatus_returnsHasSubmittedFalse_whenExceptionThrown() throws Exception {
+    void checkStudentExamStatus_returnsInternalServerError_whenLookupFails() throws Exception {
         when(resultService.getResultByExamAndStudent(5, 2)).thenThrow(new RuntimeException("Lookup error"));
 
         mockMvc.perform(get("/api/results/check/5/2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasSubmitted").value(false));
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Lookup error"));
     }
 
     @Test

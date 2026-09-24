@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,7 +64,7 @@ class ResultServiceTest {
         q2.setQuestion("5+5?");
         q2.setCorrectOption("10");
 
-        when(examRepository.getExamById(1)).thenReturn(exam);
+        when(examRepository.getExamById(1)).thenReturn(Optional.of(exam));
         when(questionRepository.getQuestionsByExamId(1)).thenReturn(List.of(q1, q2));
         when(resultRepository.createSubmittedAttempt(1, 7)).thenReturn(1);
         when(resultRepository.insertSubmissionResult(any(ExamResultDTO.class)))
@@ -98,7 +99,7 @@ class ResultServiceTest {
         exam.setExamId(1);
         exam.setExamType("MCQ");
 
-        when(examRepository.getExamById(1)).thenReturn(exam);
+        when(examRepository.getExamById(1)).thenReturn(Optional.of(exam));
         when(questionRepository.getQuestionsByExamId(1)).thenReturn(List.of());
         when(resultRepository.insertSubmissionResult(any(ExamResultDTO.class)))
                 .thenAnswer(AdditionalAnswers.returnsFirstArg());
@@ -120,7 +121,7 @@ class ResultServiceTest {
         Exam exam = new Exam();
         exam.setExamId(2);
         exam.setExamType("MCQ");
-        when(examRepository.getExamById(2)).thenReturn(exam);
+        when(examRepository.getExamById(2)).thenReturn(Optional.of(exam));
         when(questionRepository.getQuestionsByExamId(2)).thenReturn(List.of());
         when(resultRepository.insertSubmissionResult(any(ExamResultDTO.class)))
                 .thenAnswer(AdditionalAnswers.returnsFirstArg());
@@ -150,7 +151,7 @@ class ResultServiceTest {
         q1.setQuestion("Define encapsulation");
         q1.setSampleAnswer("Data hiding mechanism");
 
-        when(examRepository.getExamById(3)).thenReturn(exam);
+        when(examRepository.getExamById(3)).thenReturn(Optional.of(exam));
         when(questionRepository.getQuestionsByExamId(3)).thenReturn(List.of(q1));
         when(resultRepository.insertSubmissionResult(any(ExamResultDTO.class)))
                 .thenAnswer(AdditionalAnswers.returnsFirstArg());
@@ -183,11 +184,9 @@ class ResultServiceTest {
     @Test
     void getResultByExamAndStudent_delegatesToRepository() {
         ExamResultDTO dto = ExamResultDTO.builder().resultId(1).build();
-        when(resultRepository.getResultByExamAndStudent(5, 2)).thenReturn(dto);
+        when(resultRepository.getResultByExamAndStudent(5, 2)).thenReturn(Optional.of(dto));
 
-        ExamResultDTO actual = resultService.getResultByExamAndStudent(5, 2);
-
-        assertThat(actual).isSameAs(dto);
+        assertThat(resultService.getResultByExamAndStudent(5, 2)).containsSame(dto);
         verify(resultRepository).getResultByExamAndStudent(5, 2);
     }
 
