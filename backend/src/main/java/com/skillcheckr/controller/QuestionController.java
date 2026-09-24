@@ -28,16 +28,11 @@ public class QuestionController {
 
 	@PostMapping({"/addQues", ""})
 	public ResponseEntity<?> addAllQuestion(@RequestBody List<QuestionDTO> questions) {
-		try {
-			questionService.saveQuestionsWithAnswers(questions);
-			Map<String, Object> response = new HashMap<>();
-			response.put("message", "Questions added successfully");
-			response.put("count", questions != null ? questions.size() : 0);
-			return ResponseEntity.ok(response);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(Map.of("message", "Failed to add questions: " + e.getMessage()));
-		}
+		questionService.saveQuestionsWithAnswers(questions);
+		Map<String, Object> response = new HashMap<>();
+		response.put("message", "Questions added successfully");
+		response.put("count", questions != null ? questions.size() : 0);
+		return ResponseEntity.ok(response);
 	}
 
 	@GetMapping({"", "/all"})

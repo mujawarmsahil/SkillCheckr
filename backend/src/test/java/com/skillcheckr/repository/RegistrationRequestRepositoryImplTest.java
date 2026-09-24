@@ -110,18 +110,6 @@ class RegistrationRequestRepositoryImplTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void getRequestById_returnsMappedRequest() throws Exception {
-        RegistrationRequest req = new RegistrationRequest();
-        req.setRequestId(10);
-        when(jdbcTemplate.queryForObject(anyString(), any(RowMapper.class), eq(10))).thenReturn(req);
-
-        RegistrationRequest result = repository.getRequestById(10);
-
-        assertThat(result).isSameAs(req);
-    }
-
-    @Test
     void deleteRequestById_returnsTrue_whenRowsUpdated() {
         when(jdbcTemplate.update(anyString(), eq(5))).thenReturn(1);
 

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.model.ExamAttempt;
-import com.skillcheckr.repository.mapper.ExamAttemptRowMapper;
+import com.skillcheckr.mapper.ExamAttemptRowMapper;
 
 @Repository
 public class ExamAttemptRepositoryImpl implements ExamAttemptRepository {

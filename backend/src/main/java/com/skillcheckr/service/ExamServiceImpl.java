@@ -13,6 +13,7 @@ import com.skillcheckr.model.ExamAttempt;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.exception.AttemptStartException;
 import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.repository.ExamAttemptRepository;
 

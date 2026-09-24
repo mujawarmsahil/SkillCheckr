@@ -10,8 +10,6 @@ public interface RegistrationRequestRepository {
 
     List<RegistrationRequest> getAllRequests();
 
-    RegistrationRequest getRequestById(int id);
-
     boolean deleteRequestById(int id);
 
     boolean updateRequestStatus(int id, String status);

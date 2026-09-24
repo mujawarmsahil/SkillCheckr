@@ -30,11 +30,8 @@ import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.service.ExamService;
-import com.skillcheckr.service.AttemptStartException;
 import com.skillcheckr.service.AuthService;
-import com.skillcheckr.service.AttemptAnswerException;
 import com.skillcheckr.service.AttemptAnswerService;
-import com.skillcheckr.service.ExamSubmissionException;
 import com.skillcheckr.service.ExamSubmissionService;
 import com.skillcheckr.service.QuestionService;
 
@@ -92,24 +89,17 @@ public class ExamController {
             return error(HttpStatus.BAD_REQUEST, "Invalid examId");
         }
 
-        try {
-            int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
-            AttemptStartResult result = examService.startAttempt(examId, studentId);
-            ExamAttempt attempt = result.getAttempt();
-            ExamAttemptResponse response = ExamAttemptResponse.builder()
-                    .attemptId(attempt.getAttemptId())
-                    .examId(examId)
-                    .startedAt(attempt.getStartedAt())
-                    .expiresAt(attempt.getExpiresAt())
-                    .status(attempt.getStatus())
-                    .build();
-            return ResponseEntity.status(result.isExisting() ? HttpStatus.OK : HttpStatus.CREATED).body(response);
-        } catch (AttemptStartException ex) {
-            HttpStatus status = HttpStatus.resolve(ex.getStatus());
-            return error(status != null ? status : HttpStatus.CONFLICT, ex.getMessage());
-        } catch (Exception ex) {
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to start exam attempt");
-        }
+        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+        AttemptStartResult result = examService.startAttempt(examId, studentId);
+        ExamAttempt attempt = result.getAttempt();
+        ExamAttemptResponse response = ExamAttemptResponse.builder()
+                .attemptId(attempt.getAttemptId())
+                .examId(examId)
+                .startedAt(attempt.getStartedAt())
+                .expiresAt(attempt.getExpiresAt())
+                .status(attempt.getStatus())
+                .build();
+        return ResponseEntity.status(result.isExisting() ? HttpStatus.OK : HttpStatus.CREATED).body(response);
     }
 
     private ResponseEntity<?> error(HttpStatus status, String message) {
@@ -127,17 +117,10 @@ public class ExamController {
                 || questionId == null || questionId <= 0) {
             return error(HttpStatus.BAD_REQUEST, "Invalid examId, attemptId, or questionId");
         }
-        try {
-            int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
-            AttemptAnswerResponse response = attemptAnswerService.saveAnswer(
-                    examId, attemptId, questionId, studentId, request);
-            return ResponseEntity.ok(response);
-        } catch (AttemptAnswerException ex) {
-            HttpStatus status = HttpStatus.resolve(ex.getStatus());
-            return error(status != null ? status : HttpStatus.CONFLICT, ex.getMessage());
-        } catch (Exception ex) {
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to save exam answer");
-        }
+        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+        AttemptAnswerResponse response = attemptAnswerService.saveAnswer(
+                examId, attemptId, questionId, studentId, request);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{exam_id}/attempts/{attempt_id}/answers")
@@ -148,15 +131,8 @@ public class ExamController {
         if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0) {
             return error(HttpStatus.BAD_REQUEST, "Invalid examId or attemptId");
         }
-        try {
-            int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
-            return ResponseEntity.ok(attemptAnswerService.getAnswers(examId, attemptId, studentId));
-        } catch (AttemptAnswerException ex) {
-            HttpStatus status = HttpStatus.resolve(ex.getStatus());
-            return error(status != null ? status : HttpStatus.CONFLICT, ex.getMessage());
-        } catch (Exception ex) {
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to load saved exam answers");
-        }
+        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+        return ResponseEntity.ok(attemptAnswerService.getAnswers(examId, attemptId, studentId));
     }
 
     @PostMapping("/{exam_id}/attempts/{attempt_id}/submit")
@@ -167,15 +143,8 @@ public class ExamController {
         if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0) {
             return error(HttpStatus.BAD_REQUEST, "Invalid examId or attemptId");
         }
-        try {
-            int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
-            return ResponseEntity.ok(examSubmissionService.submit(examId, attemptId, studentId));
-        } catch (ExamSubmissionException ex) {
-            HttpStatus status = HttpStatus.resolve(ex.getStatus());
-            return error(status != null ? status : HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
-        } catch (Exception ex) {
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to submit exam attempt");
-        }
+        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+        return ResponseEntity.ok(examSubmissionService.submit(examId, attemptId, studentId));
     }
 
     @GetMapping("/teacher/{teacher_id}")

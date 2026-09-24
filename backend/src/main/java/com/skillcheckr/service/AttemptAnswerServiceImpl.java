@@ -11,6 +11,7 @@ import com.skillcheckr.model.AttemptAnswer;
 import com.skillcheckr.model.AttemptAnswerRequest;
 import com.skillcheckr.model.AttemptAnswerResponse;
 import com.skillcheckr.model.ExamAttempt;
+import com.skillcheckr.exception.AttemptAnswerException;
 import com.skillcheckr.model.Question;
 import com.skillcheckr.repository.AttemptAnswerRepository;
 import com.skillcheckr.repository.ExamAttemptRepository;
@@ -18,7 +19,7 @@ import com.skillcheckr.repository.ExamQuestionRepository;
 import com.skillcheckr.repository.QuestionRepository;
 
 import com.skillcheckr.constant.ExamConstants;
-import com.skillcheckr.service.validation.ExamAttemptValidator;
+import com.skillcheckr.validation.ExamAttemptValidator;
 
 @Service
 public class AttemptAnswerServiceImpl implements AttemptAnswerService {

@@ -26,64 +26,51 @@ public class AuthRepositoryImpl implements AuthRepository {
     @Override
     public User login(String username, String password) {
         String sql = "SELECT * FROM user WHERE username = ?";
-        try {
-            List<User> users = jdbcTemplate.query(sql, new RowMapper<User>() {
-                @Override
-                public User mapRow(ResultSet rs, int rowNum) throws SQLException {
-                    User u = new User();
-                    u.setUserId(rs.getInt("user_id"));
-                    u.setUsername(rs.getString("username"));
-                    u.setPassword(rs.getString("password"));
-                    u.setRole(rs.getString("user_role"));
-                    try {
-                        u.setProfileImage(rs.getString("profile_image"));
-                    } catch (Exception ignored) {
-                    }
-                    try {
-                        u.setAuthProvider(rs.getString("auth_provider"));
-                    } catch (Exception ignored) {
-                    }
-                    try {
-                        u.setProviderId(rs.getString("provider_id"));
-                    } catch (Exception ignored) {
-                    }
-                    return u;
-                }
-            }, username);
-
-            if (users.isEmpty()) {
-                return null;
+        List<User> users = jdbcTemplate.query(sql, new RowMapper<User>() {
+            @Override
+            public User mapRow(ResultSet rs, int rowNum) throws SQLException {
+                User u = new User();
+                u.setUserId(rs.getInt("user_id"));
+                u.setUsername(rs.getString("username"));
+                u.setPassword(rs.getString("password"));
+                u.setRole(rs.getString("user_role"));
+                u.setProfileImage(rs.getString("profile_image"));
+                u.setAuthProvider(rs.getString("auth_provider"));
+                u.setProviderId(rs.getString("provider_id"));
+                return u;
             }
+        }, username);
 
-            User user = users.get(0);
-            String storedPassword = user.getPassword();
-
-            // Support BCrypt hashed matching with fallback to plain-text (for legacy/seed accounts)
-            boolean matches = false;
-            if (storedPassword != null) {
-                if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")
-                        || storedPassword.startsWith("$2y$")) {
-                    matches = passwordEncoder.matches(password, storedPassword);
-                } else {
-                    matches = storedPassword.equals(password);
-                    // Automatically upgrade plain text password to BCrypt hash in database
-                    if (matches) {
-                        try {
-                            String newHash = passwordEncoder.encode(password);
-                            jdbcTemplate.update("UPDATE user SET password = ? WHERE user_id = ?",
-                                    newHash, user.getUserId());
-                            user.setPassword(newHash);
-                        } catch (Exception ignored) {
-                            // Non-critical auto-upgrade failure
-                        }
-                    }
-                }
-            }
-
-            return matches ? user : null;
-        } catch (EmptyResultDataAccessException e) {
+        if (users.isEmpty()) {
             return null;
         }
+
+        User user = users.get(0);
+        String storedPassword = user.getPassword();
+
+        // Support BCrypt hashed matching with fallback to plain-text (for legacy/seed accounts)
+        boolean matches = false;
+        if (storedPassword != null) {
+            if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")
+                    || storedPassword.startsWith("$2y$")) {
+                matches = passwordEncoder.matches(password, storedPassword);
+            } else {
+                matches = storedPassword.equals(password);
+                // Automatically upgrade plain text password to BCrypt hash in database
+                if (matches) {
+                    try {
+                        String newHash = passwordEncoder.encode(password);
+                        jdbcTemplate.update("UPDATE user SET password = ? WHERE user_id = ?",
+                                newHash, user.getUserId());
+                        user.setPassword(newHash);
+                    } catch (Exception ignored) {
+                        // Non-critical auto-upgrade failure
+                    }
+                }
+            }
+        }
+
+        return matches ? user : null;
     }
 
     @Override
@@ -116,212 +103,79 @@ public class AuthRepositoryImpl implements AuthRepository {
         }
     }
 
-    private String getFirstAvailableColumn(ResultSet rs, String... candidateColumns) {
-        for (String col : candidateColumns) {
-            try {
-                String val = rs.getString(col);
-                if (val != null && !val.trim().isEmpty()) {
-                    return val.trim();
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        return null;
-    }
-
     @Override
     public UserProfileDTO getUserProfile(int userId) {
         String userSql = "SELECT * FROM user WHERE user_id = ?";
-        try {
-            List<User> users = jdbcTemplate.query(userSql, (rs, rowNum) -> {
-                User u = new User();
-                u.setUserId(rs.getInt("user_id"));
-                u.setUsername(rs.getString("username"));
-                u.setRole(rs.getString("user_role"));
-                try {
-                    u.setProfileImage(rs.getString("profile_image"));
-                } catch (Exception ignored) {
-                }
-                try {
-                    u.setAuthProvider(rs.getString("auth_provider"));
-                } catch (Exception ignored) {
-                }
-                try {
-                    u.setProviderId(rs.getString("provider_id"));
-                } catch (Exception ignored) {
-                }
-                return u;
-            }, userId);
+        List<User> users = jdbcTemplate.query(userSql, (rs, rowNum) -> {
+            User u = new User();
+            u.setUserId(rs.getInt("user_id"));
+            u.setUsername(rs.getString("username"));
+            u.setRole(rs.getString("user_role"));
+            u.setProfileImage(rs.getString("profile_image"));
+            u.setAuthProvider(rs.getString("auth_provider"));
+            u.setProviderId(rs.getString("provider_id"));
+            return u;
+        }, userId);
 
-            if (users.isEmpty()) {
-                return null;
-            }
-
-            User user = users.get(0);
-            UserProfileDTO profile = new UserProfileDTO();
-            profile.setUserId(user.getUserId());
-            profile.setUsername(user.getUsername());
-            profile.setRole(user.getRole());
-            profile.setProfileImage(user.getProfileImage());
-
-            String role = user.getRole() != null ? user.getRole().trim().toLowerCase() : "";
-
-            if ("student".equals(role)) {
-                try {
-                    jdbcTemplate.query("SELECT * FROM student WHERE user_id = ?", rs -> {
-                        profile.setRoleId(rs.getInt("student_id"));
-                        String n = getFirstAvailableColumn(rs, "name", "student_name");
-                        if (n != null) profile.setName(n);
-                        String em = getFirstAvailableColumn(rs, "email", "student_email");
-                        if (em != null) profile.setEmail(em);
-                        String c = getFirstAvailableColumn(rs, "contact", "student_contact");
-                        if (c != null) profile.setContact(c);
-                        try {
-                            String img = rs.getString("profile_image");
-                            if (img != null && !img.trim().isEmpty()) {
-                                profile.setProfileImage(img);
-                            }
-                        } catch (Exception ignored) {
-                        }
-                    }, userId);
-                } catch (Exception ignored) {
-                }
-            } else if ("teacher".equals(role)) {
-                try {
-                    jdbcTemplate.query("SELECT * FROM teacher WHERE user_id = ?", rs -> {
-                        profile.setRoleId(rs.getInt("teacher_id"));
-                        String n = getFirstAvailableColumn(rs, "name", "teacher_name");
-                        if (n != null) profile.setName(n);
-                        String em = getFirstAvailableColumn(rs, "email", "teacher_email");
-                        if (em != null) profile.setEmail(em);
-                        String c = getFirstAvailableColumn(rs, "contact", "teacher_contact");
-                        if (c != null) profile.setContact(c);
-                        try {
-                            String img = rs.getString("profile_image");
-                            if (img != null && !img.trim().isEmpty()) {
-                                profile.setProfileImage(img);
-                            }
-                        } catch (Exception ignored) {
-                        }
-                    }, userId);
-                } catch (Exception ignored) {
-                }
-            } else if ("admin".equals(role)) {
-                try {
-                    jdbcTemplate.query("SELECT * FROM admin WHERE user_id = ?", rs -> {
-                        profile.setRoleId(rs.getInt("admin_id"));
-                        String n = getFirstAvailableColumn(rs, "name", "admin_name");
-                        if (n != null) profile.setName(n);
-                        String em = getFirstAvailableColumn(rs, "email", "admin_email");
-                        if (em != null) profile.setEmail(em);
-                        String c = getFirstAvailableColumn(rs, "contact", "admin_contact");
-                        if (c != null) profile.setContact(c);
-                        try {
-                            String img = rs.getString("profile_image");
-                            if (img != null && !img.trim().isEmpty()) {
-                                profile.setProfileImage(img);
-                            }
-                        } catch (Exception ignored) {
-                        }
-                    }, userId);
-                } catch (Exception ignored) {
-                }
-            }
-
-            // Fallback 1: If email is still missing, check all three role tables by user_id
-            if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                try {
-                    jdbcTemplate.query("SELECT * FROM student WHERE user_id = ?", rs -> {
-                        if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                            profile.setEmail(getFirstAvailableColumn(rs, "email", "student_email"));
-                        }
-                        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
-                            profile.setName(getFirstAvailableColumn(rs, "name", "student_name"));
-                        }
-                        if (profile.getContact() == null || profile.getContact().trim().isEmpty()) {
-                            profile.setContact(getFirstAvailableColumn(rs, "contact", "student_contact"));
-                        }
-                    }, userId);
-                } catch (Exception ignored) {}
-            }
-            if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                try {
-                    jdbcTemplate.query("SELECT * FROM teacher WHERE user_id = ?", rs -> {
-                        if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                            profile.setEmail(getFirstAvailableColumn(rs, "email", "teacher_email"));
-                        }
-                        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
-                            profile.setName(getFirstAvailableColumn(rs, "name", "teacher_name"));
-                        }
-                        if (profile.getContact() == null || profile.getContact().trim().isEmpty()) {
-                            profile.setContact(getFirstAvailableColumn(rs, "contact", "teacher_contact"));
-                        }
-                    }, userId);
-                } catch (Exception ignored) {}
-            }
-            if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                try {
-                    jdbcTemplate.query("SELECT * FROM admin WHERE user_id = ?", rs -> {
-                        if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                            profile.setEmail(getFirstAvailableColumn(rs, "email", "admin_email"));
-                        }
-                        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
-                            profile.setName(getFirstAvailableColumn(rs, "name", "admin_name"));
-                        }
-                        if (profile.getContact() == null || profile.getContact().trim().isEmpty()) {
-                            profile.setContact(getFirstAvailableColumn(rs, "contact", "admin_contact"));
-                        }
-                    }, userId);
-                } catch (Exception ignored) {}
-            }
-
-            // Fallback 2: Check the registration requests table by username
-            if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                try {
-                    jdbcTemplate.query("SELECT * FROM request WHERE username = ? ORDER BY request_id DESC LIMIT 1", rs -> {
-                        if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-                            profile.setEmail(getFirstAvailableColumn(rs, "email"));
-                        }
-                        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
-                            profile.setName(getFirstAvailableColumn(rs, "name"));
-                        }
-                        if (profile.getContact() == null || profile.getContact().trim().isEmpty()) {
-                            profile.setContact(getFirstAvailableColumn(rs, "contact"));
-                        }
-                    }, user.getUsername());
-                } catch (Exception ignored) {}
-            }
-
-            if (profile.getName() == null || profile.getName().trim().isEmpty()) {
-                profile.setName(user.getUsername());
-            }
-
-            if (profile.getEmail() == null) {
-                profile.setEmail("");
-            }
-            if (profile.getContact() == null) {
-                profile.setContact("");
-            }
-
-            return profile;
-        } catch (Exception e) {
+        if (users.isEmpty()) {
             return null;
         }
-    }
 
-    private volatile boolean profileImageColumnsChecked = false;
+        User user = users.get(0);
+        UserProfileDTO profile = new UserProfileDTO();
+        profile.setUserId(user.getUserId());
+        profile.setUsername(user.getUsername());
+        profile.setRole(user.getRole());
+        profile.setProfileImage(user.getProfileImage());
 
-    private synchronized void ensureProfileImageColumnsExist() {
-        if (profileImageColumnsChecked) {
-            return;
+        String role = user.getRole() != null ? user.getRole().trim().toLowerCase() : "";
+
+        if ("student".equals(role)) {
+            jdbcTemplate.query("SELECT * FROM student WHERE user_id = ?", rs -> {
+                profile.setRoleId(rs.getInt("student_id"));
+                profile.setName(rs.getString("name"));
+                profile.setEmail(rs.getString("email"));
+                profile.setContact(rs.getString("contact"));
+                String img = rs.getString("profile_image");
+                if (img != null && !img.trim().isEmpty()) {
+                    profile.setProfileImage(img);
+                }
+            }, userId);
+        } else if ("teacher".equals(role)) {
+            jdbcTemplate.query("SELECT * FROM teacher WHERE user_id = ?", rs -> {
+                profile.setRoleId(rs.getInt("teacher_id"));
+                profile.setName(rs.getString("name"));
+                profile.setEmail(rs.getString("email"));
+                profile.setContact(rs.getString("contact"));
+                String img = rs.getString("profile_image");
+                if (img != null && !img.trim().isEmpty()) {
+                    profile.setProfileImage(img);
+                }
+            }, userId);
+        } else if ("admin".equals(role)) {
+            jdbcTemplate.query("SELECT * FROM admin WHERE user_id = ?", rs -> {
+                profile.setRoleId(rs.getInt("admin_id"));
+                profile.setName(rs.getString("name"));
+                profile.setEmail(rs.getString("email"));
+                profile.setContact(rs.getString("contact"));
+                String img = rs.getString("profile_image");
+                if (img != null && !img.trim().isEmpty()) {
+                    profile.setProfileImage(img);
+                }
+            }, userId);
         }
-        for (String table : new String[]{"user", "student", "teacher", "admin"}) {
-            try {
-                jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN profile_image VARCHAR(1000) NULL");
-            } catch (Exception ignored) {
-            }
+
+        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
+            profile.setName(user.getUsername());
         }
-        profileImageColumnsChecked = true;
+        if (profile.getEmail() == null) {
+            profile.setEmail("");
+        }
+        if (profile.getContact() == null) {
+            profile.setContact("");
+        }
+
+        return profile;
     }
 
     @Override
@@ -331,8 +185,6 @@ public class AuthRepositoryImpl implements AuthRepository {
         }
 
         try {
-            ensureProfileImageColumnsExist();
-
             // Update user table
             if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
                 String encodedPassword = passwordEncoder.encode(profile.getPassword().trim());
@@ -351,65 +203,11 @@ public class AuthRepositoryImpl implements AuthRepository {
             String roleStr = role != null ? role.trim().toLowerCase() : "";
 
             if ("student".equals(roleStr)) {
-                int updated = 0;
-                try {
-                    updated = jdbcTemplate.update(
-                            "UPDATE student SET name = ?, email = ?, contact = ?, profile_image = ? WHERE user_id = ?",
-                            profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
-                } catch (Exception e) {
-                    try {
-                        updated = jdbcTemplate.update(
-                                "UPDATE student SET student_name = ?, student_email = ?, student_contact = ?, profile_image = ? WHERE user_id = ?",
-                                profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
-                    } catch (Exception ignored) {}
-                }
-                if (updated == 0) {
-                    try {
-                        jdbcTemplate.update(
-                                "INSERT INTO student (user_id, name, contact, email, profile_image) VALUES (?, ?, ?, ?, ?)",
-                                profile.getUserId(), profile.getName(), profile.getContact(), profile.getEmail(), profile.getProfileImage());
-                    } catch (Exception ignored) {}
-                }
+                updateOrInsertRole(profile, "student");
             } else if ("teacher".equals(roleStr)) {
-                int updated = 0;
-                try {
-                    updated = jdbcTemplate.update(
-                            "UPDATE teacher SET name = ?, email = ?, contact = ?, profile_image = ? WHERE user_id = ?",
-                            profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
-                } catch (Exception e) {
-                    try {
-                        updated = jdbcTemplate.update(
-                                "UPDATE teacher SET teacher_name = ?, teacher_email = ?, teacher_contact = ?, profile_image = ? WHERE user_id = ?",
-                                profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
-                    } catch (Exception ignored) {}
-                }
-                if (updated == 0) {
-                    try {
-                        jdbcTemplate.update(
-                                "INSERT INTO teacher (user_id, name, contact, email, profile_image) VALUES (?, ?, ?, ?, ?)",
-                                profile.getUserId(), profile.getName(), profile.getContact(), profile.getEmail(), profile.getProfileImage());
-                    } catch (Exception ignored) {}
-                }
+                updateOrInsertRole(profile, "teacher");
             } else if ("admin".equals(roleStr)) {
-                int updated = 0;
-                try {
-                    updated = jdbcTemplate.update(
-                            "UPDATE admin SET name = ?, email = ?, contact = ?, profile_image = ? WHERE user_id = ?",
-                            profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
-                } catch (Exception e) {
-                    try {
-                        updated = jdbcTemplate.update(
-                                "UPDATE admin SET admin_name = ?, admin_email = ?, admin_contact = ?, profile_image = ? WHERE user_id = ?",
-                                profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
-                    } catch (Exception ignored) {}
-                }
-                if (updated == 0) {
-                    try {
-                        jdbcTemplate.update(
-                                "INSERT INTO admin (user_id, name, contact, email, profile_image) VALUES (?, ?, ?, ?, ?)",
-                                profile.getUserId(), profile.getName(), profile.getContact(), profile.getEmail(), profile.getProfileImage());
-                    } catch (Exception ignored) {}
-                }
+                updateOrInsertRole(profile, "admin");
             }
 
             // Sync updated profile to request table as well
@@ -426,15 +224,22 @@ public class AuthRepositoryImpl implements AuthRepository {
         }
     }
 
+    private void updateOrInsertRole(UserProfileDTO profile, String role) {
+        int updated = jdbcTemplate.update(
+                "UPDATE " + role + " SET name = ?, email = ?, contact = ?, profile_image = ? WHERE user_id = ?",
+                profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
+        if (updated == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO " + role + " (user_id, name, contact, email, profile_image) VALUES (?, ?, ?, ?, ?)",
+                    profile.getUserId(), profile.getName(), profile.getContact(), profile.getEmail(), profile.getProfileImage());
+        }
+    }
+
     @Override
     public boolean isUsernameInUse(String username, int excludeUserId) {
-        try {
-            String sql = "SELECT COUNT(*) FROM user WHERE username = ? AND user_id != ?";
-            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username, excludeUserId);
-            return count != null && count > 0;
-        } catch (Exception e) {
-            return false;
-        }
+        String sql = "SELECT COUNT(*) FROM user WHERE username = ? AND user_id != ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username, excludeUserId);
+        return count != null && count > 0;
     }
 
     @Override
@@ -443,34 +248,14 @@ public class AuthRepositoryImpl implements AuthRepository {
             return false;
         }
         String trimmed = email.trim();
-        try {
-            int studentCount = countEmailInTable("student", new String[]{"email", "student_email"}, trimmed, excludeUserId);
-            if (studentCount > 0) return true;
-
-            int teacherCount = countEmailInTable("teacher", new String[]{"email", "teacher_email"}, trimmed, excludeUserId);
-            if (teacherCount > 0) return true;
-
-            int adminCount = countEmailInTable("admin", new String[]{"email", "admin_email"}, trimmed, excludeUserId);
-            if (adminCount > 0) return true;
-
-            return false;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private int countEmailInTable(String tableName, String[] emailColumns, String email, int excludeUserId) {
-        for (String col : emailColumns) {
-            try {
-                String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE " + col + " = ? AND (user_id != ? OR user_id IS NULL)";
-                Integer count = jdbcTemplate.queryForObject(sql, Integer.class, email, excludeUserId);
-                if (count != null && count > 0) {
-                    return count;
-                }
-            } catch (Exception ignored) {
+        for (String table : new String[]{"student", "teacher", "admin"}) {
+            String sql = "SELECT COUNT(*) FROM " + table + " WHERE email = ? AND (user_id != ? OR user_id IS NULL)";
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, trimmed, excludeUserId);
+            if (count != null && count > 0) {
+                return true;
             }
         }
-        return 0;
+        return false;
     }
 
     @Override
@@ -491,8 +276,6 @@ public class AuthRepositoryImpl implements AuthRepository {
                 return storedPassword.equals(oldPassword);
             }
         } catch (EmptyResultDataAccessException e) {
-            return false;
-        } catch (Exception e) {
             return false;
         }
     }

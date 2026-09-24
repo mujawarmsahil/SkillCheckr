@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Question;
-import com.skillcheckr.repository.mapper.QuestionRowMapper;
+import com.skillcheckr.mapper.QuestionRowMapper;
 
 @Repository
 public class QuestionRepositoryImpl implements QuestionRepository {

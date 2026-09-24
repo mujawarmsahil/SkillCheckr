@@ -26,28 +26,23 @@ public class ResultController {
 
 	@PostMapping({"/submit", ""})
 	public ResponseEntity<?> submitExam(@RequestBody ExamSubmissionDTO submission) {
-		try {
-			if (submission == null || submission.getExamId() <= 0) {
-				return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-						.body(Map.of("message", "Invalid submission data: exam ID is required"));
-			}
-
-			// Prevent duplicate submission if already exists
-			int studentId = submission.getStudentId();
-			int examId = submission.getExamId();
-			if (studentId > 0 && examId > 0) {
-				ExamResultDTO existing = resultService.getResultByExamAndStudent(examId, studentId);
-				if (existing != null) {
-					return ResponseEntity.ok(existing);
-				}
-			}
-
-			ExamResultDTO result = resultService.submitExam(submission);
-			return ResponseEntity.ok(result);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(Map.of("message", "Error submitting exam: " + e.getMessage()));
+		if (submission == null || submission.getExamId() <= 0) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+					.body(Map.of("message", "Invalid submission data: exam ID is required"));
 		}
+
+		// Prevent duplicate submission if already exists
+		int studentId = submission.getStudentId();
+		int examId = submission.getExamId();
+		if (studentId > 0 && examId > 0) {
+			ExamResultDTO existing = resultService.getResultByExamAndStudent(examId, studentId);
+			if (existing != null) {
+				return ResponseEntity.ok(existing);
+			}
+		}
+
+		ExamResultDTO result = resultService.submitExam(submission);
+		return ResponseEntity.ok(result);
 	}
 
 	@GetMapping("/check/{examId}/{studentId}")

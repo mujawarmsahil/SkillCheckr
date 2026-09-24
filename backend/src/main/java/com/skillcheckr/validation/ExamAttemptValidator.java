@@ -1,11 +1,11 @@
-package com.skillcheckr.service.validation;
+package com.skillcheckr.validation;
 
 import java.time.LocalDateTime;
 
 import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.exception.AttemptAnswerException;
+import com.skillcheckr.exception.ExamSubmissionException;
 import com.skillcheckr.model.ExamAttempt;
-import com.skillcheckr.service.AttemptAnswerException;
-import com.skillcheckr.service.ExamSubmissionException;
 
 public final class ExamAttemptValidator {
 

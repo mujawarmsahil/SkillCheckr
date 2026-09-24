@@ -53,10 +53,4 @@ public class ExamQuestionRepositoryImpl implements ExamQuestionRepository {
                 Integer.class, examId, questionId);
         return count != null && count > 0;
     }
-
-    @Override
-    public boolean assignQuestion(int examId, int questionId, int questionOrder) {
-        String sql = "INSERT INTO exam_question (exam_id, question_id, question_order) VALUES (?, ?, ?)";
-        return jdbcTemplate.update(sql, examId, questionId, questionOrder) > 0;
-    }
 }

@@ -31,8 +31,9 @@ import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
+import com.skillcheckr.exception.AttemptStartException;
+import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.service.ExamService;
-import com.skillcheckr.service.AttemptStartException;
 import com.skillcheckr.service.AuthService;
 import com.skillcheckr.service.AttemptAnswerService;
 import com.skillcheckr.service.ExamSubmissionService;
@@ -63,7 +64,9 @@ class ExamControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(examController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(examController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     private Exam examWith(int id, String name, String status, String date) {
@@ -186,7 +189,7 @@ class ExamControllerTest {
             when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
             when(attemptAnswerService.saveAnswer(any(Integer.class), any(Integer.class), any(Integer.class),
                 any(Integer.class), any()))
-                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(409,
+                .thenThrow(new com.skillcheckr.exception.AttemptAnswerException(409,
                     "Exam attempt has expired"));
 
             mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
@@ -218,7 +221,7 @@ class ExamControllerTest {
             void getAttemptAnswers_returnsNotFoundWhenAttemptIsMissing() throws Exception {
             when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
             when(attemptAnswerService.getAnswers(1, 2, 7))
-                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(404, "Exam attempt not found"));
+                .thenThrow(new com.skillcheckr.exception.AttemptAnswerException(404, "Exam attempt not found"));
 
             mockMvc.perform(get("/api/exams/1/attempts/2/answers")
                     .header("Authorization", "Bearer jwt-mock-42-1"))
@@ -230,7 +233,7 @@ class ExamControllerTest {
             void getAttemptAnswers_rejectsUnauthorizedAttempt() throws Exception {
             when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
             when(attemptAnswerService.getAnswers(1, 2, 7))
-                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(403,
+                .thenThrow(new com.skillcheckr.exception.AttemptAnswerException(403,
                     "You are not authorized to view this attempt"));
 
             mockMvc.perform(get("/api/exams/1/attempts/2/answers")
@@ -243,7 +246,7 @@ class ExamControllerTest {
             void getAttemptAnswers_rejectsExamMismatch() throws Exception {
             when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
             when(attemptAnswerService.getAnswers(1, 2, 7))
-                .thenThrow(new com.skillcheckr.service.AttemptAnswerException(409,
+                .thenThrow(new com.skillcheckr.exception.AttemptAnswerException(409,
                     "Attempt does not belong to this exam"));
 
             mockMvc.perform(get("/api/exams/1/attempts/2/answers")
@@ -272,7 +275,7 @@ class ExamControllerTest {
             void submitAttempt_returnsStandardizedError() throws Exception {
             when(authService.getStudentIdFromAuthorization("Bearer jwt-mock-42-1")).thenReturn(7);
             when(examSubmissionService.submit(1, 2, 7))
-                .thenThrow(new com.skillcheckr.service.ExamSubmissionException(403,
+                .thenThrow(new com.skillcheckr.exception.ExamSubmissionException(403,
                     "You are not authorized to submit this attempt"));
 
             mockMvc.perform(post("/api/exams/1/attempts/2/submit")

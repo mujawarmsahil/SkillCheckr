@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import com.skillcheckr.exception.ExamSubmissionException;
 import com.skillcheckr.model.Answer;
 import com.skillcheckr.model.AttemptAnswer;
 import com.skillcheckr.model.Exam;

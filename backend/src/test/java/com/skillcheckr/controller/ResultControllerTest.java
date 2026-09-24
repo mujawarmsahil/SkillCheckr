@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.model.ExamSubmissionDTO;
 import com.skillcheckr.service.ResultService;
@@ -36,7 +37,9 @@ class ResultControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(resultController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(resultController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
@@ -94,7 +97,7 @@ class ResultControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"examId\":5,\"studentId\":2}"))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.message").value("Error submitting exam: DB error"));
+                .andExpect(jsonPath("$.message").value("DB error"));
     }
 
     @Test

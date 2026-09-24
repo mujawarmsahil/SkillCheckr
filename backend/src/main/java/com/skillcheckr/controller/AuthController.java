@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,59 +33,51 @@ public class AuthController {
                     .body(Map.of("message", "Username and password are required"));
         }
 
-        try {
-            User user = authService.login(request.getUsername().trim(), request.getPassword());
-            if (user != null) {
-                UserProfileDTO fullProfile = null;
-                try {
-                    fullProfile = authService.getUserProfile(user.getUserId());
-                } catch (Exception ignored) {
-                }
-
-                int roleId = 0;
-                if (fullProfile != null && fullProfile.getRoleId() > 0) {
-                    roleId = fullProfile.getRoleId();
-                } else if ("Student".equalsIgnoreCase(user.getRole())) {
-                    try { roleId = authService.getStudentIdByUserId(user.getUserId()); } catch (Exception ignored) {}
-                } else if ("Teacher".equalsIgnoreCase(user.getRole())) {
-                    try { roleId = authService.getTeacherIdByUserId(user.getUserId()); } catch (Exception ignored) {}
-                } else if ("Admin".equalsIgnoreCase(user.getRole())) {
-                    try { roleId = authService.getAdminIdByUserId(user.getUserId()); } catch (Exception ignored) {}
-                }
-
-                String name = fullProfile != null && fullProfile.getName() != null ? fullProfile.getName() : user.getUsername();
-                String email = fullProfile != null && fullProfile.getEmail() != null ? fullProfile.getEmail() : "";
-                String contact = fullProfile != null && fullProfile.getContact() != null ? fullProfile.getContact() : "";
-                String profileImage = fullProfile != null && fullProfile.getProfileImage() != null ? fullProfile.getProfileImage() : user.getProfileImage();
-
-                Map<String, Object> response = new HashMap<>();
-                response.put("message", "Login Successful");
-                response.put("username", user.getUsername());
-                response.put("name", name);
-                response.put("email", email);
-                response.put("contact", contact);
-                if (profileImage != null) {
-                    response.put("profile_image", profileImage);
-                    response.put("profileImage", profileImage);
-                }
-                response.put("role", user.getRole());
-                response.put("userId", user.getUserId());
-                response.put("roleId", roleId);
-                response.put("user_id", user.getUserId());
-                response.put("role_id", roleId);
-                response.put("token", "jwt-mock-" + user.getUserId() + "-" + System.currentTimeMillis());
-
-                return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("message", "Invalid username or password"));
+        User user = authService.login(request.getUsername().trim(), request.getPassword());
+        if (user != null) {
+            UserProfileDTO fullProfile = null;
+            try {
+                fullProfile = authService.getUserProfile(user.getUserId());
+            } catch (Exception ignored) {
             }
-        } catch (EmptyResultDataAccessException e) {
+
+            int roleId = 0;
+            if (fullProfile != null && fullProfile.getRoleId() > 0) {
+                roleId = fullProfile.getRoleId();
+            } else if ("Student".equalsIgnoreCase(user.getRole())) {
+                try { roleId = authService.getStudentIdByUserId(user.getUserId()); } catch (Exception ignored) {}
+            } else if ("Teacher".equalsIgnoreCase(user.getRole())) {
+                try { roleId = authService.getTeacherIdByUserId(user.getUserId()); } catch (Exception ignored) {}
+            } else if ("Admin".equalsIgnoreCase(user.getRole())) {
+                try { roleId = authService.getAdminIdByUserId(user.getUserId()); } catch (Exception ignored) {}
+            }
+
+            String name = fullProfile != null && fullProfile.getName() != null ? fullProfile.getName() : user.getUsername();
+            String email = fullProfile != null && fullProfile.getEmail() != null ? fullProfile.getEmail() : "";
+            String contact = fullProfile != null && fullProfile.getContact() != null ? fullProfile.getContact() : "";
+            String profileImage = fullProfile != null && fullProfile.getProfileImage() != null ? fullProfile.getProfileImage() : user.getProfileImage();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Login Successful");
+            response.put("username", user.getUsername());
+            response.put("name", name);
+            response.put("email", email);
+            response.put("contact", contact);
+            if (profileImage != null) {
+                response.put("profile_image", profileImage);
+                response.put("profileImage", profileImage);
+            }
+            response.put("role", user.getRole());
+            response.put("userId", user.getUserId());
+            response.put("roleId", roleId);
+            response.put("user_id", user.getUserId());
+            response.put("role_id", roleId);
+            response.put("token", "jwt-mock-" + user.getUserId() + "-" + System.currentTimeMillis());
+
+            return ResponseEntity.ok(response);
+        } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Invalid username or password"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Login error: " + e.getMessage()));
         }
     }
 
@@ -96,17 +87,12 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "Valid User ID is required"));
         }
 
-        try {
-            UserProfileDTO profile = authService.getUserProfile(userId);
-            if (profile != null) {
-                return ResponseEntity.ok(profile);
-            } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "User not found"));
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Error fetching user profile: " + e.getMessage()));
+        UserProfileDTO profile = authService.getUserProfile(userId);
+        if (profile != null) {
+            return ResponseEntity.ok(profile);
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "User not found"));
         }
     }
 
@@ -183,21 +169,16 @@ public class AuthController {
             profile.setPassword(null); // Keep existing password
         }
 
-        try {
-            UserProfileDTO updated = authService.updateUserProfile(profile);
-            if (updated != null) {
-                return ResponseEntity.ok(Map.of(
-                        "message", "Profile updated successfully",
-                        "success", true,
-                        "profile", updated
-                ));
-            } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "User not found or update failed"));
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Error updating profile: " + e.getMessage()));
+        UserProfileDTO updated = authService.updateUserProfile(profile);
+        if (updated != null) {
+            return ResponseEntity.ok(Map.of(
+                    "message", "Profile updated successfully",
+                    "success", true,
+                    "profile", updated
+            ));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "User not found or update failed"));
         }
     }
 }
