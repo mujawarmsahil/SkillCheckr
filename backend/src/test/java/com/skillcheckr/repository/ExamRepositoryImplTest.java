@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalTime;
 import java.util.List;
-import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,9 +26,6 @@ import com.skillcheckr.model.Subject;
 
 @ExtendWith(MockitoExtension.class)
 class ExamRepositoryImplTest {
-
-    @Mock
-    private DataSource dataSource;
 
     @Mock
     private JdbcTemplate jdbcTemplate;

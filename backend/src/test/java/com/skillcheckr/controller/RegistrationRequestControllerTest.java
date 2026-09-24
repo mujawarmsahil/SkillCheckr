@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.service.RegistrationRequestService;
 
@@ -36,7 +37,9 @@ class RegistrationRequestControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(registrationRequestController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(registrationRequestController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     private RegistrationRequest requestWith(int id, String name, String role, String status) {

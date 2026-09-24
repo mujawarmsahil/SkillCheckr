@@ -1,4 +1,4 @@
-package com.skillcheckr.repository.mapper;
+package com.skillcheckr.mapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;

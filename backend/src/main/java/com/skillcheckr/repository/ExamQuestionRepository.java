@@ -10,5 +10,4 @@ public interface ExamQuestionRepository {
 
     boolean isQuestionAssigned(int examId, int questionId);
 
-    boolean assignQuestion(int examId, int questionId, int questionOrder);
 }

@@ -72,26 +72,6 @@ public class RegistrationRequestRepositoryImpl implements RegistrationRequestRep
     }
 
     @Override
-    public RegistrationRequest getRequestById(int id) {
-        String query = "SELECT * FROM request WHERE request_id = ?";
-        return jdbcTemplate.queryForObject(query, new RowMapper<RegistrationRequest>() {
-            @Override
-            public RegistrationRequest mapRow(ResultSet rs, int rowNum) throws SQLException {
-                RegistrationRequest req = new RegistrationRequest();
-                req.setRequestId(rs.getInt("request_id"));
-                req.setName(rs.getString("name"));
-                req.setContact(rs.getString("contact"));
-                req.setEmail(rs.getString("email"));
-                req.setUsername(rs.getString("username"));
-                req.setPassword(rs.getString("password"));
-                req.setRequestedRole(rs.getString("requested_role"));
-                req.setStatus(rs.getString("status"));
-                return req;
-            }
-        }, id);
-    }
-
-    @Override
     public boolean deleteRequestById(int id) {
         int value = jdbcTemplate.update("DELETE FROM request WHERE request_id = ?", id);
         return value > 0;

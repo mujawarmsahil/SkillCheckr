@@ -22,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.service.QuestionService;
 
@@ -38,7 +39,9 @@ class QuestionControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(questionController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(questionController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
@@ -68,7 +71,7 @@ class QuestionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[{\"question\":\"test\"}]"))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.message").value("Failed to add questions: DB write failure"));
+                .andExpect(jsonPath("$.message").value("DB write failure"));
     }
 
     @Test

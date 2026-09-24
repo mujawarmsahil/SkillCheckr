@@ -6,7 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.AttemptAnswer;
-import com.skillcheckr.repository.mapper.AttemptAnswerRowMapper;
+import com.skillcheckr.mapper.AttemptAnswerRowMapper;
 
 @Repository
 public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {

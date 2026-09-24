@@ -27,23 +27,18 @@ public class RegistrationRequestController {
 
     @PostMapping({"/save", ""})
     public ResponseEntity<?> saveRequest(@RequestBody RegistrationRequest request) {
-        try {
-            if (request.getStatus() == null || request.getStatus().isEmpty()) {
-                request.setStatus("Pending");
-            }
-            boolean result = registrationRequestService.saveRequest(request);
-            if (result) {
-                return ResponseEntity.ok(Map.of(
-                        "message", "Registration request submitted successfully! Awaiting Admin approval.",
-                        "success", true
-                ));
-            } else {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Map.of("message", "Failed to submit registration request", "success", false));
-            }
-        } catch (Exception e) {
+        if (request.getStatus() == null || request.getStatus().isEmpty()) {
+            request.setStatus("Pending");
+        }
+        boolean result = registrationRequestService.saveRequest(request);
+        if (result) {
+            return ResponseEntity.ok(Map.of(
+                    "message", "Registration request submitted successfully! Awaiting Admin approval.",
+                    "success", true
+            ));
+        } else {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Error: " + e.getMessage(), "success", false));
+                    .body(Map.of("message", "Failed to submit registration request", "success", false));
         }
     }
 

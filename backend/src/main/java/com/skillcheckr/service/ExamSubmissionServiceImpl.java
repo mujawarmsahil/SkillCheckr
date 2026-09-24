@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.exception.ExamSubmissionException;
 import com.skillcheckr.model.AttemptAnswer;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamAttempt;
@@ -21,7 +22,7 @@ import com.skillcheckr.repository.ExamAttemptRepository;
 import com.skillcheckr.repository.ExamQuestionRepository;
 import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.repository.ResultRepository;
-import com.skillcheckr.service.validation.ExamAttemptValidator;
+import com.skillcheckr.validation.ExamAttemptValidator;
 
 @Service
 public class ExamSubmissionServiceImpl implements ExamSubmissionService {
