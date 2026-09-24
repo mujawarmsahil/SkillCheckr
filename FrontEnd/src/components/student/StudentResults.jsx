@@ -19,11 +19,7 @@ export default function StudentResults() {
       const data = await getStudentResults(studentId);
       setResults(data);
     } catch (err) {
-      if (err.status === 404 || err.response?.status === 404) {
-        setResults([]);
-      } else {
-        showError(err.message || "Failed to load examination results");
-      }
+      showError(err.message || "Failed to load examination results");
     } finally {
       setLoading(false);
     }

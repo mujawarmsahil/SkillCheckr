@@ -15,10 +15,7 @@ export default function TotalExams() {
   const fetchExamsData = useCallback(async () => {
     setLoading(true);
     try {
-      const upPromise = apiClient.get("/api/exams/viewAllUpComingExam").catch((err) => {
-        if (err.status === 404 || err.response?.status === 404) return { data: [] };
-        throw err;
-      });
+      const upPromise = apiClient.get("/api/exams/viewAllUpComingExam");
       const compPromise = apiClient.get("/api/exams/viewAllCompletedExam").catch((err) => {
         if (err.status === 404 || err.response?.status === 404) return { data: [] };
         throw err;
