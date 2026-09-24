@@ -29,7 +29,6 @@ export default function TakeExam() {
   const [copyStrikes, setCopyStrikes] = useState(0);
   const [tabStrikes, setTabStrikes] = useState(0);
   const [, setTotalViolations] = useState(0);
-  const [isDisqualified] = useState(false);
   const [activeViolationModal, setActiveViolationModal] = useState(null);
 
   const [detectedPersonsCount, setDetectedPersonsCount] = useState(1);
@@ -257,10 +256,10 @@ export default function TakeExam() {
   useEffect(() => {
     if (!loading && !accessBlocked && !resultData && !alreadySubmitted) {
       startWebcam();
-    } else if (resultData || isDisqualified || alreadySubmitted || accessBlocked) {
+    } else if (resultData || alreadySubmitted || accessBlocked) {
       stopWebcam();
     }
-  }, [loading, accessBlocked, resultData, isDisqualified, alreadySubmitted, startWebcam, stopWebcam]);
+  }, [loading, accessBlocked, resultData, alreadySubmitted, startWebcam, stopWebcam]);
 
   useEffect(() => {
     const handleUnload = () => {
@@ -280,7 +279,7 @@ export default function TakeExam() {
   // -------------------------------------------------------------
   const handleCopyViolation = useCallback(
     (actionType = "Copying") => {
-      if (resultData || isDisqualified || isSubmittingRef.current) return;
+      if (resultData || isSubmittingRef.current) return;
 
       setCopyStrikes((prevStrikes) => {
         const newStrikes = prevStrikes + 1;
@@ -315,12 +314,12 @@ export default function TakeExam() {
         return newStrikes;
       });
     },
-    [resultData, isDisqualified, submitFinalExam, showError, showWarning]
+    [resultData, submitFinalExam, showError, showWarning]
   );
 
   const handleSecondaryDeviceDetected = useCallback(
     (_reason = "Secondary device photo capture or unauthorized screen capture detected") => {
-      if (resultData || isDisqualified || isSubmittingRef.current) return;
+      if (resultData || isSubmittingRef.current) return;
 
       setScreenShieldActive(true);
       setTotalViolations((t) => t + 1);
@@ -333,7 +332,7 @@ export default function TakeExam() {
       });
       submitFinalExam();
     },
-    [resultData, isDisqualified, submitFinalExam]
+    [resultData, submitFinalExam]
   );
 
   // Global Security Event Listeners
@@ -446,7 +445,7 @@ export default function TakeExam() {
 
   // Multi-person presence detection
   useEffect(() => {
-    if (!isCameraActive || resultData || isDisqualified) return;
+    if (!isCameraActive || resultData) return;
 
     const interval = setInterval(async () => {
       if (!videoRef.current || !canvasRef.current) return;
@@ -585,7 +584,7 @@ export default function TakeExam() {
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [isCameraActive, resultData, isDisqualified, submitFinalExam, showWarning]);
+  }, [isCameraActive, resultData, submitFinalExam, showWarning]);
 
   const requestFullscreen = () => {
     try {
@@ -712,7 +711,7 @@ export default function TakeExam() {
   // POST-SUBMISSION / ALREADY SUBMITTED RESULT VIEW
   // -------------------------------------------------------------
   if (resultData) {
-    const isDisq = !!(resultData.disqualified || resultData.is_disqualified || isDisqualified);
+    const isDisq = !!(resultData.disqualified || resultData.is_disqualified);
     const isPass = !isDisq && resultData.status === RESULT_STATUS.PASS;
     const isPendingEvaluation = resultData.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION;
 
