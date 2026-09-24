@@ -3,6 +3,7 @@ package com.skillcheckr.repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -24,7 +25,7 @@ public class AuthRepositoryImpl implements AuthRepository {
     private PasswordEncoder passwordEncoder;
 
     @Override
-    public User login(String username, String password) {
+    public Optional<User> login(String username, String password) {
         String sql = "SELECT * FROM user WHERE username = ?";
         List<User> users = jdbcTemplate.query(sql, new RowMapper<User>() {
             @Override
@@ -42,7 +43,7 @@ public class AuthRepositoryImpl implements AuthRepository {
         }, username);
 
         if (users.isEmpty()) {
-            return null;
+            return Optional.empty();
         }
 
         User user = users.get(0);
@@ -70,7 +71,7 @@ public class AuthRepositoryImpl implements AuthRepository {
             }
         }
 
-        return matches ? user : null;
+        return matches ? Optional.of(user) : Optional.empty();
     }
 
     @Override
@@ -104,7 +105,7 @@ public class AuthRepositoryImpl implements AuthRepository {
     }
 
     @Override
-    public UserProfileDTO getUserProfile(int userId) {
+    public Optional<UserProfileDTO> getUserProfile(int userId) {
         String userSql = "SELECT * FROM user WHERE user_id = ?";
         List<User> users = jdbcTemplate.query(userSql, (rs, rowNum) -> {
             User u = new User();
@@ -118,7 +119,7 @@ public class AuthRepositoryImpl implements AuthRepository {
         }, userId);
 
         if (users.isEmpty()) {
-            return null;
+            return Optional.empty();
         }
 
         User user = users.get(0);
@@ -175,13 +176,13 @@ public class AuthRepositoryImpl implements AuthRepository {
             profile.setContact("");
         }
 
-        return profile;
+        return Optional.of(profile);
     }
 
     @Override
-    public UserProfileDTO updateUserProfile(UserProfileDTO profile) {
+    public Optional<UserProfileDTO> updateUserProfile(UserProfileDTO profile) {
         if (profile == null || profile.getUserId() <= 0) {
-            return null;
+            return Optional.empty();
         }
 
         try {
@@ -220,7 +221,7 @@ public class AuthRepositoryImpl implements AuthRepository {
             return getUserProfile(profile.getUserId());
         } catch (Exception e) {
             e.printStackTrace();
-            return null;
+            return Optional.empty();
         }
     }
 

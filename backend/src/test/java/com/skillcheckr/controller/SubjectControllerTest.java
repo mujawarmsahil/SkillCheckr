@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.service.SubjectService;
 
@@ -38,7 +40,9 @@ class SubjectControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(subjectController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(subjectController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
@@ -68,7 +72,7 @@ class SubjectControllerTest {
     void updateSubject_returnsUpdatedSubject() throws Exception {
         Subject s = new Subject(10, "Advanced Physics", "PHY102");
         when(subjectService.updateSubject(eq(10), any())).thenReturn(true);
-        when(subjectService.getSubjectById(10)).thenReturn(s);
+        when(subjectService.getSubjectById(10)).thenReturn(Optional.of(s));
 
         mockMvc.perform(put("/api/subjects/10")
                         .contentType(MediaType.APPLICATION_JSON)

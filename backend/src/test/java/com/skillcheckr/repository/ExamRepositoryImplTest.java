@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -134,9 +135,9 @@ class ExamRepositoryImplTest {
         exam.setExamId(1);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(1))).thenReturn(List.of(exam));
 
-        Exam found = repository.getExamById(1);
+        Optional<Exam> found = repository.getExamById(1);
 
-        assertThat(found).isSameAs(exam);
+        assertThat(found).containsSame(exam);
     }
 
     @Test

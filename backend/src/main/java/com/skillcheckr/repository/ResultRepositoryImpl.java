@@ -4,6 +4,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,14 +33,14 @@ public class ResultRepositoryImpl implements ResultRepository {
 	}
 
 	@Override
-	public ExamResultDTO getResultByExamAndStudent(int examId, int studentId) {
+	public Optional<ExamResultDTO> getResultByExamAndStudent(int examId, int studentId) {
 		String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name "
 				+ "FROM result r "
 				+ "LEFT JOIN exam e ON r.exam_id = e.exam_id "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 				+ "WHERE r.exam_id = ? AND r.student_id = ? ORDER BY r.result_id DESC LIMIT 1";
 		List<ExamResultDTO> list = jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE, examId, studentId);
-		return list.isEmpty() ? null : list.get(0);
+		return list.stream().findFirst();
 	}
 
 	@Override
@@ -54,13 +55,13 @@ public class ResultRepositoryImpl implements ResultRepository {
 	}
 
 	@Override
-	public ExamResultDTO findByAttemptId(int attemptId) {
+	public Optional<ExamResultDTO> findByAttemptId(int attemptId) {
 		String sql = "SELECT r.*, e.exam_name, e.exam_type, s.subject_name "
 				+ "FROM result r LEFT JOIN exam e ON e.exam_id = r.exam_id "
 				+ "LEFT JOIN subject s ON s.subject_id = e.subject_id "
 				+ "WHERE r.attempt_id = ?";
 		List<ExamResultDTO> results = jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE, attemptId);
-		return results.isEmpty() ? null : results.get(0);
+		return results.stream().findFirst();
 	}
 
 	@Override

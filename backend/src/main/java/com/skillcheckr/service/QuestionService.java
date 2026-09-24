@@ -1,6 +1,7 @@
 package com.skillcheckr.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.skillcheckr.model.QuestionDTO;
 
@@ -10,7 +11,7 @@ public interface QuestionService {
 
 	List<QuestionDTO> getAllQuestions();
 
-	QuestionDTO getQuestionById(int questionId);
+	Optional<QuestionDTO> getQuestionById(int questionId);
 
 	List<QuestionDTO> getQuestionsBySubjectId(int subjectId);
 

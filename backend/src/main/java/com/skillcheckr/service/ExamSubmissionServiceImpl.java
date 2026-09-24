@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,16 +53,14 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
         ExamAttemptValidator.validateSubmitAttempt(attempt, examId, studentId);
 
         if (ExamConstants.ATTEMPT_STATUS_SUBMITTED.equalsIgnoreCase(attempt.getStatus())) {
-            ExamResultDTO existing = resultRepository.findByAttemptId(attemptId);
-            if (existing != null) return existing;
+            Optional<ExamResultDTO> existing = resultRepository.findByAttemptId(attemptId);
+            if (existing.isPresent()) return existing.get();
             throw new ExamSubmissionException(409, "Exam attempt has already been submitted");
         }
         ExamAttemptValidator.validateAttemptCanSubmit(attempt);
 
-        Exam exam = examRepository.getExamById(examId);
-        if (exam == null) {
-            throw new ExamSubmissionException(404, "Exam not found");
-        }
+        Exam exam = examRepository.getExamById(examId)
+                .orElseThrow(() -> new ExamSubmissionException(404, "Exam not found"));
 
         LocalDateTime submittedAt = LocalDateTime.now();
         List<ExamQuestion> assignedQuestions = examQuestionRepository.findByExamId(examId);

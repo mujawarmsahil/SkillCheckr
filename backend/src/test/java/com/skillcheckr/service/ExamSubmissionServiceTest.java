@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,7 +69,7 @@ class ExamSubmissionServiceTest {
                 .startedAt(LocalDateTime.now().minusMinutes(10))
                 .expiresAt(LocalDateTime.now().plusMinutes(10)).build();
         when(examAttemptRepository.findByIdForUpdate(1)).thenReturn(attempt);
-        when(examRepository.getExamById(10)).thenReturn(exam);
+        when(examRepository.getExamById(10)).thenReturn(Optional.of(exam));
         when(examQuestionRepository.findByExamId(10)).thenReturn(List.of(
                 assignment(100, "MCQ", 5), assignment(101, "MCQ", 5)));
         when(attemptAnswerRepository.findByAttemptId(1)).thenReturn(List.of(
@@ -115,7 +116,7 @@ class ExamSubmissionServiceTest {
     void repeatedSubmissionReturnsExistingResultWithoutReprocessing() {
         ExamResultDTO existing = ExamResultDTO.builder().resultId(88).attemptId(1).status("Pass").build();
         attempt.setStatus("SUBMITTED");
-        when(resultRepository.findByAttemptId(1)).thenReturn(existing);
+        when(resultRepository.findByAttemptId(1)).thenReturn(Optional.of(existing));
 
         assertThat(service.submit(10, 1, 20)).isSameAs(existing);
         verify(examQuestionRepository, never()).findByExamId(10);

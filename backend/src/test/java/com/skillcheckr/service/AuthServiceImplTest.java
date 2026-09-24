@@ -10,6 +10,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
 import com.skillcheckr.repository.AuthRepository;
@@ -28,19 +30,17 @@ class AuthServiceImplTest {
         User expectedUser = new User();
         expectedUser.setUserId(1);
         expectedUser.setRole("Student");
-        when(authRepository.login("student", "pass")).thenReturn(expectedUser);
+        when(authRepository.login("student", "pass")).thenReturn(Optional.of(expectedUser));
 
-        User actual = authService.login("student", "pass");
-
-        assertThat(actual).isSameAs(expectedUser);
+        assertThat(authService.login("student", "pass")).containsSame(expectedUser);
         verify(authRepository).login("student", "pass");
     }
 
     @Test
-    void login_returnsNullWhenRepositoryDoesNotMatch() {
-        when(authRepository.login("nobody", "nope")).thenReturn(null);
+    void login_returnsEmptyWhenRepositoryDoesNotMatch() {
+        when(authRepository.login("nobody", "nope")).thenReturn(Optional.empty());
 
-        assertThat(authService.login("nobody", "nope")).isNull();
+        assertThat(authService.login("nobody", "nope")).isEmpty();
     }
 
     @Test
@@ -75,11 +75,9 @@ class AuthServiceImplTest {
                 .name("User One")
                 .email("user1@test.com")
                 .build();
-        when(authRepository.getUserProfile(1)).thenReturn(profile);
+        when(authRepository.getUserProfile(1)).thenReturn(Optional.of(profile));
 
-        UserProfileDTO actual = authService.getUserProfile(1);
-
-        assertThat(actual).isSameAs(profile);
+        assertThat(authService.getUserProfile(1)).containsSame(profile);
         verify(authRepository).getUserProfile(1);
     }
 
@@ -91,11 +89,9 @@ class AuthServiceImplTest {
                 .name("User One Updated")
                 .email("user1_updated@test.com")
                 .build();
-        when(authRepository.updateUserProfile(profile)).thenReturn(profile);
+        when(authRepository.updateUserProfile(profile)).thenReturn(Optional.of(profile));
 
-        UserProfileDTO actual = authService.updateUserProfile(profile);
-
-        assertThat(actual).isSameAs(profile);
+        assertThat(authService.updateUserProfile(profile)).containsSame(profile);
         verify(authRepository).updateUserProfile(profile);
     }
 

@@ -6,6 +6,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -230,10 +231,10 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 
 	@Override
-	public Exam getExamById(int examId) {
+	public Optional<Exam> getExamById(int examId) {
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id WHERE e.exam_id = ?";
 		List<Exam> list = jdbcTemplate.query(query, getExamRowMapper(), examId);
-		return list.isEmpty() ? null : list.get(0);
+		return list.stream().findFirst();
 	}
 
 	@Override

@@ -45,10 +45,8 @@ public class AttemptAnswerServiceImpl implements AttemptAnswerService {
         ExamAttempt attempt = examAttemptRepository.findById(attemptId);
         ExamAttemptValidator.validateAnswerAttempt(attempt, examId, studentId);
 
-        Question question = questionRepository.findQuestionDetailsById(questionId);
-        if (question == null) {
-            throw new AttemptAnswerException(404, "Question not found");
-        }
+        Question question = questionRepository.findQuestionDetailsById(questionId)
+                .orElseThrow(() -> new AttemptAnswerException(404, "Question not found"));
         if (!examQuestionRepository.isQuestionAssigned(examId, questionId)) {
             throw new AttemptAnswerException(409, "Question does not belong to this exam");
         }

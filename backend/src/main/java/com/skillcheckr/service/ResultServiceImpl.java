@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,7 +40,7 @@ public class ResultServiceImpl implements ResultService {
 				? submission.getAttemptId()
 				: resultRepository.createSubmittedAttempt(examId, studentId);
 
-		Exam exam = examRepository.getExamById(examId);
+		Exam exam = examRepository.getExamById(examId).orElse(null);
 		List<QuestionDTO> questions = questionRepository.getQuestionsByExamId(examId);
 
 		int totalMarks = exam != null && exam.getTotalMarks() > 0 ? exam.getTotalMarks() : (questions.isEmpty() ? 100 : questions.size());
@@ -142,7 +143,7 @@ public class ResultServiceImpl implements ResultService {
 	}
 
 	@Override
-	public ExamResultDTO getResultByExamAndStudent(int examId, int studentId) {
+	public Optional<ExamResultDTO> getResultByExamAndStudent(int examId, int studentId) {
 		return resultRepository.getResultByExamAndStudent(examId, studentId);
 	}
 

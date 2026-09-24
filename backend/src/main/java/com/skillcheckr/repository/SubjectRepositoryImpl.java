@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -45,15 +46,15 @@ public class SubjectRepositoryImpl implements SubjectRepository {
     }
 
     @Override
-    public Subject getSubjectById(int subjectId) {
+    public Optional<Subject> getSubjectById(int subjectId) {
         try {
             String sql = "SELECT * FROM subject WHERE subject_id = ?";
-            return jdbcTemplate.queryForObject(sql, subjectRowMapper, subjectId);
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, subjectRowMapper, subjectId));
         } catch (EmptyResultDataAccessException e) {
-            return null;
+            return Optional.empty();
         } catch (Exception e) {
             System.err.println("Error fetching subject by ID: " + e.getMessage());
-            return null;
+            return Optional.empty();
         }
     }
 

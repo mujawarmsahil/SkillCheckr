@@ -3,6 +3,7 @@ package com.skillcheckr.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -62,16 +63,14 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
-	public Exam getExamById(int examId) {
+	public Optional<Exam> getExamById(int examId) {
 		return examRepository.getExamById(examId);
 	}
 
 	@Override
 	public AttemptStartResult startAttempt(int examId, int studentId) {
-		Exam exam = examRepository.getExamById(examId);
-		if (exam == null) {
-			throw new AttemptStartException(404, "Exam not found");
-		}
+		Exam exam = examRepository.getExamById(examId)
+				.orElseThrow(() -> new AttemptStartException(404, "Exam not found"));
 		if (studentId <= 0) {
 			throw new AttemptStartException(404, "Student not found");
 		}

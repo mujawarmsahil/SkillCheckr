@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -101,7 +102,7 @@ class ExamControllerTest {
     @Test
     void getExamById_returnsExam_whenFound() throws Exception {
         Exam exam = examWith(1, "Mathematics", "Upcoming", "2030-01-15T09:00:00");
-        when(examService.getExamById(1)).thenReturn(exam);
+        when(examService.getExamById(1)).thenReturn(Optional.of(exam));
 
         mockMvc.perform(get("/api/Exams/1"))
                 .andExpect(status().isOk())
@@ -111,7 +112,7 @@ class ExamControllerTest {
 
     @Test
     void getExamById_returns404_whenNotFound() throws Exception {
-        when(examService.getExamById(99)).thenReturn(null);
+        when(examService.getExamById(99)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/Exams/99"))
                 .andExpect(status().isNotFound());
@@ -405,7 +406,7 @@ class ExamControllerTest {
 
     @Test
     void registerForExam_returnsNotFound_whenExamDoesNotExist() throws Exception {
-        when(examService.getExamById(99)).thenReturn(null);
+        when(examService.getExamById(99)).thenReturn(Optional.empty());
 
         mockMvc.perform(post("/api/Exams/99/register/5"))
                 .andExpect(status().isNotFound())
@@ -415,7 +416,7 @@ class ExamControllerTest {
     @Test
     void registerForExam_returnsBadRequest_whenDeadlinePassed() throws Exception {
         Exam pastExam = examWith(10, "Past Exam", "Upcoming", "2020-01-01 09:00:00");
-        when(examService.getExamById(10)).thenReturn(pastExam);
+        when(examService.getExamById(10)).thenReturn(Optional.of(pastExam));
 
         mockMvc.perform(post("/api/Exams/10/register/5"))
                 .andExpect(status().isBadRequest())
@@ -425,7 +426,7 @@ class ExamControllerTest {
     @Test
     void registerForExam_returnsSuccess_whenRegistered() throws Exception {
         Exam futureExam = examWith(11, "Future Exam", "Upcoming", "2035-01-01 09:00:00");
-        when(examService.getExamById(11)).thenReturn(futureExam);
+        when(examService.getExamById(11)).thenReturn(Optional.of(futureExam));
         when(examService.registerStudentForExam(5, 11)).thenReturn(true);
 
         mockMvc.perform(post("/api/Exams/11/register/5"))
@@ -436,7 +437,7 @@ class ExamControllerTest {
     @Test
     void registerForExam_returns500_whenRegistrationFails() throws Exception {
         Exam futureExam = examWith(11, "Future Exam", "Upcoming", "2035-01-01 09:00:00");
-        when(examService.getExamById(11)).thenReturn(futureExam);
+        when(examService.getExamById(11)).thenReturn(Optional.of(futureExam));
         when(examService.registerStudentForExam(5, 11)).thenReturn(false);
 
         mockMvc.perform(post("/api/Exams/register")

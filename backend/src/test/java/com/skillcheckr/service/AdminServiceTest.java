@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 import com.skillcheckr.repository.AdminRepository;
@@ -28,6 +30,7 @@ class AdminServiceTest {
 
     @Test
     void addStudentFromRequest_returnsTrue_whenRepositorySucceeds() {
+        when(adminRepository.getUsernameByRequestId(1)).thenReturn(Optional.empty());
         when(adminRepository.addStudentFromRequest(1)).thenReturn(true);
 
         boolean result = adminService.addStudentFromRequest(1);
@@ -38,6 +41,7 @@ class AdminServiceTest {
 
     @Test
     void addStudentFromRequest_returnsFalse_whenRepositoryFails() {
+        when(adminRepository.getUsernameByRequestId(2)).thenReturn(Optional.empty());
         when(adminRepository.addStudentFromRequest(2)).thenReturn(false);
 
         boolean result = adminService.addStudentFromRequest(2);
@@ -48,6 +52,7 @@ class AdminServiceTest {
 
     @Test
     void addTeacherFromRequest_returnsTrue_whenRepositorySucceeds() {
+        when(adminRepository.getUsernameByRequestId(3)).thenReturn(Optional.empty());
         when(adminRepository.addTeacherFromRequest(3)).thenReturn(true);
 
         boolean result = adminService.addTeacherFromRequest(3);
@@ -58,6 +63,7 @@ class AdminServiceTest {
 
     @Test
     void addTeacherFromRequest_returnsFalse_whenRepositoryFails() {
+        when(adminRepository.getUsernameByRequestId(4)).thenReturn(Optional.empty());
         when(adminRepository.addTeacherFromRequest(4)).thenReturn(false);
 
         boolean result = adminService.addTeacherFromRequest(4);
@@ -76,9 +82,9 @@ class AdminServiceTest {
 
     @Test
     void getUsernameByRequestId_delegatesToRepository() {
-        when(adminRepository.getUsernameByRequestId(9)).thenReturn("someone");
+        when(adminRepository.getUsernameByRequestId(9)).thenReturn(Optional.of("someone"));
 
-        assertThat(adminService.getUsernameByRequestId(9)).isEqualTo("someone");
+        assertThat(adminService.getUsernameByRequestId(9)).contains("someone");
         verify(adminRepository).getUsernameByRequestId(9);
     }
 
@@ -126,7 +132,7 @@ class AdminServiceTest {
 
     @Test
     void getAdminStats_delegatesToRepository() {
-        java.util.Map<String, Object> stats = java.util.Map.of("totalStudents", 5);
+        AdminStatsResponse stats = AdminStatsResponse.builder().totalStudents(5).build();
         when(adminRepository.getAdminStats()).thenReturn(stats);
 
         assertThat(adminService.getAdminStats()).isEqualTo(stats);

@@ -1,11 +1,12 @@
 package com.skillcheckr.service;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 import com.skillcheckr.repository.AdminRepository;
@@ -18,8 +19,7 @@ public class AdminServiceImpl implements AdminService {
 
 	@Override
 	public boolean addTeacherFromRequest(int requestId) {
-		String username = adminRepository.getUsernameByRequestId(requestId);
-		if (username != null && isUsernameExist(username)) {
+		if (adminRepository.getUsernameByRequestId(requestId).map(this::isUsernameExist).orElse(false)) {
 			return false;
 		}
 		return adminRepository.addTeacherFromRequest(requestId);
@@ -27,8 +27,7 @@ public class AdminServiceImpl implements AdminService {
 
 	@Override
 	public boolean addStudentFromRequest(int requestId) {
-		String username = adminRepository.getUsernameByRequestId(requestId);
-		if (username != null && isUsernameExist(username)) {
+		if (adminRepository.getUsernameByRequestId(requestId).map(this::isUsernameExist).orElse(false)) {
 			return false;
 		}
 		return adminRepository.addStudentFromRequest(requestId);
@@ -70,12 +69,12 @@ public class AdminServiceImpl implements AdminService {
 	}
 
 	@Override
-	public String getUsernameByRequestId(int requestId) {
+	public Optional<String> getUsernameByRequestId(int requestId) {
 		return adminRepository.getUsernameByRequestId(requestId);
 	}
 
 	@Override
-	public Map<String, Object> getAdminStats() {
+	public AdminStatsResponse getAdminStats() {
 		return adminRepository.getAdminStats();
 	}
 }

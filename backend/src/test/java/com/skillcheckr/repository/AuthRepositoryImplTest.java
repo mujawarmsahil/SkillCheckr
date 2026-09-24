@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,10 +50,10 @@ class AuthRepositoryImplTest {
                 .thenReturn(List.of(user));
         when(passwordEncoder.matches("secret", "$2a$10$hashed")).thenReturn(true);
 
-        User loggedIn = repository.login("john", "secret");
+        Optional<User> loggedIn = repository.login("john", "secret");
 
-        assertThat(loggedIn).isNotNull();
-        assertThat(loggedIn.getUsername()).isEqualTo("john");
+        assertThat(loggedIn).contains(user);
+        assertThat(loggedIn.get().getUsername()).isEqualTo("john");
     }
 
     @Test
@@ -68,19 +69,19 @@ class AuthRepositoryImplTest {
                 .thenReturn(List.of(user));
         when(passwordEncoder.encode("plainPass")).thenReturn("$2a$10$newHash");
 
-        User loggedIn = repository.login("plainUser", "plainPass");
+        Optional<User> loggedIn = repository.login("plainUser", "plainPass");
 
-        assertThat(loggedIn).isNotNull();
+        assertThat(loggedIn).contains(user);
         verify(jdbcTemplate).update("UPDATE user SET password = ? WHERE user_id = ?", "$2a$10$newHash", 2);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void login_returnsNull_whenUserNotFoundOrPasswordMismatches() {
+    void login_returnsEmpty_whenUserNotFoundOrPasswordMismatches() {
         when(jdbcTemplate.query(eq("SELECT * FROM user WHERE username = ?"), any(RowMapper.class), eq("ghost")))
                 .thenReturn(List.of());
 
-        assertThat(repository.login("ghost", "pass")).isNull();
+        assertThat(repository.login("ghost", "pass")).isEmpty();
     }
 
     @Test
@@ -120,21 +121,21 @@ class AuthRepositoryImplTest {
         when(jdbcTemplate.query(eq("SELECT * FROM user WHERE user_id = ?"), any(RowMapper.class), eq(5)))
                 .thenReturn(List.of(user));
 
-        UserProfileDTO profile = repository.getUserProfile(5);
+        Optional<UserProfileDTO> profile = repository.getUserProfile(5);
 
-        assertThat(profile).isNotNull();
-        assertThat(profile.getUserId()).isEqualTo(5);
-        assertThat(profile.getUsername()).isEqualTo("student5");
-        assertThat(profile.getRole()).isEqualTo("Student");
+        assertThat(profile).isPresent();
+        assertThat(profile.get().getUserId()).isEqualTo(5);
+        assertThat(profile.get().getUsername()).isEqualTo("student5");
+        assertThat(profile.get().getRole()).isEqualTo("Student");
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void getUserProfile_returnsNull_whenUserNotFound() {
+    void getUserProfile_returnsEmpty_whenUserNotFound() {
         when(jdbcTemplate.query(eq("SELECT * FROM user WHERE user_id = ?"), any(RowMapper.class), eq(999)))
                 .thenReturn(List.of());
 
-        assertThat(repository.getUserProfile(999)).isNull();
+        assertThat(repository.getUserProfile(999)).isEmpty();
     }
 
     @Test
@@ -209,9 +210,9 @@ class AuthRepositoryImplTest {
         when(jdbcTemplate.query(eq("SELECT * FROM user WHERE user_id = ?"), any(RowMapper.class), eq(1)))
                 .thenReturn(List.of(user));
 
-        UserProfileDTO result = repository.updateUserProfile(profile);
+        Optional<UserProfileDTO> result = repository.updateUserProfile(profile);
 
-        assertThat(result).isNotNull();
+        assertThat(result).isPresent();
         verify(jdbcTemplate).update(eq("UPDATE user SET username = ?, password = ?, profile_image = ? WHERE user_id = ?"),
                 eq("updatedUser"), eq("$2a$10$encodedNewPass"), any(), eq(1));
     }

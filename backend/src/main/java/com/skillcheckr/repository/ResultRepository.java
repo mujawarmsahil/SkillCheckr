@@ -1,6 +1,7 @@
 package com.skillcheckr.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.skillcheckr.model.ExamResultDTO;
 
@@ -8,11 +9,11 @@ public interface ResultRepository {
 
 	List<ExamResultDTO> getResultsByStudentId(int studentId);
 
-	ExamResultDTO getResultByExamAndStudent(int examId, int studentId);
+	Optional<ExamResultDTO> getResultByExamAndStudent(int examId, int studentId);
 
 	List<ExamResultDTO> getAllResults();
 
-	ExamResultDTO findByAttemptId(int attemptId);
+	Optional<ExamResultDTO> findByAttemptId(int attemptId);
 
 	ExamResultDTO insertSubmissionResult(ExamResultDTO result);
 

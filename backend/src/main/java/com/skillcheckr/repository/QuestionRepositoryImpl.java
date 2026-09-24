@@ -5,6 +5,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -118,30 +119,30 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 	}
 
 	@Override
-	public QuestionDTO getQuestionById(int questionId) {
+	public Optional<QuestionDTO> getQuestionById(int questionId) {
 		try {
 			String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, s.subject_name "
 					+ "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id WHERE q.question_id = ?";
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(selectQuestionSql, questionId);
-			if (rows.isEmpty()) return null;
+			if (rows.isEmpty()) return Optional.empty();
 
 			Map<String, Object> row = rows.get(0);
 			int subjectId = row.get("subject_id") != null ? ((Number) row.get("subject_id")).intValue() : 0;
 			String questionText = (String) row.get("question_text");
 			String subjectName = (String) row.get("subject_name");
-			return buildQuestionDto(questionId, subjectId, questionText, subjectName);
+			return Optional.of(buildQuestionDto(questionId, subjectId, questionText, subjectName));
 		} catch (Exception e) {
 			System.err.println("Error fetching question by ID: " + e.getMessage());
-			return null;
+			return Optional.empty();
 		}
 	}
 
 	@Override
-	public Question findQuestionDetailsById(int questionId) {
+	public Optional<Question> findQuestionDetailsById(int questionId) {
 		String sql = "SELECT question_id, subject_id, question_text, question_type, marks, word_limit "
 				+ "FROM question WHERE question_id = ?";
 		List<Question> questions = jdbcTemplate.query(sql, QuestionRowMapper.INSTANCE, questionId);
-		return questions.isEmpty() ? null : questions.get(0);
+		return questions.stream().findFirst();
 	}
 
 	@Override

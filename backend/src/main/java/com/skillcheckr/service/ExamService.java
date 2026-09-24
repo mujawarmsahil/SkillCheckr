@@ -1,6 +1,7 @@
 package com.skillcheckr.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.AttemptStartResult;
@@ -22,7 +23,7 @@ public interface ExamService {
 
 	List<Exam> viewAllCompletedExam();
 
-	Exam getExamById(int examId);
+	Optional<Exam> getExamById(int examId);
 
 	AttemptStartResult startAttempt(int examId, int studentId);
 

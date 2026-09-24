@@ -1,10 +1,6 @@
 package com.skillcheckr.controller;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,7 +10,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ResourceNotFoundException;
+import com.skillcheckr.exception.UnauthorizedException;
 import com.skillcheckr.model.LoginRequest;
+import com.skillcheckr.model.LoginResponse;
+import com.skillcheckr.model.ProfileUpdateResponse;
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
 import com.skillcheckr.service.AuthService;
@@ -27,105 +28,91 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        if (request == null || request.getUsername() == null || request.getPassword() == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Username and password are required"));
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+        if (request == null || request.getUsername() == null || request.getUsername().trim().isEmpty()
+                || request.getPassword() == null || request.getPassword().isEmpty()) {
+            throw new BadRequestException("Username and password are required");
         }
 
-        User user = authService.login(request.getUsername().trim(), request.getPassword());
-        if (user != null) {
-            UserProfileDTO fullProfile = null;
-            try {
-                fullProfile = authService.getUserProfile(user.getUserId());
-            } catch (Exception ignored) {
-            }
+        User user = authService.login(request.getUsername().trim(), request.getPassword())
+                .orElseThrow(() -> new UnauthorizedException("Invalid username or password"));
 
-            int roleId = 0;
-            if (fullProfile != null && fullProfile.getRoleId() > 0) {
-                roleId = fullProfile.getRoleId();
-            } else if ("Student".equalsIgnoreCase(user.getRole())) {
-                try { roleId = authService.getStudentIdByUserId(user.getUserId()); } catch (Exception ignored) {}
-            } else if ("Teacher".equalsIgnoreCase(user.getRole())) {
-                try { roleId = authService.getTeacherIdByUserId(user.getUserId()); } catch (Exception ignored) {}
-            } else if ("Admin".equalsIgnoreCase(user.getRole())) {
-                try { roleId = authService.getAdminIdByUserId(user.getUserId()); } catch (Exception ignored) {}
-            }
+        UserProfileDTO fullProfile = authService.getUserProfile(user.getUserId()).orElse(null);
 
-            String name = fullProfile != null && fullProfile.getName() != null ? fullProfile.getName() : user.getUsername();
-            String email = fullProfile != null && fullProfile.getEmail() != null ? fullProfile.getEmail() : "";
-            String contact = fullProfile != null && fullProfile.getContact() != null ? fullProfile.getContact() : "";
-            String profileImage = fullProfile != null && fullProfile.getProfileImage() != null ? fullProfile.getProfileImage() : user.getProfileImage();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Login Successful");
-            response.put("username", user.getUsername());
-            response.put("name", name);
-            response.put("email", email);
-            response.put("contact", contact);
-            if (profileImage != null) {
-                response.put("profile_image", profileImage);
-                response.put("profileImage", profileImage);
-            }
-            response.put("role", user.getRole());
-            response.put("userId", user.getUserId());
-            response.put("roleId", roleId);
-            response.put("user_id", user.getUserId());
-            response.put("role_id", roleId);
-            response.put("token", "jwt-mock-" + user.getUserId() + "-" + System.currentTimeMillis());
-
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Invalid username or password"));
+        int roleId = 0;
+        if (fullProfile != null && fullProfile.getRoleId() > 0) {
+            roleId = fullProfile.getRoleId();
+        } else if ("Student".equalsIgnoreCase(user.getRole())) {
+            roleId = authService.getStudentIdByUserId(user.getUserId());
+        } else if ("Teacher".equalsIgnoreCase(user.getRole())) {
+            roleId = authService.getTeacherIdByUserId(user.getUserId());
+        } else if ("Admin".equalsIgnoreCase(user.getRole())) {
+            roleId = authService.getAdminIdByUserId(user.getUserId());
         }
+
+        String name = fullProfile != null && fullProfile.getName() != null ? fullProfile.getName() : user.getUsername();
+        String email = fullProfile != null && fullProfile.getEmail() != null ? fullProfile.getEmail() : "";
+        String contact = fullProfile != null && fullProfile.getContact() != null ? fullProfile.getContact() : "";
+        String profileImage = fullProfile != null && fullProfile.getProfileImage() != null
+                ? fullProfile.getProfileImage()
+                : user.getProfileImage();
+
+        return ResponseEntity.ok(LoginResponse.builder()
+                .message("Login Successful")
+                .username(user.getUsername())
+                .name(name)
+                .email(email)
+                .contact(contact)
+                .profileImage(profileImage)
+                .role(user.getRole())
+                .userId(user.getUserId())
+                .roleId(roleId)
+                .token("jwt-mock-" + user.getUserId() + "-" + System.currentTimeMillis())
+                .build());
     }
 
     @GetMapping({"/profile/{userId}", "/user/profile/{userId}"})
-    public ResponseEntity<?> getUserProfile(@PathVariable("userId") Integer userId) {
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable("userId") Integer userId) {
         if (userId == null || userId <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Valid User ID is required"));
+            throw new BadRequestException("Valid User ID is required");
         }
 
-        UserProfileDTO profile = authService.getUserProfile(userId);
-        if (profile != null) {
-            return ResponseEntity.ok(profile);
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", "User not found"));
-        }
+        UserProfileDTO profile = authService.getUserProfile(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return ResponseEntity.ok(profile);
     }
 
     @PutMapping({"/profile/{userId}", "/user/profile/{userId}"})
-    public ResponseEntity<?> updateProfile(@PathVariable("userId") Integer userId, @RequestBody UserProfileDTO profileRequest) {
+    public ResponseEntity<ProfileUpdateResponse> updateProfile(@PathVariable("userId") Integer userId,
+            @RequestBody UserProfileDTO profileRequest) {
         if (userId == null || userId <= 0 || profileRequest == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid profile update data"));
+            throw new BadRequestException("Invalid profile update data");
         }
         profileRequest.setUserId(userId);
-        return handleProfileUpdate(profileRequest);
+        return ResponseEntity.ok(performProfileUpdate(profileRequest));
     }
 
     @PostMapping({"/profile/update", "/profile"})
-    public ResponseEntity<?> updateProfilePost(@RequestBody UserProfileDTO profileRequest) {
+    public ResponseEntity<ProfileUpdateResponse> updateProfilePost(@RequestBody UserProfileDTO profileRequest) {
         if (profileRequest == null || profileRequest.getUserId() <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Valid User ID is required in profile data"));
+            throw new BadRequestException("Valid User ID is required in profile data");
         }
-        return handleProfileUpdate(profileRequest);
+        return ResponseEntity.ok(performProfileUpdate(profileRequest));
     }
 
-    private ResponseEntity<?> handleProfileUpdate(UserProfileDTO profile) {
+    private ProfileUpdateResponse performProfileUpdate(UserProfileDTO profile) {
         // Validate required fields
         if (profile.getName() == null || profile.getName().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Name is required"));
+            throw new BadRequestException("Name is required");
         }
         if (profile.getUsername() == null || profile.getUsername().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Username is required"));
+            throw new BadRequestException("Username is required");
         }
         if (profile.getEmail() == null || profile.getEmail().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Email is required"));
+            throw new BadRequestException("Email is required");
         }
         if (!profile.getEmail().trim().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Please provide a valid email address"));
+            throw new BadRequestException("Please provide a valid email address");
         }
 
         String trimmedUsername = profile.getUsername().trim();
@@ -139,29 +126,28 @@ public class AuthController {
 
         // Check duplicate username
         if (authService.isUsernameInUse(trimmedUsername, profile.getUserId())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Username is already taken by another account"));
+            throw new BadRequestException("Username is already taken by another account");
         }
 
         // Check duplicate email
         if (authService.isEmailInUse(trimmedEmail, profile.getUserId())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Email is already in use by another account"));
+            throw new BadRequestException("Email is already in use by another account");
         }
 
         // Validate password if provided
         if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
             String newPassword = profile.getPassword().trim();
             if (newPassword.length() < 4) {
-                return ResponseEntity.badRequest().body(Map.of("message", "New password must be at least 4 characters long"));
+                throw new BadRequestException("New password must be at least 4 characters long");
             }
 
             if (profile.getOldPassword() == null || profile.getOldPassword().trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Current password is required to change password"));
+                throw new BadRequestException("Current password is required to change password");
             }
 
             boolean isOldPasswordValid = authService.verifyCurrentPassword(profile.getUserId(), profile.getOldPassword().trim());
             if (!isOldPasswordValid) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of("message", "Invalid current password. Cannot change password."));
+                throw new BadRequestException("Invalid current password. Cannot change password.");
             }
 
             profile.setPassword(newPassword);
@@ -169,17 +155,13 @@ public class AuthController {
             profile.setPassword(null); // Keep existing password
         }
 
-        UserProfileDTO updated = authService.updateUserProfile(profile);
-        if (updated != null) {
-            return ResponseEntity.ok(Map.of(
-                    "message", "Profile updated successfully",
-                    "success", true,
-                    "profile", updated
-            ));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", "User not found or update failed"));
-        }
+        UserProfileDTO updated = authService.updateUserProfile(profile)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found or update failed"));
+
+        return ProfileUpdateResponse.builder()
+                .message("Profile updated successfully")
+                .success(true)
+                .profile(updated)
+                .build();
     }
 }
-

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -92,9 +93,9 @@ class ExamServiceTest {
     void getExamById_delegatesToRepository() {
         Exam exam = new Exam();
         exam.setExamId(1);
-        when(examRepository.getExamById(1)).thenReturn(exam);
+        when(examRepository.getExamById(1)).thenReturn(Optional.of(exam));
 
-        assertThat(examService.getExamById(1)).isSameAs(exam);
+        assertThat(examService.getExamById(1)).containsSame(exam);
         verify(examRepository).getExamById(1);
     }
 
