@@ -17,7 +17,7 @@ export default function TotalExams() {
     try {
       const upPromise = apiClient.get("/api/exams/viewAllUpComingExam");
       const compPromise = apiClient.get("/api/exams/viewAllCompletedExam").catch((err) => {
-        if (err.status === 404 || err.response?.status === 404) return { data: [] };
+        if (err.status === 404) return { data: [] };
         throw err;
       });
       const [upRes, compRes] = await Promise.all([upPromise, compPromise]);
