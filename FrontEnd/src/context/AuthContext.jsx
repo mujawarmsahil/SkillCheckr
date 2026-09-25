@@ -6,7 +6,6 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,7 +17,6 @@ export function AuthProvider({ children }) {
       const storedProfileImage = localStorage.getItem("profile_image");
       const storedContact = localStorage.getItem("contact");
       const storedUserId = localStorage.getItem("user_id");
-      const storedToken = localStorage.getItem("token");
       const storedTeacherId = localStorage.getItem("teacher_id");
       const storedStudentId = localStorage.getItem("student_id");
 
@@ -35,7 +33,6 @@ export function AuthProvider({ children }) {
           roleId: roleId ? parseInt(roleId, 10) : null,
         });
         setRole(storedRole);
-        setToken(storedToken);
       }
     } catch (e) {
       console.error("Failed to load auth session", e);
@@ -93,7 +90,6 @@ export function AuthProvider({ children }) {
       role_id: roleId,
     });
     setRole(userRole);
-    setToken(userToken);
 
     return data;
   };
@@ -184,7 +180,6 @@ export function AuthProvider({ children }) {
       roleId: roleId ? parseInt(roleId, 10) : null,
     });
     setRole(userRole);
-    setToken(userToken);
   };
 
   const logout = () => {
@@ -203,15 +198,6 @@ export function AuthProvider({ children }) {
 
     setUser(null);
     setRole(null);
-    setToken(null);
-  };
-
-  const hasRole = (allowedRoles) => {
-    if (!role) return false;
-    if (typeof allowedRoles === "string") {
-      return role.toLowerCase() === allowedRoles.toLowerCase();
-    }
-    return allowedRoles.some((r) => r.toLowerCase() === role.toLowerCase());
   };
 
   return (
@@ -219,12 +205,10 @@ export function AuthProvider({ children }) {
       value={{
         user,
         role,
-        token,
         loading,
         isAuthenticated: !!user,
         login,
         logout,
-        hasRole,
         updateUser,
         setAuthSession,
       }}

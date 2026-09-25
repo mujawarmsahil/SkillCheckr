@@ -132,9 +132,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
           }
         }
       } catch {
-        if (isMounted) {
-          // Keep current fallback data
-        }
+        // Profile fetch is best effort; the pre-populated fallback data is kept
       } finally {
         if (isMounted) {
           setInitialLoading(false);

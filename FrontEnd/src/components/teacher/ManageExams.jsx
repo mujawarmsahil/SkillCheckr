@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import apiClient from "../../api/client";
+import { getAllExams, getTeacherExams, getExamQuestions, deleteExam } from "../../api/examApi";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
@@ -21,14 +21,9 @@ export default function ManageExams({ onAddNew }) {
     setLoading(true);
     try {
       const teacherId = user?.roleId || localStorage.getItem("teacher_id");
-      let url = "/api/exams/viewAllExams";
-      if (teacherId) {
-        url = `/api/exams/teacher/${teacherId}`;
-      }
-      const res = await apiClient.get(url);
-      setExams(Array.isArray(res.data) ? res.data : []);
+      setExams(teacherId ? await getTeacherExams(teacherId) : await getAllExams());
     } catch (err) {
-      if (err.status === 404 || err.response?.status === 404) {
+      if (err.status === 404) {
         setExams([]);
       } else {
         showError(err.message || "Failed to load exams");
@@ -48,7 +43,7 @@ export default function ManageExams({ onAddNew }) {
     }
 
     try {
-      await apiClient.delete(`/api/exams/deleteExamById/${examId}`);
+      await deleteExam(examId);
       showSuccess("Exam deleted successfully");
       setExams((prev) => prev.filter((e) => e.exam_id !== examId && e.examId !== examId));
     } catch (err) {
@@ -61,8 +56,7 @@ export default function ManageExams({ onAddNew }) {
     setSelectedExam(exam);
     setLoadingQuestions(true);
     try {
-      const res = await apiClient.get(`/api/exams/${examId}/questions`);
-      setExamQuestions(Array.isArray(res.data) ? res.data : []);
+      setExamQuestions(await getExamQuestions(examId));
     } catch {
       showError("Could not load questions for this exam");
       setExamQuestions([]);
@@ -173,8 +167,7 @@ export default function ManageExams({ onAddNew }) {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredExams.map((exam) => {
                   const examId = exam.exam_id || exam.examId;
-                  const examType = (exam.exam_type || exam.examType || "MCQ").toUpperCase();
-                  const isMcq = examType === "MCQ";
+                  const isMcq = (exam.exam_type || exam.examType || "MCQ").toUpperCase() === "MCQ";
                   const status = exam.status || "Upcoming";
 
                   return (

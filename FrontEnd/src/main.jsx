@@ -36,7 +36,6 @@ const router = createBrowserRouter(
 
       {/* Auth Entry */}
       <Route path="/authentication" element={<Authentication />} />
-      <Route path="/oauth2/callback" element={<Authentication />} />
       <Route path="/login" element={<Navigate to="/authentication" replace />} />
       <Route path="/signup" element={<Navigate to="/authentication" replace />} />
 

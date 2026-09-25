@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import apiClient from "../../api/client";
+import { getAllExams, approveExam, rejectExam, cancelExam, deleteExam } from "../../api/examApi";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 import { isExamDateTimePassed } from "../../utils/examUtils";
@@ -14,10 +14,9 @@ export default function AcceptExam() {
   const fetchExams = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get("/api/exams/viewAllExams");
-      setExams(Array.isArray(res.data) ? res.data : []);
+      setExams(await getAllExams());
     } catch (err) {
-      if (err.status === 404 || err.response?.status === 404) {
+      if (err.status === 404) {
         setExams([]);
       } else {
         showError(err.message || "Failed to load exams");
@@ -33,7 +32,7 @@ export default function AcceptExam() {
 
   const handleApproveExam = async (examId) => {
     try {
-      await apiClient.post(`/api/exams/approve/${examId}`);
+      await approveExam(examId);
       showSuccess("Exam approved & scheduled for student registration!");
       setExams((prev) =>
         prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Upcoming" } : e))
@@ -46,7 +45,7 @@ export default function AcceptExam() {
   const handleRejectExam = async (examId) => {
     if (!window.confirm("Are you sure you want to reject this proposed examination?")) return;
     try {
-      await apiClient.post(`/api/exams/reject/${examId}`);
+      await rejectExam(examId);
       showSuccess("Exam marked as rejected");
       setExams((prev) =>
         prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Rejected" } : e))
@@ -59,7 +58,7 @@ export default function AcceptExam() {
   const handleCancelExam = async (examId) => {
     if (!window.confirm("Are you sure you want to cancel this scheduled exam? Enrolled students will not be able to attend.")) return;
     try {
-      await apiClient.post(`/api/exams/cancel/${examId}`);
+      await cancelExam(examId);
       showSuccess("Exam cancelled successfully");
       setExams((prev) =>
         prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Cancelled" } : e))
@@ -72,7 +71,7 @@ export default function AcceptExam() {
   const handleDeleteExam = async (examId) => {
     if (!window.confirm("Are you sure you want to permanently delete this exam?")) return;
     try {
-      await apiClient.delete(`/api/exams/deleteExamById/${examId}`);
+      await deleteExam(examId);
       showSuccess("Exam deleted successfully");
       setExams((prev) => prev.filter((e) => e.exam_id !== examId && e.examId !== examId));
     } catch (err) {

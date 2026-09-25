@@ -112,8 +112,6 @@ export default function AvailableExams() {
     }
   };
 
-  const getExamTimingInfo = (exam) => parseExamSchedule(exam, currentTime);
-
   const filteredExams = exams.filter((e) => {
     const examId = e.exam_id || e.examId;
     const title = (e.exam_name || e.examName || "").toLowerCase();
@@ -211,8 +209,7 @@ export default function AvailableExams() {
             const totalMarks = exam.total_marks || exam.totalMarks || 100;
             const passMarks = exam.passing_marks || exam.passingMarks || 40;
 
-            const existingResult = submittedExamsMap[examId];
-            const isSubmitted = !!existingResult;
+            const isSubmitted = !!submittedExamsMap[examId];
             const isRegistered = !!registeredExamsMap[examId];
 
             const {
@@ -222,7 +219,7 @@ export default function AvailableExams() {
               isRegistrationClosed,
               isExamUpcoming,
               isExamActive,
-            } = getExamTimingInfo(exam);
+            } = parseExamSchedule(exam, currentTime);
 
             const isRegisteringThis = registeringId === examId;
 

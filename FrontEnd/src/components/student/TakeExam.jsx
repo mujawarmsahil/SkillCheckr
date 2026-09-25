@@ -28,7 +28,6 @@ export default function TakeExam() {
   // -------------------------------------------------------------
   const [copyStrikes, setCopyStrikes] = useState(0);
   const [tabStrikes, setTabStrikes] = useState(0);
-  const [, setTotalViolations] = useState(0);
   const [activeViolationModal, setActiveViolationModal] = useState(null);
 
   const [detectedPersonsCount, setDetectedPersonsCount] = useState(1);
@@ -283,7 +282,6 @@ export default function TakeExam() {
 
       setCopyStrikes((prevStrikes) => {
         const newStrikes = prevStrikes + 1;
-        setTotalViolations((t) => t + 1);
 
         if (newStrikes === 1) {
           setActiveViolationModal({
@@ -322,7 +320,6 @@ export default function TakeExam() {
       if (resultData || isSubmittingRef.current) return;
 
       setScreenShieldActive(true);
-      setTotalViolations((t) => t + 1);
       setActiveViolationModal({
         title: "🚫 Exam Terminated: Secondary Device Detected",
         message:
@@ -402,7 +399,6 @@ export default function TakeExam() {
 
         setTabStrikes((prev) => {
           const next = prev + 1;
-          setTotalViolations((t) => t + 1);
           if (next >= 3) {
             handleSecondaryDeviceDetected("Repeated tab-switching and window focus loss");
           } else {
@@ -486,17 +482,10 @@ export default function TakeExam() {
             let leftUpperFace = 0;
             let centerUpperFace = 0;
             let rightUpperFace = 0;
-            let brightPixels = 0;
-            let totalBrightness = 0;
-
-            const totalPixels = data.length / 4;
             for (let i = 0; i < data.length; i += 4) {
               const r = data[i];
               const g = data[i + 1];
               const b = data[i + 2];
-              const avg = (r + g + b) / 3;
-              totalBrightness += avg;
-              if (avg > 240) brightPixels++;
 
               const pixelIndex = i / 4;
               const y = Math.floor(pixelIndex / 96);
@@ -538,11 +527,6 @@ export default function TakeExam() {
               );
               personsDetectedThisFrame = 1;
             }
-
-            const avgLuma = totalBrightness / totalPixels;
-            if (brightPixels > 300 && avgLuma > 190) {
-              console.warn("Optical flash glare detected");
-            }
           } catch {
             personsDetectedThisFrame = 1;
           }
@@ -563,7 +547,6 @@ export default function TakeExam() {
                 isDisqualified: false,
               });
               showWarning("⚠️ Multiple persons detected in room for 3+ minutes! Please be alone.");
-              setTotalViolations((v) => v + 1);
             } else if (nextDuration >= 240 && prevDuration < 240) {
               setActiveViolationModal({
                 title: "🚫 Exam Terminated: Unauthorized Persons Present",

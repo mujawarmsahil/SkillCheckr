@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import apiClient from "../../api/client";
+import { getAllResults } from "../../api/resultApi";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 
@@ -15,8 +15,7 @@ export default function ManageResults() {
   const fetchResults = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get("/api/results/all");
-      setResults(Array.isArray(res.data) ? res.data : []);
+      setResults(await getAllResults());
     } catch (err) {
       showError(err.message || "Failed to load examination results");
     } finally {
