@@ -1,7 +1,6 @@
 package com.skillcheckr.service;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -66,11 +65,6 @@ public class AdminServiceImpl implements AdminService {
 	@Override
 	public boolean toggleStudentStatus(int studentId, String status) {
 		return adminRepository.toggleStudentStatus(studentId, status);
-	}
-
-	@Override
-	public Optional<String> getUsernameByRequestId(int requestId) {
-		return adminRepository.getUsernameByRequestId(requestId);
 	}
 
 	@Override

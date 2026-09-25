@@ -1,7 +1,6 @@
 package com.skillcheckr.service;
 
 import java.util.List;
-import java.util.Optional;
 
 import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.Student;
@@ -26,8 +25,6 @@ public interface AdminService {
 	boolean toggleTeacherStatus(int teacherId, String status);
 
 	boolean toggleStudentStatus(int studentId, String status);
-
-	Optional<String> getUsernameByRequestId(int requestId);
 
 	AdminStatsResponse getAdminStats();
 }

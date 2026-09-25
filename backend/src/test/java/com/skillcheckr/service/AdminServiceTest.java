@@ -1,7 +1,6 @@
 package com.skillcheckr.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,14 +77,6 @@ class AdminServiceTest {
 
         assertThat(adminService.isUsernameExist("someone")).isTrue();
         verify(adminRepository).isUsernameExist("someone");
-    }
-
-    @Test
-    void getUsernameByRequestId_delegatesToRepository() {
-        when(adminRepository.getUsernameByRequestId(9)).thenReturn(Optional.of("someone"));
-
-        assertThat(adminService.getUsernameByRequestId(9)).contains("someone");
-        verify(adminRepository).getUsernameByRequestId(9);
     }
 
     @Test

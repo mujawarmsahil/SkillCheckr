@@ -3,7 +3,6 @@ package com.skillcheckr.constant;
 public final class ExamConstants {
 
     private ExamConstants() {
-        // Utility / constant class
     }
 
     // Question Types
@@ -22,8 +21,6 @@ public final class ExamConstants {
     // Exam Statuses
     public static final String EXAM_STATUS_UPCOMING = "Upcoming";
     public static final String EXAM_STATUS_APPROVED = "Approved";
-    public static final String EXAM_STATUS_COMPLETED = "Completed";
-    public static final String EXAM_STATUS_PENDING = "Pending";
     public static final String EXAM_STATUS_REJECTED = "Rejected";
     public static final String EXAM_STATUS_CANCELLED = "Cancelled";
 }
