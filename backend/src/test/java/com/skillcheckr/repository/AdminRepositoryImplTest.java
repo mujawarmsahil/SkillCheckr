@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,7 +12,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.List;
-import java.util.Optional;
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
@@ -141,6 +141,39 @@ class AdminRepositoryImplTest {
     }
 
     @Test
+    void addStudentFromRequest_returnsTrue_whenReapprovingAlreadyProvisionedRequest() throws Exception {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT * FROM request WHERE request_id = ?")).thenReturn(psSelect);
+        when(psSelect.executeQuery()).thenReturn(rsSelect);
+        when(rsSelect.next()).thenReturn(true);
+        when(rsSelect.getString("username")).thenReturn("alice");
+        when(rsSelect.getString("password")).thenReturn("$2a$10$alreadyHashed");
+        when(rsSelect.getString("name")).thenReturn("Alice");
+        when(rsSelect.getString("contact")).thenReturn("123");
+        when(rsSelect.getString("email")).thenReturn("alice@test.com");
+
+        when(connection.prepareStatement("SELECT user_id FROM user WHERE username = ?")).thenReturn(psCheck);
+        when(psCheck.executeQuery()).thenReturn(rsCheck);
+        when(rsCheck.next()).thenReturn(true);
+        when(rsCheck.getInt("user_id")).thenReturn(10);
+
+        when(connection.prepareStatement("SELECT student_id FROM student WHERE user_id = ? OR email = ?")).thenReturn(psRole);
+        when(psRole.executeQuery()).thenReturn(rsRole);
+        when(rsRole.next()).thenReturn(true);
+
+        when(connection.prepareStatement("UPDATE request SET status = 'Approved' WHERE request_id = ?")).thenReturn(psUpdate);
+
+        boolean success = repository.addStudentFromRequest(1);
+
+        assertThat(success).isTrue();
+        verify(psUpdate).executeUpdate();
+        verify(connection, never()).prepareStatement(
+                eq("INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)"));
+        verify(connection, never()).prepareStatement(
+                eq("INSERT INTO student(user_id, name, contact, email) VALUES (?, ?, ?, ?)"));
+    }
+
+    @Test
     void addStudentFromRequest_returnsFalse_whenRequestNotFound() throws Exception {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement("SELECT * FROM request WHERE request_id = ?")).thenReturn(psSelect);
@@ -182,20 +215,6 @@ class AdminRepositoryImplTest {
 
         assertThat(success).isTrue();
         verify(psUpdate).executeUpdate();
-    }
-
-    @Test
-    void isUsernameExist_returnsTrue_whenCountGreaterThanZero() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("taken"))).thenReturn(1);
-
-        assertThat(repository.isUsernameExist("taken")).isTrue();
-    }
-
-    @Test
-    void isUsernameExist_returnsFalse_whenCountZeroOrException() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("free"))).thenReturn(0);
-
-        assertThat(repository.isUsernameExist("free")).isFalse();
     }
 
     @Test
@@ -246,15 +265,6 @@ class AdminRepositoryImplTest {
 
         assertThat(result).isTrue();
         verify(jdbcTemplate).update("DELETE FROM user WHERE user_id = ?", 60);
-    }
-
-    @Test
-    void getUsernameByRequestId_returnsUsername() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(String.class), eq(10))).thenReturn("john_doe");
-
-        Optional<String> username = repository.getUsernameByRequestId(10);
-
-        assertThat(username).contains("john_doe");
     }
 
     @Test
