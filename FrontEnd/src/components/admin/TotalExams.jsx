@@ -42,7 +42,7 @@ export default function TotalExams() {
       setUpcomingExams(genuinelyUpcoming);
       setCompletedExams(allCompleted);
     } catch (err) {
-      showError(err.message || "Failed to load examination statistics");
+      showError(err.message || "Failed to load exam statistics");
     } finally {
       setLoading(false);
     }
@@ -63,18 +63,16 @@ export default function TotalExams() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="chart" className="w-5 h-5 text-orange-500" />
-          Examination Distribution & Analytics
+          Exam Statistics
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Comprehensive statistics on scheduled upcoming and finalized examinations
+          Upcoming and completed exam totals
         </p>
       </div>
 
-      {/* Stats Cards & Chart */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 min-h-[120px]">
           <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
@@ -104,7 +102,6 @@ export default function TotalExams() {
             </div>
           ) : (
             <div className="w-full flex items-center justify-between gap-3">
-              {/* Donut Chart */}
               <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
@@ -139,7 +136,6 @@ export default function TotalExams() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Breakdown Legend */}
               <div className="flex flex-col justify-center gap-1.5 flex-1 min-w-0">
                 <div className="flex items-center justify-between pb-1 border-b border-slate-100">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Breakdown</span>
@@ -166,7 +162,6 @@ export default function TotalExams() {
         </div>
       </div>
 
-      {/* Switcher & Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -192,7 +187,7 @@ export default function TotalExams() {
         {loading ? (
           <div className="py-12 text-center">
             <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-xs text-slate-500">Loading exams data...</p>
+            <p className="text-xs text-slate-500">Loading exams...</p>
           </div>
         ) : currentList.length === 0 ? (
           <div className="text-center py-10 space-y-2">

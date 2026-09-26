@@ -24,7 +24,7 @@ export default function TotalUsers() {
       setTeachers(Array.isArray(tRes.data) ? tRes.data : []);
       setStudents(Array.isArray(sRes.data) ? sRes.data : []);
     } catch (err) {
-      showError(err.message || "Failed to load user rosters");
+      showError(err.message || "Failed to load users");
     } finally {
       setLoading(false);
     }
@@ -51,17 +51,17 @@ export default function TotalUsers() {
           prev.map((t) => ((t.teacher_id || t.teacherId) === id ? { ...t, status: nextStatus } : t))
         );
       }
-      showSuccess(`Account ${nextStatus.toLowerCase() === "active" ? "activated" : "deactivated"} successfully`);
+      showSuccess(`Account ${nextStatus.toLowerCase() === "active" ? "activated" : "deactivated"}`);
     } catch (err) {
       showError(err.response?.data?.message || err.message || "Failed to update account status");
     }
   };
 
   const handleDeleteStudent = async (studentId) => {
-    if (!window.confirm("Are you sure you want to process this student account? If the student has test history, the account will be safely deactivated to protect record integrity.")) return;
+    if (!window.confirm("Deactivate this student account? Accounts with exam history stay deactivated to protect records.")) return;
     try {
       await apiClient.delete(`/api/admin/studentDeleteById/${studentId}`);
-      showSuccess("Student account safely removed/deactivated");
+      showSuccess("Student account deactivated.");
       fetchUsers();
     } catch (err) {
       showError(err.message || "Failed to delete student");
@@ -69,10 +69,10 @@ export default function TotalUsers() {
   };
 
   const handleDeleteTeacher = async (teacherId) => {
-    if (!window.confirm("Are you sure you want to process this instructor account? If active exams exist, the account will be safely deactivated.")) return;
+    if (!window.confirm("Deactivate this teacher account? Accounts with active exams stay deactivated.")) return;
     try {
       await apiClient.delete(`/api/admin/teacherDeleteById/${teacherId}`);
-      showSuccess("Teacher account safely removed/deactivated");
+      showSuccess("Teacher account deactivated.");
       fetchUsers();
     } catch (err) {
       showError(err.message || "Failed to delete teacher");
@@ -103,18 +103,16 @@ export default function TotalUsers() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="users" className="w-5 h-5 text-orange-500" />
-          Active Platform Users Directory & Access Management
+          Users
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Audit enrolled students and registered faculty members, manage activation status, and safely deactivate accounts
+          View students and teachers, and activate or deactivate accounts
         </p>
       </div>
 
-      {/* Summary Cards & Chart */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 min-h-[120px]">
           <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
@@ -131,7 +129,7 @@ export default function TotalUsers() {
             <Icon name="award" className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Faculty Instructors</span>
+            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Teachers</span>
             <p className="text-2xl font-black text-slate-900 mt-0.5">{teachers.length}</p>
           </div>
         </div>
@@ -144,7 +142,6 @@ export default function TotalUsers() {
             </div>
           ) : (
             <div className="w-full flex items-center justify-between gap-3">
-              {/* Donut Chart */}
               <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
@@ -179,7 +176,6 @@ export default function TotalUsers() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Breakdown Legend */}
               <div className="flex flex-col justify-center gap-1.5 flex-1 min-w-0">
                 <div className="flex items-center justify-between pb-1 border-b border-slate-100">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ratio</span>
@@ -206,9 +202,7 @@ export default function TotalUsers() {
         </div>
       </div>
 
-      {/* Directory Filter & Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-        {/* Tab switch */}
         <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
           <button
             onClick={() => setActiveTab("STUDENTS")}
@@ -228,7 +222,6 @@ export default function TotalUsers() {
           </button>
         </div>
 
-        {/* Status and Search */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="flex bg-slate-100 p-1 rounded-xl">
             {["ALL", "ACTIVE", "INACTIVE"].map((st) => (
@@ -250,14 +243,13 @@ export default function TotalUsers() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or email..."
+              placeholder="Search by name or email"
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
             />
           </div>
         </div>
       </div>
 
-      {/* Users Table */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -302,7 +294,7 @@ export default function TotalUsers() {
                           </div>
                           <div>
                             <div className="font-semibold text-slate-900">{name}</div>
-                            <div className="text-[11px] text-slate-400">{activeTab === "STUDENTS" ? "Student" : "Instructor"}</div>
+                            <div className="text-[11px] text-slate-400">{activeTab === "STUDENTS" ? "Student" : "Teacher"}</div>
                           </div>
                         </div>
                       </td>
@@ -336,7 +328,7 @@ export default function TotalUsers() {
                           <button
                             onClick={() => (activeTab === "STUDENTS" ? handleDeleteStudent(id) : handleDeleteTeacher(id))}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Safely Delete / Deactivate Account"
+                            title="Deactivate account"
                           >
                             <Icon name="trash" className="w-4 h-4" />
                           </button>

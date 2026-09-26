@@ -19,11 +19,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (allowedRoles && allowedRoles.length > 0) {
-    const isAllowed = allowedRoles.some(
-      (r) => r.toLowerCase() === (role || "").toLowerCase()
-    );
+    const isAllowed = allowedRoles.some((r) => r.toLowerCase() === (role || "").toLowerCase());
     if (!isAllowed) {
-      // Redirect to their own dashboard
       const targetRole = (role || "student").toLowerCase();
       return <Navigate to={`/dashboard/${targetRole}`} replace />;
     }

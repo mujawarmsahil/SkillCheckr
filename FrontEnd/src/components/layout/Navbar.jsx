@@ -24,7 +24,6 @@ export default function Navbar() {
   return (
     <header className="w-full h-24 sm:h-28 bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 transition-all shadow-sm flex items-center">
       <div className="w-full max-w-[1536px] mx-auto h-full px-4 sm:px-8 lg:px-12 flex items-center justify-between">
-        {/* Brand Logo - Centered Vertically */}
         <Link to="/" className="flex items-center group py-0">
           <img
             src={Logo}
@@ -33,7 +32,6 @@ export default function Navbar() {
           />
         </Link>
 
-        {/* Desktop Nav Links - Centered Vertically */}
         <nav className="hidden md:flex items-center gap-10 lg:gap-12 h-full">
           {navLinks.map((link) => (
             <NavLink
@@ -52,7 +50,6 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* Auth CTA - Centered Vertically */}
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated ? (
             <>
@@ -90,7 +87,6 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile Menu Button - Centered Vertically */}
         <div className="md:hidden flex items-center">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -102,7 +98,6 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-slate-200 px-6 pt-3 pb-6 space-y-3 shadow-xl">
           {navLinks.map((link) => (

@@ -19,7 +19,7 @@ export default function AdminOverview({ setActiveTab }) {
   const [loading, setLoading] = useState(true);
   const { showError } = useToast();
 
-  const fetchStats = useCallback(async () => {
+  const loadStats = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiClient.get("/api/admin/stats");
@@ -34,13 +34,13 @@ export default function AdminOverview({ setActiveTab }) {
   }, [showError]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    loadStats();
+  }, [loadStats]);
 
   const cards = [
     {
       id: "students",
-      label: "Enrolled Students",
+      label: "Students",
       value: stats.totalStudents || 0,
       icon: "users",
       color: "orange",
@@ -49,76 +49,76 @@ export default function AdminOverview({ setActiveTab }) {
     },
     {
       id: "teachers",
-      label: "Faculty Members",
+      label: "Teachers",
       value: stats.totalTeachers || 0,
       icon: "award",
       color: "blue",
       actionTab: "USERS",
-      desc: "Registered instructors",
+      desc: "Registered teacher accounts",
     },
     {
       id: "requests",
-      label: "Pending Approvals",
+      label: "Approvals",
       value: stats.pendingRequests || 0,
       icon: "user-plus",
       color: "amber",
       actionTab: "REQUESTS",
-      desc: "Awaiting administrative review",
+      desc: "Awaiting review",
       highlight: (stats.pendingRequests || 0) > 0,
     },
     {
       id: "exams",
-      label: "Total Examinations",
+      label: "Exams",
       value: stats.totalExams || 0,
       icon: "clock",
       color: "slate",
       actionTab: "EXAMS",
-      desc: "All scheduled & finalized exams",
+      desc: "Scheduled and completed",
     },
     {
       id: "upcomingExams",
-      label: "Upcoming Scheduled",
+      label: "Upcoming",
       value: stats.upcomingExams || 0,
       icon: "clock",
       color: "emerald",
       actionTab: "EXAMS",
-      desc: "Active upcoming exams",
+      desc: "Scheduled ahead",
     },
     {
       id: "completedExams",
-      label: "Concluded Exams",
+      label: "Completed",
       value: stats.completedExams || 0,
       icon: "check-circle",
       color: "indigo",
       actionTab: "STATS",
-      desc: "Archived & evaluated tests",
+      desc: "Finished exams",
     },
     {
       id: "subjects",
-      label: "Curriculum Subjects",
+      label: "Subjects",
       value: stats.totalSubjects || 0,
       icon: "book",
       color: "purple",
       actionTab: "SUBJECTS",
-      desc: "Configured subject categories",
+      desc: "Configured subjects",
     },
     {
       id: "questions",
-      label: "Question Bank Items",
+      label: "Questions",
       value: stats.totalQuestions || 0,
       icon: "help-circle",
       color: "rose",
       actionTab: "QUESTIONS",
-      desc: "Repository questions & rubrics",
+      desc: "Questions and rubrics",
     },
     {
       id: "results",
-      label: "Candidate Submissions",
+      label: "Results",
       value: stats.totalResults || 0,
       icon: "chart",
       color: "cyan",
       actionTab: "RESULTS",
-      desc: "Exam attempts & scorecards",
+      desc: "Attempts and scores",
     },
   ];
 
@@ -147,25 +147,23 @@ export default function AdminOverview({ setActiveTab }) {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-orange-950 p-6 rounded-3xl text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-2xl space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold text-orange-300 border border-white/10">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             System Health: Operational
           </div>
-          <h2 className="text-2xl font-black tracking-tight">Admin Executive Command Center</h2>
+          <h2 className="text-2xl font-black tracking-tight">Admin Overview</h2>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Monitor real-time candidate registrations, manage academic departments, schedule assessments, and audit examination performance across the SkillCheckr ecosystem.
+            Monitor registrations, subjects, exams, and results.
           </p>
         </div>
       </div>
 
-      {/* Metric Cards Grid */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-xs text-slate-500">Compiling executive telemetry...</p>
+          <p className="text-xs text-slate-500">Loading metrics...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -207,11 +205,10 @@ export default function AdminOverview({ setActiveTab }) {
         </div>
       )}
 
-      {/* Quick Navigation Panel */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
           <Icon name="grid" className="w-4 h-4 text-orange-500" />
-          Administrative Quick Actions
+          Quick Actions
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
@@ -220,7 +217,7 @@ export default function AdminOverview({ setActiveTab }) {
             { label: "Manage Exams", tab: "EXAMS", icon: "clock" },
             { label: "Question Bank", tab: "QUESTIONS", icon: "help-circle" },
             { label: "Curriculum Subjects", tab: "SUBJECTS", icon: "book" },
-            { label: "Exams Results", tab: "RESULTS", icon: "award" },
+            { label: "Results", tab: "RESULTS", icon: "award" },
           ].map((item) => (
             <button
               key={item.tab}

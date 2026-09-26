@@ -8,12 +8,11 @@ export default function StudentDashboard() {
 
   const tabs = [
     { id: "AVAILABLE", label: "Available Exams", icon: "book" },
-    { id: "RESULTS", label: "My Results & Scorecards", icon: "chart" },
+    { id: "RESULTS", label: "My Results", icon: "chart" },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Navigation Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200">
         {tabs.map((tab) => (
           <button
@@ -31,7 +30,6 @@ export default function StudentDashboard() {
         ))}
       </div>
 
-      {/* Content */}
       <div className="transition-opacity duration-200">
         {activeTab === "AVAILABLE" && <AvailableExams />}
         {activeTab === "RESULTS" && <StudentResults />}

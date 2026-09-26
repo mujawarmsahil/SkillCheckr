@@ -34,12 +34,10 @@ const router = createBrowserRouter(
         <Route path="contact" element={<Contact />} />
       </Route>
 
-      {/* Auth Entry */}
       <Route path="/authentication" element={<Authentication />} />
       <Route path="/login" element={<Navigate to="/authentication" replace />} />
       <Route path="/signup" element={<Navigate to="/authentication" replace />} />
 
-      {/* Protected Role Dashboards */}
       <Route
         path="/dashboard"
         element={
@@ -65,7 +63,6 @@ const router = createBrowserRouter(
         }
       />
 
-      {/* Protected Student Exam Taking Interface */}
       <Route
         path="/take-exam/:examId"
         element={
@@ -87,7 +84,6 @@ const router = createBrowserRouter(
         element={<Navigate to="/dashboard/teacher" replace />}
       />
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </>
   )

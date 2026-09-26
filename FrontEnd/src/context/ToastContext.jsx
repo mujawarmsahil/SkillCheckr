@@ -20,7 +20,7 @@ export function ToastProvider({ children }) {
   const addToast = useCallback((message, type = "info", duration = 4000) => {
     if (!message) return;
 
-    // Strict deduplication: do not display the exact same message if already showing
+    // Ignore a message that is already on screen
     if (activeMessagesRef.current.has(message)) {
       return;
     }

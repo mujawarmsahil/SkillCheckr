@@ -17,7 +17,7 @@ export function useExamTimer({ expiresAt, onExpire, active = true, showWarning }
     const expiresAtMs = new Date(expiresAt).getTime();
     if (Number.isNaN(expiresAtMs)) {
       if (showWarning) {
-        showWarning("The exam expiry time could not be read from the server.");
+        showWarning("Could not read the exam expiry time from the server.");
       }
       return;
     }
@@ -33,7 +33,7 @@ export function useExamTimer({ expiresAt, onExpire, active = true, showWarning }
         expiryNoticeShownRef.current = true;
         setIsAttemptExpired(true);
         if (showWarning) {
-          showWarning("Your exam attempt has expired. Submit the attempt to continue.");
+          showWarning("Time is up. Submitting your exam.");
         }
         if (onExpireRef.current) {
           onExpireRef.current();

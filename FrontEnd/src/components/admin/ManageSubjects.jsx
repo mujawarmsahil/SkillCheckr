@@ -48,7 +48,7 @@ export default function ManageSubjects() {
   const handleSaveSubject = async (e) => {
     e.preventDefault();
     if (!formData.subjectName.trim()) {
-      showError("Please enter a subject name");
+      showError("Subject name is required.");
       return;
     }
 
@@ -60,13 +60,13 @@ export default function ManageSubjects() {
           subject_name: formData.subjectName.trim(),
           subject_code: formData.subjectCode.trim(),
         });
-        showSuccess("Subject updated successfully!");
+        showSuccess("Subject updated.");
       } else {
         await apiClient.post("/api/subjects", {
           subject_name: formData.subjectName.trim(),
           subject_code: formData.subjectCode.trim(),
         });
-        showSuccess("Subject created successfully!");
+        showSuccess("Subject created.");
       }
       setModalOpen(false);
       fetchSubjects();
@@ -80,13 +80,13 @@ export default function ManageSubjects() {
   const handleDeleteSubject = async (sub) => {
     const id = sub.subjectId || sub.subject_id;
     const name = sub.subjectName || sub.subject_name;
-    if (!window.confirm(`Are you sure you want to delete subject "${name}"? Associated questions and data will be removed.`)) {
+    if (!window.confirm(`Delete subject "${name}"? Its questions and exams will be removed.`)) {
       return;
     }
 
     try {
       await apiClient.delete(`/api/subjects/${id}`);
-      showSuccess(`Subject "${name}" deleted`);
+      showSuccess(`Subject "${name}" deleted.`);
       setSubjects((prev) => prev.filter((s) => (s.subjectId || s.subject_id) !== id));
     } catch (err) {
       showError(err.message || "Failed to delete subject");
@@ -102,15 +102,14 @@ export default function ManageSubjects() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <Icon name="book" className="w-5 h-5 text-orange-500" />
-            Subject & Curriculum Management
+            Subjects
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Add, update, or remove subjects and audit curriculum question allocations
+            Add, update, and remove subjects.
           </p>
         </div>
         <button
@@ -122,7 +121,6 @@ export default function ManageSubjects() {
         </button>
       </div>
 
-      {/* Search & Stats Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative w-full sm:w-80">
           <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -130,7 +128,7 @@ export default function ManageSubjects() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by subject name or code..."
+            placeholder="Search by name or code"
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
           />
         </div>
@@ -139,7 +137,6 @@ export default function ManageSubjects() {
         </div>
       </div>
 
-      {/* Subjects Grid */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -149,7 +146,7 @@ export default function ManageSubjects() {
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
           <Icon name="book" className="w-10 h-10 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-700">No subjects found</h3>
-          <p className="text-xs text-slate-400">Click "Add New Subject" to create your first course discipline.</p>
+          <p className="text-xs text-slate-400">Use "Add New Subject" to create one.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -177,14 +174,14 @@ export default function ManageSubjects() {
                       <button
                         onClick={() => handleOpenEditModal(sub)}
                         className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                        title="Edit Subject"
+                        title="Edit subject"
                       >
                         <Icon name="edit" className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteSubject(sub)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Delete Subject"
+                        title="Delete subject"
                       >
                         <Icon name="trash" className="w-4 h-4" />
                       </button>
@@ -215,14 +212,13 @@ export default function ManageSubjects() {
         </div>
       )}
 
-      {/* Add / Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-scale-up">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                 <Icon name="book" className="w-4 h-4 text-orange-500" />
-                {editingSubject ? "Edit Subject" : "Create New Subject"}
+                {editingSubject ? "Edit Subject" : "Add Subject"}
               </h3>
               <button
                 onClick={() => setModalOpen(false)}
@@ -253,7 +249,7 @@ export default function ManageSubjects() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. CS-401 (Auto-generated if empty)"
+                  placeholder="e.g. CS-401 (generated if empty)"
                   value={formData.subjectCode}
                   onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"

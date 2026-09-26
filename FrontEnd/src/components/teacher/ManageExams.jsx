@@ -38,13 +38,13 @@ export default function ManageExams({ onAddNew }) {
   }, [fetchExams]);
 
   const handleDelete = async (examId) => {
-    if (!window.confirm("Are you sure you want to delete this exam? All associated questions will be removed.")) {
+    if (!window.confirm("Delete this exam? Its questions will be removed too.")) {
       return;
     }
 
     try {
       await deleteExam(examId);
-      showSuccess("Exam deleted successfully");
+      showSuccess("Exam deleted.");
       setExams((prev) => prev.filter((e) => e.exam_id !== examId && e.examId !== examId));
     } catch (err) {
       showError(err.message || "Failed to delete exam");
@@ -78,12 +78,11 @@ export default function ManageExams({ onAddNew }) {
 
   return (
     <div className="space-y-6">
-      {/* Top Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <Icon name="file-text" className="w-5 h-5 text-orange-500" />
-            Manage Created Examinations
+            My Exams
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Total configured exams: <span className="font-semibold text-slate-800">{exams.length}</span>
@@ -96,12 +95,11 @@ export default function ManageExams({ onAddNew }) {
             className="py-2.5 px-4 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center gap-2"
           >
             <Icon name="plus" className="w-4 h-4" />
-            Create New Exam
+            Add Exam
           </button>
         )}
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative flex-1 w-full">
           <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -109,15 +107,14 @@ export default function ManageExams({ onAddNew }) {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by exam name or subject..."
+            placeholder="Search by name or subject"
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-500 focus:bg-white"
           />
         </div>
 
-        {/* Filter Pills */}
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
           {[
-            { id: "ALL", label: "All Formats" },
+            { id: "ALL", label: "All" },
             { id: "MCQ", label: "MCQ Only" },
             { id: "QUESTION_ANSWER", label: "Q&A (Theory)" },
           ].map((tab) => (
@@ -136,7 +133,6 @@ export default function ManageExams({ onAddNew }) {
         </div>
       </div>
 
-      {/* Exams Table / Cards */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -146,7 +142,7 @@ export default function ManageExams({ onAddNew }) {
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
           <Icon name="file-text" className="w-10 h-10 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-700">No exams match your search criteria</h3>
-          <p className="text-xs text-slate-400">Try adjusting your filters or create a new examination</p>
+          <p className="text-xs text-slate-400">Adjust your filters or create a new exam</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -222,7 +218,7 @@ export default function ManageExams({ onAddNew }) {
                           <button
                             onClick={() => handleViewQuestions(exam)}
                             className="p-1.5 text-slate-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors text-xs font-medium flex items-center gap-1"
-                            title="View Questions"
+                            title="View questions"
                           >
                             <Icon name="eye" className="w-4 h-4" />
                             View
@@ -230,7 +226,7 @@ export default function ManageExams({ onAddNew }) {
                           <button
                             onClick={() => handleDelete(examId)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Delete Exam"
+                            title="Delete exam"
                           >
                             <Icon name="trash" className="w-4 h-4" />
                           </button>
@@ -245,14 +241,13 @@ export default function ManageExams({ onAddNew }) {
         </div>
       )}
 
-      {/* Questions Modal */}
       {selectedExam && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div>
                 <h3 className="font-bold text-slate-800 text-base">
-                  {selectedExam.exam_name || selectedExam.examName} - Question Set
+                  {selectedExam.exam_name || selectedExam.examName} Questions
                 </h3>
                 <p className="text-xs text-slate-500">
                   Format: {(selectedExam.exam_type || selectedExam.examType || "MCQ").toUpperCase()} | Total Questions: {examQuestions.length}

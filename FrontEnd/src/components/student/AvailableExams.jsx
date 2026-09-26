@@ -22,7 +22,7 @@ export default function AvailableExams() {
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
-  // Live ticker for real-time window status and countdowns
+  // Drives the window status and countdown labels
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -30,16 +30,14 @@ export default function AvailableExams() {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchUpcomingExamsAndRegistrations = useCallback(async () => {
+  const loadExams = useCallback(async () => {
     setLoading(true);
     try {
       const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
 
-      // 1. Fetch upcoming exams
       const fetchedExams = await getUpcomingExams();
       setExams(fetchedExams);
 
-      // 2. Fetch student's registrations
       try {
         const regIds = await getStudentRegistrations(studentId);
         const regMap = {};
@@ -57,11 +55,11 @@ export default function AvailableExams() {
           const localRegs = JSON.parse(localStorage.getItem(`student_${studentId}_registered_exams`) || "{}");
           setRegisteredExamsMap(localRegs);
         } catch {
-          // ignore fallback error
+          // no local copy either
         }
       }
 
-      // 3. Fetch student's completed results to enforce single attempt policy
+      // Completed exams stay visible; the backend allows one attempt each
       try {
         const results = await getStudentResults(studentId);
         const map = {};
@@ -73,19 +71,19 @@ export default function AvailableExams() {
         });
         setSubmittedExamsMap(map);
       } catch (err) {
-        showError(err.message || "Failed to load examination results");
+        showError(err.message || "Failed to load your results");
         setSubmittedExamsMap({});
       }
     } catch (err) {
-      showError(err.message || "Failed to fetch upcoming exams");
+      showError(err.message || "Failed to load exams");
     } finally {
       setLoading(false);
     }
   }, [user?.roleId, showError]);
 
   useEffect(() => {
-    fetchUpcomingExamsAndRegistrations();
-  }, [fetchUpcomingExamsAndRegistrations]);
+    loadExams();
+  }, [loadExams]);
 
   const handleRegister = async (examId, examName) => {
     const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
@@ -94,18 +92,18 @@ export default function AvailableExams() {
     try {
       const res = await registerForExam(examId, studentId);
 
-      showSuccess(res?.message || `Successfully registered for ${examName}!`);
+      showSuccess(res?.message || `Registered for ${examName}.`);
       setRegisteredExamsMap((prev) => {
         const updated = { ...prev, [examId]: true };
         try {
           localStorage.setItem(`student_${studentId}_registered_exams`, JSON.stringify(updated));
         } catch {
-          // ignore storage error
+          // local cache is optional
         }
         return updated;
       });
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || "Failed to register for examination";
+      const errorMsg = err.response?.data?.message || err.message || "Failed to register for this exam";
       showError(errorMsg);
     } finally {
       setRegisteringId(null);
@@ -133,18 +131,16 @@ export default function AvailableExams() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="book" className="w-5 h-5 text-orange-500" />
-          Examination Portal
+          Available Exams
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Register for scheduled assessments. Only registered students with valid active time windows can attend.
+          Register for an exam to attend it during the scheduled window.
         </p>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative flex-1 w-full">
           <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -157,13 +153,12 @@ export default function AvailableExams() {
           />
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
           {[
             { id: "ALL", label: "All Exams" },
-            { id: "REGISTERED", label: `My Registered (${Object.keys(registeredExamsMap).length})` },
+            { id: "REGISTERED", label: `Registered (${Object.keys(registeredExamsMap).length})` },
             { id: "MCQ", label: "MCQ Format" },
-            { id: "QUESTION_ANSWER", label: "Q&A (Theory)" },
+            { id: "QUESTION_ANSWER", label: "Question & Answer" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -180,22 +175,19 @@ export default function AvailableExams() {
         </div>
       </div>
 
-      {/* Exam Cards Grid */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-xs text-slate-500">Loading examinations and registration status...</p>
+          <p className="text-xs text-slate-500">Loading exams...</p>
         </div>
       ) : filteredExams.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
           <Icon name="book" className="w-10 h-10 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-700">
-            {filterType === "REGISTERED" ? "No Registered Examinations Found" : "No examinations currently available"}
+            {filterType === "REGISTERED" ? "No registered exams" : "No exams available"}
           </h3>
           <p className="text-xs text-slate-400">
-            {filterType === "REGISTERED"
-              ? "Browse 'All Exams' to register for upcoming tests."
-              : "Check back later or contact your instructor for scheduled tests."}
+            {filterType === "REGISTERED" ? "Browse all exams to register." : "Check back later."}
           </p>
         </div>
       ) : (
@@ -236,7 +228,6 @@ export default function AvailableExams() {
                     : "border-slate-200"
                 }`}
               >
-                {/* Card Header */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">
@@ -244,7 +235,6 @@ export default function AvailableExams() {
                     </span>
 
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {/* Submission Status */}
                       {isSubmitted ? (
                         <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                           <Icon name="check-circle" className="w-3.5 h-3.5" />
@@ -266,13 +256,12 @@ export default function AvailableExams() {
                         </span>
                       )}
 
-                      {/* Format Badge */}
                       <span
                         className={`text-xs font-bold px-2.5 py-1 rounded-md ${
                           isMcq ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
                         }`}
                       >
-                        {isMcq ? "MCQ" : "Theory"}
+                        {isMcq ? "MCQ" : "Q&A"}
                       </span>
                     </div>
                   </div>
@@ -282,7 +271,6 @@ export default function AvailableExams() {
                   </h3>
                 </div>
 
-                {/* Exam Specs */}
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div className="flex items-center gap-1.5">
                     <Icon name="clock" className="w-3.5 h-3.5 text-slate-400" />
@@ -294,14 +282,12 @@ export default function AvailableExams() {
                   </div>
                   <div className="flex items-center gap-1.5 col-span-2">
                     <Icon name="clock" className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Slot: <strong className="text-slate-800 font-mono">{datePart} ({startTimeStr} - {endTimeStr})</strong></span>
+                    <span>Schedule: <strong className="text-slate-800 font-mono">{datePart} ({startTimeStr} - {endTimeStr})</strong></span>
                   </div>
                 </div>
 
-                {/* Card CTA Actions */}
                 <div className="pt-1">
                   {isSubmitted ? (
-                    /* 1. Already Submitted -> View Scorecard */
                     <button
                       type="button"
                       onClick={() =>
@@ -317,12 +303,10 @@ export default function AvailableExams() {
                       className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2"
                     >
                       <Icon name="award" className="w-4 h-4" />
-                      <span>View Final Scorecard</span>
+                      <span>View Result</span>
                     </button>
                   ) : isRegistered ? (
-                    /* 2. Registered Student Options */
                     isExamActive ? (
-                      /* 2A. Registered & Timing is Active NOW -> Can enter exam */
                       <button
                         type="button"
                         onClick={() =>
@@ -341,10 +325,9 @@ export default function AvailableExams() {
                         className="w-full py-2.5 px-4 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 animate-pulse"
                       >
                         <Icon name="check-circle" className="w-4 h-4" />
-                        <span>Attend Examination Hall →</span>
+                        <span>Start Exam →</span>
                       </button>
                     ) : isExamUpcoming ? (
-                      /* 2B. Registered & Timing is in Future -> Disabled with countdown */
                       <button
                         type="button"
                         disabled
@@ -355,21 +338,18 @@ export default function AvailableExams() {
                         <span>Exam Not Started Yet</span>
                       </button>
                     ) : (
-                      /* 2C. Registered & Timing Expired -> Disabled */
                       <button
                         type="button"
                         disabled
                         className="w-full py-2.5 px-4 bg-slate-100 border border-slate-200 text-slate-500 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2 select-none"
-                        title="The scheduled time window for this exam has passed."
+                        title="The exam window has closed."
                       >
                         <Icon name="clock" className="w-4 h-4 text-slate-400" />
                         <span>Exam Window Expired</span>
                       </button>
                     )
                   ) : (
-                    /* 3. Not Registered Student */
                     !isRegistrationClosed ? (
-                      /* 3A. Not Registered & Registration Open -> Can Register */
                       <button
                         type="button"
                         disabled={isRegisteringThis}
@@ -389,12 +369,11 @@ export default function AvailableExams() {
                         )}
                       </button>
                     ) : (
-                      /* 3B. Not Registered & Registration Deadline Passed */
                       <button
                         type="button"
                         disabled
                         className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-50/90 via-rose-50/60 to-slate-50 border border-rose-200 text-rose-700 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2 shadow-xs select-none transition-all"
-                        title="Registration deadline for this examination has passed."
+                        title="Registration for this exam has closed."
                       >
                         <span className="w-5 h-5 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0 shadow-2xs">
                           <Icon name="lock" className="w-3.5 h-3.5" />

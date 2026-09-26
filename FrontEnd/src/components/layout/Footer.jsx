@@ -9,17 +9,15 @@ export default function Footer() {
     <footer className="bg-slate-950 text-slate-300 border-t border-slate-800">
       <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-          {/* Brand Col */}
           <div className="space-y-4">
             <Link to="/" className="inline-block">
               <img src={Logo} alt="SkillCheckr" className="h-11 w-auto object-contain" />
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Empowering students, educators, and institutions with advanced MCQ and descriptive assessments.
+              MCQ and written-answer exams for students, teachers, and institutions.
             </p>
           </div>
 
-          {/* Quick Links */}
           <div>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Platform</h3>
             <ul className="space-y-3 text-sm">
@@ -46,7 +44,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Access Roles */}
           <div>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Access</h3>
             <ul className="space-y-3 text-sm">
@@ -68,7 +65,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Support / Contact */}
           <div>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Connect</h3>
             <p className="text-sm text-slate-400 mb-4">

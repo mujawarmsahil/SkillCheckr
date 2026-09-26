@@ -1,7 +1,3 @@
-/**
- * Utility functions for examination scheduling, dates, and status evaluations.
- */
-
 export const isExamDateTimePassed = (exam) => {
   if (!exam) return false;
   if (exam.status === "Completed") return true;

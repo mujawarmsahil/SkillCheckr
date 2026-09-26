@@ -11,6 +11,6 @@ export const saveExamSession = (examId, attemptId) => {
     });
     sessionStorage.setItem(getExamSessionKey(examId), payload);
   } catch {
-    // Session persistence is best effort; backend remains source of truth
+    // Best effort: the server is the source of truth
   }
 };

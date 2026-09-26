@@ -33,7 +33,7 @@ export default function AcceptExam() {
   const handleApproveExam = async (examId) => {
     try {
       await approveExam(examId);
-      showSuccess("Exam approved & scheduled for student registration!");
+      showSuccess("Exam approved. Open for student registration.");
       setExams((prev) =>
         prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Upcoming" } : e))
       );
@@ -43,10 +43,10 @@ export default function AcceptExam() {
   };
 
   const handleRejectExam = async (examId) => {
-    if (!window.confirm("Are you sure you want to reject this proposed examination?")) return;
+    if (!window.confirm("Reject this exam?")) return;
     try {
       await rejectExam(examId);
-      showSuccess("Exam marked as rejected");
+      showSuccess("Exam rejected.");
       setExams((prev) =>
         prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Rejected" } : e))
       );
@@ -56,10 +56,10 @@ export default function AcceptExam() {
   };
 
   const handleCancelExam = async (examId) => {
-    if (!window.confirm("Are you sure you want to cancel this scheduled exam? Enrolled students will not be able to attend.")) return;
+    if (!window.confirm("Cancel this exam? Registered students will not be able to attend.")) return;
     try {
       await cancelExam(examId);
-      showSuccess("Exam cancelled successfully");
+      showSuccess("Exam cancelled.");
       setExams((prev) =>
         prev.map((e) => ((e.exam_id === examId || e.examId === examId) ? { ...e, status: "Cancelled" } : e))
       );
@@ -69,10 +69,10 @@ export default function AcceptExam() {
   };
 
   const handleDeleteExam = async (examId) => {
-    if (!window.confirm("Are you sure you want to permanently delete this exam?")) return;
+    if (!window.confirm("Permanently delete this exam?")) return;
     try {
       await deleteExam(examId);
-      showSuccess("Exam deleted successfully");
+      showSuccess("Exam deleted.");
       setExams((prev) => prev.filter((e) => e.exam_id !== examId && e.examId !== examId));
     } catch (err) {
       showError(err.message || "Failed to delete exam");
@@ -106,18 +106,16 @@ export default function AcceptExam() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="clock" className="w-5 h-5 text-orange-500" />
-          Examination Approvals & Lifecycle Management
+          Exam Approvals
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Review educator-created assessments, approve schedules, cancel ongoing/upcoming tests, and manage statuses
+          Approve, cancel, or delete exams.
         </p>
       </div>
 
-      {/* Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative flex-1 w-full">
           <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -125,12 +123,11 @@ export default function AcceptExam() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search exams by title or subject..."
+            placeholder="Search by exam name or subject"
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
           />
         </div>
 
-        {/* Status Filters */}
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           {[
             { id: "ALL", label: "All Exams" },
@@ -154,17 +151,15 @@ export default function AcceptExam() {
         </div>
       </div>
 
-      {/* Exams Table */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-xs text-slate-500">Loading examinations...</p>
+          <p className="text-xs text-slate-500">Loading exams...</p>
         </div>
       ) : filteredExams.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3 shadow-sm">
           <Icon name="check-circle" className="w-10 h-10 text-slate-300 mx-auto" />
-          <h3 className="text-base font-bold text-slate-700">No exams match your criteria</h3>
-          <p className="text-xs text-slate-400">All submitted assessments have been updated or filtered.</p>
+          <h3 className="text-base font-bold text-slate-700">No exams match your filters</h3>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -251,7 +246,7 @@ export default function AcceptExam() {
                             <button
                               onClick={() => handleCancelExam(examId)}
                               className="py-1 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1"
-                              title="Cancel Scheduled Exam"
+                              title="Cancel exam"
                             >
                               <Icon name="alert" className="w-3.5 h-3.5" />
                               Cancel
@@ -261,7 +256,7 @@ export default function AcceptExam() {
                           <button
                             onClick={() => handleDeleteExam(examId)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Delete Exam"
+                            title="Delete exam"
                           >
                             <Icon name="trash" className="w-4 h-4" />
                           </button>

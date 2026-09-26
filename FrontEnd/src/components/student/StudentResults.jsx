@@ -19,7 +19,7 @@ export default function StudentResults() {
       const data = await getStudentResults(studentId);
       setResults(data);
     } catch (err) {
-      showError(err.message || "Failed to load examination results");
+      showError(err.message || "Failed to load results");
     } finally {
       setLoading(false);
     }
@@ -35,18 +35,16 @@ export default function StudentResults() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="chart" className="w-5 h-5 text-orange-500" />
-          Examination Performance & Results
+          My Results
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Review your scorecard history and academic progress
+          Review your result history and academic progress
         </p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
@@ -79,7 +77,6 @@ export default function StudentResults() {
         </div>
       </div>
 
-      {/* Results Table */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -88,8 +85,8 @@ export default function StudentResults() {
       ) : results.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
           <Icon name="award" className="w-10 h-10 text-slate-300 mx-auto" />
-          <h3 className="text-base font-bold text-slate-700">No examination attempts recorded yet</h3>
-          <p className="text-xs text-slate-400">Complete an examination to view your verified results.</p>
+          <h3 className="text-base font-bold text-slate-700">No attempts recorded yet</h3>
+          <p className="text-xs text-slate-400">Complete an exam to see your results.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

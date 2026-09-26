@@ -23,9 +23,7 @@ export default function TakeExam() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
 
-  // -------------------------------------------------------------
-  // ANTI-CHEATING & PROCTORING STATE
-  // -------------------------------------------------------------
+  // Proctoring state
   const [copyStrikes, setCopyStrikes] = useState(0);
   const [tabStrikes, setTabStrikes] = useState(0);
   const [activeViolationModal, setActiveViolationModal] = useState(null);
@@ -47,9 +45,6 @@ export default function TakeExam() {
   const consecutiveMultiPersonFramesRef = useRef(0);
   const isTabHiddenRef = useRef(false);
 
-  // -------------------------------------------------------------
-  // 1. ATTEMPT LIFECYCLE HOOK
-  // -------------------------------------------------------------
   const {
     exam,
     questions,
@@ -73,9 +68,6 @@ export default function TakeExam() {
     (exam?.exam_type || exam?.examType || questions[currentIndex]?.questionType || QUESTION_TYPES.MCQ).toUpperCase() ===
     QUESTION_TYPES.MCQ;
 
-  // -------------------------------------------------------------
-  // 2. WEBCAM PROCTORING CONTROL
-  // -------------------------------------------------------------
   const stopWebcam = useCallback(() => {
     if (streamRef.current) {
       try {
@@ -141,14 +133,11 @@ export default function TakeExam() {
       }
     } catch (err) {
       console.warn("Camera access warning:", err);
-      setCameraError("Camera permission recommended for proctoring verification.");
+      setCameraError("Camera access is recommended for proctoring.");
     }
   }, []);
 
-  // -------------------------------------------------------------
-  // 3. FINAL SUBMISSION HANDLER
-  // -------------------------------------------------------------
-  const submitFinalExam = useCallback(
+  const submitExam = useCallback(
     async () => {
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
@@ -160,7 +149,7 @@ export default function TakeExam() {
       try {
         const activeAttemptId = attemptSession?.attemptId;
         if (!activeAttemptId) {
-          throw new Error("Your exam attempt is not ready. Please reload the exam and try again.");
+          throw new Error("Exam attempt is not ready. Reload the page and try again.");
         }
 
         const result = await submitExamAttempt(examId, activeAttemptId);
@@ -169,9 +158,9 @@ export default function TakeExam() {
         localStorage.removeItem(draftKey);
 
         setResultData(result);
-        showSuccess("Exam submitted successfully! Scorecard generated.");
+        showSuccess("Exam submitted.");
       } catch (err) {
-        showError(err.message || "Unable to submit exam. Please try again.");
+        showError(err.message || "Failed to submit exam.");
       } finally {
         setIsSubmitting(false);
         stopWebcam();
@@ -180,19 +169,13 @@ export default function TakeExam() {
     [attemptSession?.attemptId, examId, stopWebcam, showError, showSuccess, setResultData, user?.userId]
   );
 
-  // -------------------------------------------------------------
-  // 4. SERVER-AUTHORITATIVE TIMER HOOK
-  // -------------------------------------------------------------
   const { timeLeftSeconds, isAttemptExpired, formattedTime } = useExamTimer({
     expiresAt: attemptSession?.expiresAt,
-    onExpire: submitFinalExam,
+    onExpire: submitExam,
     active: !resultData && !loading,
     showWarning,
   });
 
-  // -------------------------------------------------------------
-  // 5. ANSWERS MANAGEMENT HOOK
-  // -------------------------------------------------------------
   const {
     mcqAnswers,
     textAnswers,
@@ -211,14 +194,12 @@ export default function TakeExam() {
     isMcqExam: isMcq,
   });
 
-  // Restore initial answers when loaded
   useEffect(() => {
     if (initialAnswers.length > 0 && questions.length > 0) {
       restoreSavedAnswers(initialAnswers, questions);
     }
   }, [initialAnswers, questions, restoreSavedAnswers]);
 
-  // Restore draft if any
   useEffect(() => {
     const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
     const savedDraft = localStorage.getItem(draftKey);
@@ -233,7 +214,6 @@ export default function TakeExam() {
     }
   }, [examId, setMcqAnswers, setTextAnswers, user?.userId]);
 
-  // Persist draft
   useEffect(() => {
     if (questions.length > 0 && !resultData) {
       const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
@@ -244,7 +224,6 @@ export default function TakeExam() {
     }
   }, [mcqAnswers, textAnswers, examId, user, questions, resultData]);
 
-  // Initialize Exam & Proctoring
   useEffect(() => {
     loadExamAndAttempt();
     return () => {
@@ -273,9 +252,6 @@ export default function TakeExam() {
     };
   }, [stopWebcam]);
 
-  // -------------------------------------------------------------
-  // 6. PROCTORING VIOLATION HANDLERS
-  // -------------------------------------------------------------
   const handleCopyViolation = useCallback(
     (actionType = "Copying") => {
       if (resultData || isSubmittingRef.current) return;
@@ -285,54 +261,53 @@ export default function TakeExam() {
 
         if (newStrikes === 1) {
           setActiveViolationModal({
-            title: "⚠️ Integrity Warning (Strike 1 of 3)",
-            message: `${actionType} text, questions, or options is strictly forbidden. This violation has been logged. 2 strikes remaining.`,
+            title: "⚠️ Copying is not allowed (1 of 3)",
+            message: `${actionType} questions or options is not allowed. This violation has been logged. 2 strikes remaining.`,
             strike: 1,
             isDisqualified: false,
           });
-          showWarning("Anti-Cheating Warning (1/3): Copying is prohibited!");
+          showWarning("Copying is not allowed (1/3).");
         } else if (newStrikes === 2) {
           setActiveViolationModal({
-            title: "🚨 FINAL WARNING (Strike 2 of 3)",
-            message: `Second copy attempt detected! One more copy violation will result in immediate disqualification and automated paper submission with 0 marks.`,
+            title: "⚠️ Final warning (2 of 3)",
+            message: "One more copy violation will disqualify you and submit the exam with 0 marks.",
             strike: 2,
             isDisqualified: false,
           });
-          showError("Final Warning (2/3): Next copy attempt will disqualify you!");
+          showError("One more copy violation will disqualify you (2/3).");
         } else if (newStrikes >= 3) {
           setActiveViolationModal({
-            title: "🚫 Exam Terminated & Disqualified (Strike 3 of 3)",
-            message: `Multiple copy violations detected. In accordance with examination regulations, your paper has been automatically locked and submitted.`,
+            title: "🚫 Exam submitted and disqualified",
+            message: "The copy limit was reached. Your exam has been submitted and you are disqualified.",
             strike: 3,
             isDisqualified: true,
           });
-          submitFinalExam();
+          submitExam();
         }
 
         return newStrikes;
       });
     },
-    [resultData, submitFinalExam, showError, showWarning]
+    [resultData, submitExam, showError, showWarning]
   );
 
   const handleSecondaryDeviceDetected = useCallback(
-    (_reason = "Secondary device photo capture or unauthorized screen capture detected") => {
+    () => {
       if (resultData || isSubmittingRef.current) return;
 
       setScreenShieldActive(true);
       setActiveViolationModal({
         title: "🚫 Exam Terminated: Secondary Device Detected",
         message:
-          "An attempt to photograph questions or capture the screen using a secondary device was detected by the proctoring shield. The examination has been immediately locked and submitted.",
+          "Screen capture or a secondary device was detected. Your exam has been submitted and you are disqualified.",
         strike: 3,
         isDisqualified: true,
       });
-      submitFinalExam();
+      submitExam();
     },
-    [resultData, submitFinalExam]
+    [resultData, submitExam]
   );
 
-  // Global Security Event Listeners
   useEffect(() => {
     if (resultData) return;
 
@@ -360,7 +335,7 @@ export default function TakeExam() {
       ) {
         e.preventDefault();
         e.stopPropagation();
-        handleSecondaryDeviceDetected("Screen capture / screenshot tool trigger");
+        handleSecondaryDeviceDetected();
         return false;
       }
 
@@ -388,7 +363,7 @@ export default function TakeExam() {
 
     const handleContextMenu = (e) => {
       e.preventDefault();
-      showWarning("Right-click context menu is disabled during exams.");
+      showWarning("Right-click is disabled during the exam.");
     };
 
     const handleVisibilityChange = () => {
@@ -400,9 +375,9 @@ export default function TakeExam() {
         setTabStrikes((prev) => {
           const next = prev + 1;
           if (next >= 3) {
-            handleSecondaryDeviceDetected("Repeated tab-switching and window focus loss");
+            handleSecondaryDeviceDetected();
           } else {
-            showWarning(`⚠️ Tab switch detected (${next}/3). Please remain on the exam window!`);
+            showWarning(`⚠️ Tab switch detected (${next}/3). Stay on the exam window.`);
           }
           return next;
         });
@@ -439,7 +414,7 @@ export default function TakeExam() {
     };
   }, [resultData, handleCopyViolation, handleSecondaryDeviceDetected, showWarning]);
 
-  // Multi-person presence detection
+  // Face-count polling; skin-tone heuristic when the browser has no FaceDetector
   useEffect(() => {
     if (!isCameraActive || resultData) return;
 
@@ -542,20 +517,20 @@ export default function TakeExam() {
               setActiveViolationModal({
                 title: "⚠️ Security Warning: Multiple Persons Detected",
                 message:
-                  "Proctoring has detected multiple people present in your camera frame for over 3 minutes. Please ensure you are alone in a private room. Continued presence of others will lead to disqualification.",
+                  "Multiple people have been in frame for over 3 minutes. Be alone in a private room, otherwise you will be disqualified.",
                 strike: 1,
                 isDisqualified: false,
               });
-              showWarning("⚠️ Multiple persons detected in room for 3+ minutes! Please be alone.");
+              showWarning("⚠️ Multiple people detected for 3+ minutes. Be alone.");
             } else if (nextDuration >= 240 && prevDuration < 240) {
               setActiveViolationModal({
                 title: "🚫 Exam Terminated: Unauthorized Persons Present",
                 message:
-                  "Multiple persons remained in the examination room for over 4 minutes. In accordance with academic integrity standards, this session is terminated.",
+                  "Multiple people remained in the room for over 4 minutes. Your exam has ended.",
                 strike: 3,
                 isDisqualified: true,
               });
-              submitFinalExam();
+              submitExam();
             }
 
             return nextDuration;
@@ -567,7 +542,7 @@ export default function TakeExam() {
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [isCameraActive, resultData, submitFinalExam, showWarning]);
+  }, [isCameraActive, resultData, submitExam, showWarning]);
 
   const requestFullscreen = () => {
     try {
@@ -579,16 +554,16 @@ export default function TakeExam() {
     }
   };
 
-  const currentQ = questions[currentIndex];
-  const currentQId = currentQ?.question_id || currentQ?.questionId || currentIndex + 1;
+  const currentQuestion = questions[currentIndex];
+  const currentQuestionId = currentQuestion?.question_id || currentQuestion?.questionId || currentIndex + 1;
 
   const toggleFlag = () => {
     setFlagged((prev) => {
       const next = new Set(prev);
-      if (next.has(currentQId)) {
-        next.delete(currentQId);
+      if (next.has(currentQuestionId)) {
+        next.delete(currentQuestionId);
       } else {
-        next.add(currentQId);
+        next.add(currentQuestionId);
       }
       return next;
     });
@@ -598,16 +573,13 @@ export default function TakeExam() {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 border-3 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-sm font-bold text-slate-200">Initializing Secure Exam Session & Proctor Shield...</p>
+        <p className="text-sm font-bold text-slate-200">Loading exam...</p>
       </div>
     );
   }
 
-  // -------------------------------------------------------------
-  // ACCESS BLOCKED (NOT REGISTERED / NOT STARTED / EXPIRED)
-  // -------------------------------------------------------------
   if (accessBlocked) {
-    const isNotReg = accessBlocked.reason === "NOT_REGISTERED";
+    const isNotRegistered = accessBlocked.reason === "NOT_REGISTERED";
     const isNotStarted = accessBlocked.reason === "NOT_STARTED";
 
     return (
@@ -615,18 +587,18 @@ export default function TakeExam() {
         <div className="w-full max-w-lg bg-white text-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
           <div
             className={`p-8 text-center ${
-              isNotReg ? "bg-slate-900 text-white" : isNotStarted ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
+              isNotRegistered ? "bg-slate-900 text-white" : isNotStarted ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
             }`}
           >
             <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-3">
-              <Icon name={isNotReg ? "lock" : isNotStarted ? "clock" : "alert-triangle"} className="w-8 h-8 text-white" />
+              <Icon name={isNotRegistered ? "lock" : isNotStarted ? "clock" : "alert-triangle"} className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-2xl font-black">
-              {isNotReg
+              {isNotRegistered
                 ? "Registration Required"
                 : isNotStarted
-                ? "Examination Not Started"
-                : "Examination Window Closed"}
+                ? "Exam Not Started"
+                : "Exam Window Closed"}
             </h2>
             <p className="text-xs text-white/90 mt-1">
               {exam?.exam_name || `Exam #${examId}`} • {exam?.subject?.subject_name || "General"}
@@ -652,24 +624,24 @@ export default function TakeExam() {
             </div>
 
             <div className="flex flex-col gap-3 pt-2">
-              {isNotReg && accessBlocked.isRegistrationOpen && (
+              {isNotRegistered && accessBlocked.isRegistrationOpen && (
                 <button
                   type="button"
                   onClick={async () => {
                     const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
                     try {
                       await registerForExam(examId, studentId);
-                      showSuccess("Successfully registered! Launching exam hall...");
+                      showSuccess("Registered. Opening exam...");
                       setAccessBlocked(null);
                       loadExamAndAttempt();
                     } catch (err) {
-                      showError(err.response?.data?.message || "Failed to register for exam");
+                      showError(err.response?.data?.message || "Failed to register for this exam");
                     }
                   }}
                   className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
                 >
                   <Icon name="check-circle" className="w-4 h-4" />
-                  <span>Register Now & Enter Exam →</span>
+                  <span>Register &amp; Start Exam →</span>
                 </button>
               )}
 
@@ -690,12 +662,9 @@ export default function TakeExam() {
     );
   }
 
-  // -------------------------------------------------------------
-  // POST-SUBMISSION / ALREADY SUBMITTED RESULT VIEW
-  // -------------------------------------------------------------
   if (resultData) {
-    const isDisq = !!(resultData.disqualified || resultData.is_disqualified);
-    const isPass = !isDisq && resultData.status === RESULT_STATUS.PASS;
+    const isDisqualified = !!(resultData.disqualified || resultData.is_disqualified);
+    const isPass = !isDisqualified && resultData.status === RESULT_STATUS.PASS;
     const isPendingEvaluation = resultData.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION;
 
     const marksObtained = resultData.marks_obtained ?? resultData.marksObtained ?? resultData.score;
@@ -739,19 +708,19 @@ export default function TakeExam() {
         <div className="w-full max-w-2xl bg-white text-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
           <div
             className={`p-8 text-center ${
-              isDisq ? "bg-rose-600 text-white" : isPass ? "bg-emerald-600 text-white" : "bg-slate-900 text-white"
+              isDisqualified ? "bg-rose-600 text-white" : isPass ? "bg-emerald-600 text-white" : "bg-slate-900 text-white"
             }`}
           >
             <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-3">
-              <Icon name={isDisq ? "x-circle" : isPass ? "check-circle" : "award"} className="w-8 h-8 text-white" />
+              <Icon name={isDisqualified ? "x-circle" : isPass ? "check-circle" : "award"} className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-2xl font-black">
               {alreadySubmitted
-                ? "Examination Already Completed"
-                : isDisq
-                ? "Examination Disqualified"
+                ? "Exam Already Submitted"
+                : isDisqualified
+                ? "Exam Disqualified"
                 : isPass
-                ? "Assessment Completed!"
+                ? "Exam Passed"
                 : "Exam Submitted"}
             </h2>
             <p className="text-xs text-white/90 mt-1">
@@ -763,7 +732,7 @@ export default function TakeExam() {
             <div className="bg-amber-50 border-b border-amber-200 p-4 text-center">
               <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Single Attempt Policy</p>
               <p className="text-sm font-semibold text-amber-900 mt-1">
-                You have already completed and submitted this examination. Re-attempts are not permitted.
+                You have already submitted this exam. Re-attempts are not allowed.
               </p>
             </div>
           )}
@@ -772,12 +741,12 @@ export default function TakeExam() {
             <div className="bg-blue-50 border-b border-blue-200 p-4 text-center">
               <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">Evaluation Pending</p>
               <p className="text-sm font-semibold text-blue-900 mt-1">
-                Your descriptive answers require teacher evaluation. The backend result will be updated after grading.
+                Your written answers need teacher evaluation. The result is updated after grading.
               </p>
             </div>
           )}
 
-          {isDisq && (
+          {isDisqualified && (
             <div className="bg-rose-50 border-b border-rose-200 p-4 text-center">
               <p className="text-xs font-bold text-rose-800 uppercase tracking-wide">Academic Integrity Violation</p>
               <p className="text-sm font-semibold text-rose-900 mt-1">
@@ -800,28 +769,28 @@ export default function TakeExam() {
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Percentage</span>
-                <p className={`text-2xl font-extrabold mt-1 ${isDisq ? "text-rose-600" : "text-orange-600"}`}>
+                <p className={`text-2xl font-extrabold mt-1 ${isDisqualified ? "text-rose-600" : "text-orange-600"}`}>
                   {percentage ?? "-"}{percentage !== undefined && "%"}
                 </p>
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Outcome</span>
-                <p className={`text-base font-bold mt-2 ${isDisq ? "text-rose-600" : isPass ? "text-emerald-600" : "text-amber-600"}`}>
-                  {isDisq ? "Disqualified" : resultData.status || "Submitted"}
+                <p className={`text-base font-bold mt-2 ${isDisqualified ? "text-rose-600" : isPass ? "text-emerald-600" : "text-amber-600"}`}>
+                  {isDisqualified ? "Disqualified" : resultData.status || "Submitted"}
                 </p>
               </div>
             </div>
 
-            {!isDisq && breakdownList.length > 0 && (
+            {!isDisqualified && breakdownList.length > 0 && (
               <div className="space-y-3 pt-2">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Question Review ({breakdownList.length})
                 </h4>
                 <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                   {breakdownList.map((item, idx) => {
-                    const selectedAns = item.selected_answer || item.selectedAnswer || item.answer || item.chosen || "None";
-                    const correctAns = item.correct_answer || item.correctAnswer || item.correctOption || "";
+                    const selectedAnswer = item.selected_answer || item.selectedAnswer || item.answer || item.chosen || "None";
+                    const correctAnswer = item.correct_answer || item.correctAnswer || item.correctOption || "";
                     const isItemCorrect =
                       item.is_correct !== undefined
                         ? !!item.is_correct
@@ -857,10 +826,10 @@ export default function TakeExam() {
                           </span>
                         </div>
                         <p className="text-slate-600">
-                          Your answer: <strong className="text-slate-900">{selectedAns}</strong>
+                          Your answer: <strong className="text-slate-900">{selectedAnswer}</strong>
                         </p>
-                        {isItemCorrect === false && correctAns && (
-                          <p className="text-emerald-700 font-medium">Correct answer: {correctAns}</p>
+                        {isItemCorrect === false && correctAnswer && (
+                          <p className="text-emerald-700 font-medium">Correct answer: {correctAnswer}</p>
                         )}
                       </div>
                     );
@@ -886,9 +855,6 @@ export default function TakeExam() {
     );
   }
 
-  // -------------------------------------------------------------
-  // ACTIVE EXAMINATION INTERFACE
-  // -------------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col select-none relative overflow-x-hidden">
       <canvas ref={canvasRef} className="hidden" />
@@ -900,18 +866,17 @@ export default function TakeExam() {
           </div>
           <h2 className="text-2xl font-black text-white">Security Shield Active</h2>
           <p className="text-sm text-slate-300 max-w-md mt-2">
-            The exam window lost focus or a screenshot shortcut was detected. Please return focus to the exam window to continue.
+            The exam window lost focus or a screenshot shortcut was detected. Return focus to the exam window to continue.
           </p>
           <button
             onClick={() => setScreenShieldActive(false)}
             className="mt-6 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-bold shadow-lg transition-all"
           >
-            Resume Examination
+            Resume Exam
           </button>
         </div>
       )}
 
-      {/* Dynamic Watermark */}
       <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden opacity-[0.045] flex flex-wrap gap-16 p-8 rotate-[-12deg] select-none">
         {Array.from({ length: 48 }).map((_, idx) => (
           <div key={idx} className="text-white text-xs font-mono font-black tracking-widest whitespace-nowrap">
@@ -920,7 +885,6 @@ export default function TakeExam() {
         ))}
       </div>
 
-      {/* Proctoring Header */}
       <header className="h-20 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-4">
           <button
@@ -941,7 +905,7 @@ export default function TakeExam() {
             </h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs text-slate-400 font-medium">
-                {exam?.subject?.subject_name || "General"} • {isMcq ? "MCQ Exam" : "Descriptive Q&A"}
+                {exam?.subject?.subject_name || "General"} • {isMcq ? "MCQ Exam" : "Written Q&A"}
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -987,7 +951,7 @@ export default function TakeExam() {
                 ? "bg-amber-950/60 border-amber-500/60 text-amber-400"
                 : "bg-rose-950/80 border-rose-500 text-rose-400 animate-bounce"
             }`}
-            title="Copy violations warning counter (Max 3 strikes)"
+            title="Copy violations (3 strikes before disqualification)"
           >
             <span>Strikes:</span>
             <span className="font-mono font-black">{copyStrikes} / 3</span>
@@ -1015,7 +979,7 @@ export default function TakeExam() {
 
       {(!isFullscreen || fullscreenWarning) && (
         <div className="bg-orange-500/15 border-b border-orange-500/30 px-4 py-2 text-center text-xs font-semibold text-orange-300 flex items-center justify-center gap-3">
-          <span>🔒 For maximum test integrity, full-screen examination mode is recommended.</span>
+          <span>🔒 Fullscreen mode is recommended during the exam.</span>
           <button
             onClick={requestFullscreen}
             className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-[11px] transition-all"
@@ -1025,7 +989,6 @@ export default function TakeExam() {
         </div>
       )}
 
-      {/* Main Examination Area */}
       <main className="flex-1 max-w-[1536px] w-full mx-auto p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3 flex flex-col justify-between bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-10 backdrop-blur-sm space-y-8 relative">
           <div className="space-y-4">
@@ -1035,9 +998,9 @@ export default function TakeExam() {
                   Question {currentIndex + 1}
                 </span>
                 <span className="text-xs font-semibold text-slate-400">of {questions.length}</span>
-                {currentQ?.marks && (
+                {currentQuestion?.marks && (
                   <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300">
-                    {currentQ.marks} Marks
+                    {currentQuestion.marks} Marks
                   </span>
                 )}
               </div>
@@ -1046,17 +1009,17 @@ export default function TakeExam() {
                 type="button"
                 onClick={toggleFlag}
                 className={`text-xs font-bold px-3.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 ${
-                  flagged.has(currentQId)
+                  flagged.has(currentQuestionId)
                     ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm"
                     : "bg-slate-800/60 border-slate-700 text-slate-400 hover:text-white"
                 }`}
               >
-                ★ {flagged.has(currentQId) ? "Flagged for Review" : "Flag for Review"}
+                ★ {flagged.has(currentQuestionId) ? "Flagged for Review" : "Flag for Review"}
               </button>
             </div>
 
             <h2 className="text-lg sm:text-xl font-bold text-slate-100 leading-relaxed">
-              {currentQ?.question}
+              {currentQuestion?.question}
             </h2>
           </div>
 
@@ -1064,20 +1027,20 @@ export default function TakeExam() {
             {isMcq ? (
               <div className="space-y-3.5">
                 {[
-                  { key: "option1", text: currentQ?.option1 },
-                  { key: "option2", text: currentQ?.option2 },
-                  { key: "option3", text: currentQ?.option3 },
-                  { key: "option4", text: currentQ?.option4 },
+                  { key: "option1", text: currentQuestion?.option1 },
+                  { key: "option2", text: currentQuestion?.option2 },
+                  { key: "option3", text: currentQuestion?.option3 },
+                  { key: "option4", text: currentQuestion?.option4 },
                 ]
                   .filter((opt) => opt.text && opt.text.trim() !== "")
                   .map((opt, idx) => {
-                    const isSelected = mcqAnswers[currentQId] === opt.text;
+                    const isSelected = mcqAnswers[currentQuestionId] === opt.text;
                     return (
                       <button
                         key={opt.key}
                         type="button"
                         disabled={isAttemptExpired}
-                        onClick={() => handleSelectOption(currentQ, opt.key, opt.text)}
+                        onClick={() => handleSelectOption(currentQuestion, opt.key, opt.text)}
                         className={`w-full text-left p-4 sm:p-5 rounded-2xl border transition-all flex items-start gap-4 ${
                           isSelected
                             ? "bg-orange-500/20 border-orange-500 text-white shadow-md ring-1 ring-orange-500/50"
@@ -1101,15 +1064,15 @@ export default function TakeExam() {
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-                  <span>Write your answer below:</span>
-                  <span>Word Limit: ~{currentQ?.wordLimit || 250} words</span>
+                  <span>Write your answer:</span>
+                  <span>Word Limit: ~{currentQuestion?.wordLimit || 250} words</span>
                 </div>
                 <textarea
                   rows={8}
-                  value={textAnswers[currentQId] || ""}
+                  value={textAnswers[currentQuestionId] || ""}
                   disabled={isAttemptExpired}
-                  onChange={(e) => handleTextAnswerChange(currentQId, e.target.value)}
-                  placeholder="Type your comprehensive descriptive answer here..."
+                  onChange={(e) => handleTextAnswerChange(currentQuestionId, e.target.value)}
+                  placeholder="Type your answer..."
                   className="w-full bg-slate-950/80 border border-slate-700 rounded-2xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all resize-y"
                 />
               </div>
@@ -1206,13 +1169,13 @@ export default function TakeExam() {
               {questions.map((q, idx) => {
                 const qId = q.question_id || q.questionId || idx + 1;
                 const isAnswered = isMcq ? !!mcqAnswers[qId] : !!textAnswers[qId];
-                const isFlag = flagged.has(qId);
+                const isFlagged = flagged.has(qId);
                 const isCurrent = currentIndex === idx;
 
                 let colorClasses = "bg-slate-800 text-slate-400 border-slate-700";
                 if (isCurrent) {
                   colorClasses = "bg-orange-500 text-white border-orange-400 ring-2 ring-orange-500/40 font-black";
-                } else if (isFlag) {
+                } else if (isFlagged) {
                   colorClasses = "bg-amber-500/20 text-amber-300 border-amber-500 font-bold";
                 } else if (isAnswered) {
                   colorClasses = "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 font-bold";
@@ -1253,7 +1216,6 @@ export default function TakeExam() {
         </div>
       </main>
 
-      {/* Violation Modal */}
       {activeViolationModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
@@ -1297,7 +1259,6 @@ export default function TakeExam() {
         </div>
       )}
 
-      {/* Confirmation Modal */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 text-center">
@@ -1306,10 +1267,10 @@ export default function TakeExam() {
             </div>
 
             <div>
-              <h3 className="text-xl font-black text-white">Submit Examination?</h3>
+              <h3 className="text-xl font-black text-white">Submit Exam?</h3>
               <p className="text-sm text-slate-300 mt-2 leading-relaxed">
                 You have answered <strong className="text-white font-bold">{answeredCount}</strong> of{" "}
-                <strong className="text-white font-bold">{questions.length}</strong> questions. Once submitted, you cannot change your answers.
+                <strong className="text-white font-bold">{questions.length}</strong> questions. You cannot change your answers after submitting.
               </p>
             </div>
 
@@ -1324,7 +1285,7 @@ export default function TakeExam() {
               </button>
               <button
                 type="button"
-                onClick={() => submitFinalExam()}
+                onClick={() => submitExam()}
                 disabled={isSubmitting}
                 className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2"
               >

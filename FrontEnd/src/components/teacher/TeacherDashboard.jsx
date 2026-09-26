@@ -7,13 +7,12 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState("MANAGE");
 
   const tabs = [
-    { id: "MANAGE", label: "My Created Exams", icon: "file-text" },
-    { id: "ADD_EXAM", label: "Create New Exam", icon: "plus" },
+    { id: "MANAGE", label: "My Exams", icon: "file-text" },
+    { id: "ADD_EXAM", label: "Add Exam", icon: "plus" },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Navigation Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200">
         {tabs.map((tab) => (
           <button
@@ -31,7 +30,6 @@ export default function TeacherDashboard() {
         ))}
       </div>
 
-      {/* Active Tab Content */}
       <div className="transition-opacity duration-200">
         {activeTab === "MANAGE" && <ManageExams onAddNew={() => setActiveTab("ADD_EXAM")} />}
         {activeTab === "ADD_EXAM" && <AddExam onExamCreated={() => setActiveTab("MANAGE")} />}

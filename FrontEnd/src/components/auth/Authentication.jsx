@@ -13,11 +13,9 @@ export default function Authentication() {
 
   return (
     <section className="min-h-screen w-full bg-slate-950 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden">
-      {/* Background Decorative Gradients (Static) */}
       <div className="absolute top-1/4 -left-20 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      {/* Brand Header with High-Contrast White Logo & Glow */}
       <div className="mb-8 flex flex-col items-center text-center relative z-10">
         <Link
           to="/"
@@ -30,11 +28,10 @@ export default function Authentication() {
           />
         </Link>
         <p className="text-xs text-slate-400 font-medium mt-3 tracking-wide">
-          Next-Gen Academic Assessment & Proctoring Portal
+          Exam management and proctoring portal
         </p>
       </div>
 
-      {/* Auth Card */}
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 relative z-10">
         {isAuthenticated ? (
           <div className="text-center py-6">
@@ -62,7 +59,6 @@ export default function Authentication() {
           </div>
         ) : (
           <>
-            {/* Tab Switcher */}
             <div className="flex bg-slate-100 p-1.5 rounded-2xl">
               <button
                 type="button"
@@ -88,7 +84,6 @@ export default function Authentication() {
               </button>
             </div>
 
-            {/* Subtitle */}
             <div className="mt-5 text-center">
               <h2 className="text-2xl font-black text-slate-900">
                 {activeTab === "login" ? "Welcome back" : "Create an Account"}
@@ -96,11 +91,10 @@ export default function Authentication() {
               <p className="text-xs text-slate-500 mt-1.5">
                 {activeTab === "login"
                   ? "Enter your credentials to access your dashboard"
-                  : "Submit your registration request for Admin review"}
+                  : "Submit a registration request for admin approval"}
               </p>
             </div>
 
-            {/* Forms */}
             {activeTab === "login" ? (
               <Login />
             ) : (
@@ -110,14 +104,13 @@ export default function Authentication() {
         )}
       </div>
 
-      {/* Back to Home Link */}
       <div className="mt-8 text-center z-10">
         <Link
           to="/"
           className="text-xs font-semibold text-slate-400 hover:text-orange-400 transition-colors flex items-center justify-center gap-1.5"
         >
           <span>←</span>
-          <span>Back to Homepage</span>
+          <span>Back to Home</span>
         </Link>
       </div>
     </section>
