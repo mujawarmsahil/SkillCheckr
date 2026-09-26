@@ -147,16 +147,31 @@ export default function AdminOverview({ setActiveTab }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-orange-950 p-6 rounded-3xl text-white shadow-md relative overflow-hidden">
-        <div className="relative z-10 max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold text-orange-300 border border-white/10">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            System Health: Operational
-          </div>
-          <h2 className="text-2xl font-black tracking-tight">Admin Overview</h2>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Monitor registrations, subjects, exams, and results.
-          </p>
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <Icon name="grid" className="w-4 h-4 text-orange-500" />
+          Quick Actions
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { label: "User Directory", tab: "USERS", icon: "users" },
+            { label: "Review Requests", tab: "REQUESTS", icon: "user-plus" },
+            { label: "Manage Exams", tab: "EXAMS", icon: "clock" },
+            { label: "Question Bank", tab: "QUESTIONS", icon: "help-circle" },
+            { label: "Curriculum Subjects", tab: "SUBJECTS", icon: "book" },
+            { label: "Results", tab: "RESULTS", icon: "award" },
+          ].map((item) => (
+            <button
+              key={item.tab}
+              onClick={() => setActiveTab && setActiveTab(item.tab)}
+              className="p-3 bg-slate-50 hover:bg-orange-50 hover:border-orange-200 border border-slate-200 rounded-xl text-left transition-all group flex flex-col justify-between min-h-[80px]"
+            >
+              <Icon name={item.icon} className="w-5 h-5 text-slate-500 group-hover:text-orange-600 mb-2 transition-colors" />
+              <span className="text-xs font-bold text-slate-700 group-hover:text-orange-700 leading-tight">
+                {item.label}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -204,34 +219,6 @@ export default function AdminOverview({ setActiveTab }) {
           })}
         </div>
       )}
-
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-          <Icon name="grid" className="w-4 h-4 text-orange-500" />
-          Quick Actions
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[
-            { label: "User Directory", tab: "USERS", icon: "users" },
-            { label: "Review Requests", tab: "REQUESTS", icon: "user-plus" },
-            { label: "Manage Exams", tab: "EXAMS", icon: "clock" },
-            { label: "Question Bank", tab: "QUESTIONS", icon: "help-circle" },
-            { label: "Curriculum Subjects", tab: "SUBJECTS", icon: "book" },
-            { label: "Results", tab: "RESULTS", icon: "award" },
-          ].map((item) => (
-            <button
-              key={item.tab}
-              onClick={() => setActiveTab && setActiveTab(item.tab)}
-              className="p-3 bg-slate-50 hover:bg-orange-50 hover:border-orange-200 border border-slate-200 rounded-xl text-left transition-all group flex flex-col justify-between min-h-[80px]"
-            >
-              <Icon name={item.icon} className="w-5 h-5 text-slate-500 group-hover:text-orange-600 mb-2 transition-colors" />
-              <span className="text-xs font-bold text-slate-700 group-hover:text-orange-700 leading-tight">
-                {item.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
