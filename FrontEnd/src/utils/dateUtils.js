@@ -2,6 +2,35 @@
  * Date and time utilities for exams and server-authoritative timers.
  */
 
+import { EXAM_MIN_LEAD_TIME_DAYS } from "../constants/examConstants";
+
+/**
+ * Formats a Date as a local `YYYY-MM-DD` string for `<input type="date">`.
+ * toISOString() must not be used here because it converts to UTC and can shift
+ * the value by a day for users east or west of Greenwich.
+ */
+export const toDateInputValue = (date = new Date()) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+/**
+ * Earliest exam date that satisfies the required lead time: the current day plus
+ * `leadDays`. Returned in the same `YYYY-MM-DD` form used by the date input.
+ */
+export const getMinimumExamDate = (leadDays = EXAM_MIN_LEAD_TIME_DAYS, referenceDate = new Date()) =>
+  toDateInputValue(new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate() + leadDays));
+
+/**
+ * True when the exam date is earlier than the current day plus the required lead
+ * time. Only the date portion is compared, so the time of day never affects the
+ * result and a date exactly on the boundary is accepted.
+ */
+export const isExamDateTooSoon = (examDate, leadDays = EXAM_MIN_LEAD_TIME_DAYS, referenceDate = new Date()) => {
+  if (!examDate) return false;
+  const datePart = String(examDate).trim().split(/[ T]/)[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false;
+  return datePart < getMinimumExamDate(leadDays, referenceDate);
+};
+
 export const parseExamSchedule = (exam, referenceDate = new Date()) => {
   if (!exam) {
     return {

@@ -17,6 +17,7 @@ import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.AttemptStartException;
 import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.repository.ExamAttemptRepository;
+import com.skillcheckr.validation.ExamCreationValidator;
 
 @Service
 public class ExamServiceImpl implements ExamService {
@@ -29,6 +30,7 @@ public class ExamServiceImpl implements ExamService {
 
 	@Override
 	public Subject saveExam(Exam exam) {
+		ExamCreationValidator.validateExamForCreation(exam);
 		return examRepository.saveExam(exam);
 	}
 

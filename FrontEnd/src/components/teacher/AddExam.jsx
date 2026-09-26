@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
+import { getMinimumExamDate, isExamDateTooSoon } from "../../utils/dateUtils";
+import { EXAM_MIN_LEAD_TIME_DAYS } from "../../constants/examConstants";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
+
+const EXAM_NAME_PATTERN = /^[A-Za-z]+(?:[ -][A-Za-z]+)*$/;
 
 export default function AddExam({ onExamCreated }) {
   const { user } = useAuth();
@@ -18,7 +22,7 @@ export default function AddExam({ onExamCreated }) {
     subjectName: "",
     subjectCode: "",
     examType: "MCQ", // "MCQ" or "QUESTION_ANSWER"
-    startDate: new Date().toISOString().split("T")[0],
+    startDate: getMinimumExamDate(),
     startTime: "10:00",
     endTime: "11:00",
     durationMinutes: 60,
@@ -75,8 +79,17 @@ export default function AddExam({ onExamCreated }) {
   };
 
   const validateStep1 = () => {
-    if (!examData.examName.trim()) {
+    const examName = examData.examName;
+    if (!examName.trim()) {
       showWarning("Please enter an Exam Name");
+      return false;
+    }
+    if (examName !== examName.trim()) {
+      showWarning("Exam Name must not start or end with a space");
+      return false;
+    }
+    if (!EXAM_NAME_PATTERN.test(examName)) {
+      showWarning("Exam Name may only contain letters, single spaces and hyphens");
       return false;
     }
     if (!examData.subjectName.trim() || !examData.subjectCode.trim()) {
@@ -85,6 +98,10 @@ export default function AddExam({ onExamCreated }) {
     }
     if (!examData.startDate) {
       showWarning("Please select a valid Exam Date");
+      return false;
+    }
+    if (isExamDateTooSoon(examData.startDate)) {
+      showWarning(`Exam Date must be at least ${EXAM_MIN_LEAD_TIME_DAYS} days from today`);
       return false;
     }
     if (examData.durationMinutes <= 0) {
@@ -394,6 +411,8 @@ export default function AddExam({ onExamCreated }) {
               <input
                 type="date"
                 name="startDate"
+                min={getMinimumExamDate()}
+                title={`Exam Date must be at least ${EXAM_MIN_LEAD_TIME_DAYS} days from today`}
                 value={examData.startDate}
                 onChange={handleExamChange}
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-xl text-slate-800 text-sm outline-none transition-all"
