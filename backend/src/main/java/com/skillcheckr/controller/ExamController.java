@@ -41,6 +41,9 @@ import com.skillcheckr.service.AttemptAnswerService;
 import com.skillcheckr.service.ExamSubmissionService;
 import com.skillcheckr.service.QuestionService;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestController
 @RequestMapping({"/api/Exams", "/api/exams"})
 public class ExamController {
@@ -70,12 +73,12 @@ public class ExamController {
     }
 
     @GetMapping({"/viewAllExams", ""})
-    public ResponseEntity<List<Exam>> viewAllExams() {
-        List<Exam> list = examService.viewAllExams();
-        if (list == null || list.isEmpty()) {
+    public ResponseEntity<List<Exam>> getAllExams() {
+        List<Exam> exams = examService.getAllExams();
+        if (exams == null || exams.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
         }
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(exams);
     }
 
     @GetMapping("/{exam_id}")
@@ -149,8 +152,8 @@ public class ExamController {
 
     @GetMapping("/teacher/{teacher_id}")
     public ResponseEntity<List<Exam>> getExamsByTeacherId(@PathVariable("teacher_id") Integer teacherId) {
-        List<Exam> list = examService.getExamsByTeacherId(teacherId);
-        return ResponseEntity.ok(list != null ? list : List.of());
+        List<Exam> exams = examService.getExamsByTeacherId(teacherId);
+        return ResponseEntity.ok(exams != null ? exams : List.of());
     }
 
     @GetMapping({"/{exam_id}/questions", "/questions/{exam_id}"})
@@ -207,18 +210,18 @@ public class ExamController {
     }
 
     @GetMapping({"/viewAllUpComingExam", "/upcoming"})
-    public ResponseEntity<List<Exam>> viewAllUpcomingExam() {
-        List<Exam> list = examService.viewAllUpcomingExam();
-        return ResponseEntity.ok(list != null ? list : List.of());
+    public ResponseEntity<List<Exam>> getAllUpcomingExams() {
+        List<Exam> exams = examService.getAllUpcomingExams();
+        return ResponseEntity.ok(exams != null ? exams : List.of());
     }
 
     @GetMapping({"/viewAllCompletedExam", "/completed"})
-    public ResponseEntity<List<Exam>> viewAllCompletedExams() {
-        List<Exam> list = examService.viewAllCompletedExam();
-        if (list == null || list.isEmpty()) {
+    public ResponseEntity<List<Exam>> getAllCompletedExams() {
+        List<Exam> exams = examService.getAllCompletedExams();
+        if (exams == null || exams.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
         }
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(exams);
     }
 
 
@@ -252,7 +255,6 @@ public class ExamController {
         Exam exam = examService.getExamById(examId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exam not found."));
 
-        // Validate registration deadline (exam start date & time)
         try {
             if (exam.getDate() != null && !exam.getDate().isEmpty()) {
                 String rawDate = exam.getDate().trim();
@@ -264,24 +266,24 @@ public class ExamController {
                 if (LocalDateTime.now().isAfter(startDateTime)) {
                     return ResponseEntity.badRequest().body(new ApiResponse(
                             false,
-                            "Registration closed: The registration deadline for this examination has passed."
+                            "Registration closed: the deadline for this exam has passed."
                     ));
                 }
             }
         } catch (Exception e) {
-            System.err.println("Registration deadline check parse error: " + e.getMessage());
+            log.error("Could not parse the exam date for the registration deadline check", e);
         }
 
         boolean registered = examService.registerStudentForExam(studentId, examId);
         if (registered) {
             return ResponseEntity.ok(new ApiResponse(
                     true,
-                    "Successfully registered for " + exam.getExamName() + "! You may attend when the exam window starts."
+                    "Registered for " + exam.getExamName() + ". You may attend when the exam window starts."
             ));
         } else {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(
                     false,
-                    "Failed to register for exam. Please try again."
+                    "Failed to register for exam."
             ));
         }
     }
@@ -294,8 +296,8 @@ public class ExamController {
 
     @GetMapping("/registrations/student/{student_id}/detailed")
     public ResponseEntity<List<ExamRegistration>> getDetailedRegistrationsForStudent(@PathVariable("student_id") Integer studentId) {
-        List<ExamRegistration> list = examService.getRegistrationsByStudentId(studentId);
-        return ResponseEntity.ok(list != null ? list : List.of());
+        List<ExamRegistration> registrations = examService.getRegistrationsByStudentId(studentId);
+        return ResponseEntity.ok(registrations != null ? registrations : List.of());
     }
 
     @GetMapping({"/{exam_id}/isRegistered/{student_id}", "/isRegistered/{exam_id}/{student_id}"})

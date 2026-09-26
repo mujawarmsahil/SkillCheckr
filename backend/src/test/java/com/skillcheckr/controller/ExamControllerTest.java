@@ -80,17 +80,17 @@ class ExamControllerTest {
     }
 
     @Test
-    void viewAllExams_returns404_whenNoExamsExist() throws Exception {
-        when(examService.viewAllExams()).thenReturn(List.of());
+    void getAllExams_returns404_whenNoExamsExist() throws Exception {
+        when(examService.getAllExams()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/Exams/viewAllExams"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void viewAllExams_returnsListOfExams_whenPresent() throws Exception {
+    void getAllExams_returnsListOfExams_whenPresent() throws Exception {
         Exam maths = examWith(1, "Mathematics", "Pending", "2025-01-15T09:00:00");
-        when(examService.viewAllExams()).thenReturn(List.of(maths));
+        when(examService.getAllExams()).thenReturn(List.of(maths));
 
         mockMvc.perform(get("/api/Exams/viewAllExams"))
                 .andExpect(status().isOk())
@@ -342,8 +342,8 @@ class ExamControllerTest {
     }
 
     @Test
-    void viewAllUpcomingExam_returnsList() throws Exception {
-        when(examService.viewAllUpcomingExam())
+    void getAllUpcomingExams_returnsList() throws Exception {
+        when(examService.getAllUpcomingExams())
                 .thenReturn(List.of(examWith(4, "Physics", "Upcoming", "2030-02-01T10:00:00")));
 
         mockMvc.perform(get("/api/Exams/viewAllUpComingExam"))
@@ -352,16 +352,16 @@ class ExamControllerTest {
     }
 
     @Test
-    void viewAllCompletedExam_returns404_whenEmpty() throws Exception {
-        when(examService.viewAllCompletedExam()).thenReturn(List.of());
+    void getAllCompletedExams_returns404_whenEmpty() throws Exception {
+        when(examService.getAllCompletedExams()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/Exams/viewAllCompletedExam"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void viewAllCompletedExam_returnsList_whenPresent() throws Exception {
-        when(examService.viewAllCompletedExam())
+    void getAllCompletedExams_returnsList_whenPresent() throws Exception {
+        when(examService.getAllCompletedExams())
                 .thenReturn(List.of(examWith(4, "Chemistry", "Completed", "2024-02-01T10:00:00")));
 
         mockMvc.perform(get("/api/Exams/viewAllCompletedExam"))
@@ -420,7 +420,7 @@ class ExamControllerTest {
 
         mockMvc.perform(post("/api/Exams/10/register/5"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Registration closed: The registration deadline for this examination has passed."));
+                .andExpect(jsonPath("$.message").value("Registration closed: the deadline for this exam has passed."));
     }
 
     @Test

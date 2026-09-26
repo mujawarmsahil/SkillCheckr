@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.AttemptStartResult;
 import com.skillcheckr.model.ExamAttempt;
+import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.constant.ExamConstants;
@@ -35,8 +36,8 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
-	public List<Exam> viewAllExams() {
-		return examRepository.viewAllExams();
+	public List<Exam> getAllExams() {
+		return examRepository.getAllExams();
 	}
 
 	@Override
@@ -55,13 +56,13 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
-	public List<Exam> viewAllUpcomingExam() {
-		return examRepository.viewAllUpcomingExam();
+	public List<Exam> getAllUpcomingExams() {
+		return examRepository.getAllUpcomingExams();
 	}
 
 	@Override
-	public List<Exam> viewAllCompletedExam() {
-		return examRepository.viewAllCompletedExam();
+	public List<Exam> getAllCompletedExams() {
+		return examRepository.getAllCompletedExams();
 	}
 
 	@Override
@@ -153,12 +154,12 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
-	public List<com.skillcheckr.model.ExamRegistration> getRegistrationsByStudentId(int studentId) {
+	public List<ExamRegistration> getRegistrationsByStudentId(int studentId) {
 		return examRepository.getRegistrationsByStudentId(studentId);
 	}
 
 	@Override
-	public List<com.skillcheckr.model.Student> getRegisteredStudentsByExamId(int examId) {
+	public List<Student> getRegisteredStudentsByExamId(int examId) {
 		return examRepository.getRegisteredStudentsByExamId(examId);
 	}
 

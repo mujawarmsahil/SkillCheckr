@@ -19,6 +19,9 @@ import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Repository
 public class AdminRepositoryImpl implements AdminRepository {
 
@@ -52,7 +55,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 				? password
 				: passwordEncoder.encode(password);
 
-			// Check if username already exists
 			String checkUserSql = "SELECT user_id FROM user WHERE username = ?";
 			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
 			psCheck.setString(1, username);
@@ -72,7 +74,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 				userId = genKeys.getInt(1);
 			}
 
-			// Check if student already exists for this user_id
 			String checkStudentSql = "SELECT student_id FROM student WHERE user_id = ? OR email = ?";
 			PreparedStatement psCheckStudent = conn.prepareStatement(checkStudentSql);
 			psCheckStudent.setInt(1, userId);
@@ -88,7 +89,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 				psStudent.executeUpdate();
 			}
 
-			// Update request status to Approved
 			String updateRequest = "UPDATE request SET status = 'Approved' WHERE request_id = ?";
 			PreparedStatement psUpdate = conn.prepareStatement(updateRequest);
 			psUpdate.setInt(1, requestId);
@@ -96,7 +96,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 
 			return true;
 		} catch (Exception e) {
-			System.err.println("Error adding student from request: " + e.getMessage());
+			log.error("Error adding student from request", e);
 			return false;
 		}
 	}
@@ -122,7 +122,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 				? password
 				: passwordEncoder.encode(password);
 
-			// Check if username already exists
 			String checkUserSql = "SELECT user_id FROM user WHERE username = ?";
 			PreparedStatement psCheck = conn.prepareStatement(checkUserSql);
 			psCheck.setString(1, username);
@@ -142,7 +141,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 				userId = genKeys.getInt(1);
 			}
 
-			// Check if teacher already exists
 			String checkTeacherSql = "SELECT teacher_id FROM teacher WHERE user_id = ? OR email = ?";
 			PreparedStatement psCheckTeacher = conn.prepareStatement(checkTeacherSql);
 			psCheckTeacher.setInt(1, userId);
@@ -158,7 +156,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 				psTeacher.executeUpdate();
 			}
 
-			// Update request status to Approved
 			String updateRequest = "UPDATE request SET status = 'Approved' WHERE request_id = ?";
 			PreparedStatement psUpdate = conn.prepareStatement(updateRequest);
 			psUpdate.setInt(1, requestId);
@@ -166,7 +163,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 
 			return true;
 		} catch (Exception e) {
-			System.err.println("Error adding teacher from request: " + e.getMessage());
+			log.error("Error adding teacher from request", e);
 			return false;
 		}
 	}
@@ -238,7 +235,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM teacher WHERE teacher_id = ?",
 				(rs, rowNum) -> rs.getInt("user_id"), teacherId);
 
-			// Check if teacher has associated exams
 			Integer examCount = 0;
 			try {
 				examCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE teacher_id = ?", Integer.class, teacherId);
@@ -262,7 +258,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 			}
 			return teacherDeleted > 0;
 		} catch (Exception e) {
-			System.err.println("Error deleting teacher: " + e.getMessage());
+			log.error("Error deleting teacher", e);
 			return false;
 		}
 	}
@@ -273,7 +269,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 			List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM student WHERE student_id = ?",
 				(rs, rowNum) -> rs.getInt("user_id"), studentId);
 
-			// Check if student has exam results or registrations
 			Integer resultCount = 0;
 			try {
 				resultCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM result WHERE student_id = ?", Integer.class, studentId);
@@ -290,7 +285,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 				return true;
 			}
 
-			// Clean up registrations
 			try {
 				jdbcTemplate.update("DELETE FROM exam_registration WHERE student_id = ?", studentId);
 			} catch (Exception ignored) {}
@@ -301,7 +295,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 			}
 			return studentDeleted > 0;
 		} catch (Exception e) {
-			System.err.println("Error deleting student: " + e.getMessage());
+			log.error("Error deleting student", e);
 			return false;
 		}
 	}
@@ -320,7 +314,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 			}
 			return rows > 0;
 		} catch (Exception e) {
-			System.err.println("Error toggling teacher status: " + e.getMessage());
+			log.error("Error toggling teacher status", e);
 			return false;
 		}
 	}
@@ -339,7 +333,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 			}
 			return rows > 0;
 		} catch (Exception e) {
-			System.err.println("Error toggling student status: " + e.getMessage());
+			log.error("Error toggling student status", e);
 			return false;
 		}
 	}
@@ -406,7 +400,7 @@ public class AdminRepositoryImpl implements AdminRepository {
 			stats.setTotalQuestions(totalQuestions != null ? totalQuestions : 0);
 			stats.setTotalResults(totalResults != null ? totalResults : 0);
 		} catch (Exception e) {
-			System.err.println("Error gathering admin stats: " + e.getMessage());
+			log.error("Error gathering admin stats", e);
 		}
 		return stats;
 	}

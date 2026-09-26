@@ -93,36 +93,36 @@ class ExamRepositoryImplTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void viewAllUpcomingExam_returnsList() {
+    void getAllUpcomingExams_returnsList() {
         Exam exam = new Exam();
         exam.setExamId(1);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of(exam));
 
-        List<Exam> exams = repository.viewAllUpcomingExam();
+        List<Exam> exams = repository.getAllUpcomingExams();
 
         assertThat(exams).containsExactly(exam);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void viewAllCompletedExam_returnsList() {
+    void getAllCompletedExams_returnsList() {
         Exam exam = new Exam();
         exam.setExamId(2);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of(exam));
 
-        List<Exam> exams = repository.viewAllCompletedExam();
+        List<Exam> exams = repository.getAllCompletedExams();
 
         assertThat(exams).containsExactly(exam);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void viewAllExams_returnsList() {
+    void getAllExams_returnsList() {
         Exam exam = new Exam();
         exam.setExamId(3);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of(exam));
 
-        List<Exam> exams = repository.viewAllExams();
+        List<Exam> exams = repository.getAllExams();
 
         assertThat(exams).containsExactly(exam);
     }
