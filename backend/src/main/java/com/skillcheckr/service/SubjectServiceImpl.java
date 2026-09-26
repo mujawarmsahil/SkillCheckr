@@ -1,15 +1,14 @@
 package com.skillcheckr.service;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.skillcheckr.model.Subject;
+import com.skillcheckr.model.SubjectStatsResponse;
 import com.skillcheckr.repository.SubjectRepository;
 
 @Service
@@ -44,20 +43,17 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
-    public List<Map<String, Object>> getAllSubjectsWithStats() {
+    public List<SubjectStatsResponse> getAllSubjectsWithStats() {
         List<Subject> subjects = subjectRepository.getAllSubjects();
-        List<Map<String, Object>> subjectStats = new ArrayList<>();
-        for (Subject s : subjects) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("subjectId", s.getSubjectId());
-            map.put("subject_id", s.getSubjectId());
-            map.put("subjectName", s.getSubjectName());
-            map.put("subject_name", s.getSubjectName());
-            map.put("subjectCode", s.getSubjectCode());
-            map.put("subject_code", s.getSubjectCode());
-            map.put("questionCount", subjectRepository.getQuestionCountBySubjectId(s.getSubjectId()));
-            map.put("examCount", subjectRepository.getExamCountBySubjectId(s.getSubjectId()));
-            subjectStats.add(map);
+        List<SubjectStatsResponse> subjectStats = new ArrayList<>();
+        for (Subject subject : subjects) {
+            subjectStats.add(SubjectStatsResponse.builder()
+                    .subjectId(subject.getSubjectId())
+                    .subjectName(subject.getSubjectName())
+                    .subjectCode(subject.getSubjectCode())
+                    .questionCount(subjectRepository.getQuestionCountBySubjectId(subject.getSubjectId()))
+                    .examCount(subjectRepository.getExamCountBySubjectId(subject.getSubjectId()))
+                    .build());
         }
         return subjectStats;
     }

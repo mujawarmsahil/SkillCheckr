@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.Subject;
+import com.skillcheckr.model.SubjectStatsResponse;
 import com.skillcheckr.service.SubjectService;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +55,26 @@ class SubjectControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].subject_id").value(1))
                 .andExpect(jsonPath("$[0].subject_name").value("Computer Science"));
+    }
+
+    @Test
+    void getAllSubjectsWithStats_returnsCamelCaseFieldsAndCounts() throws Exception {
+        SubjectStatsResponse stats = SubjectStatsResponse.builder()
+                .subjectId(1)
+                .subjectName("Computer Science")
+                .subjectCode("CS101")
+                .questionCount(7)
+                .examCount(2)
+                .build();
+        when(subjectService.getAllSubjectsWithStats()).thenReturn(List.of(stats));
+
+        mockMvc.perform(get("/api/subjects/with-stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].subjectId").value(1))
+                .andExpect(jsonPath("$[0].subjectName").value("Computer Science"))
+                .andExpect(jsonPath("$[0].subjectCode").value("CS101"))
+                .andExpect(jsonPath("$[0].questionCount").value(7))
+                .andExpect(jsonPath("$[0].examCount").value(2));
     }
 
     @Test
