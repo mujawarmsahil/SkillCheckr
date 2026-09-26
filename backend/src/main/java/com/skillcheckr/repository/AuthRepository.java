@@ -21,6 +21,8 @@ public interface AuthRepository {
 
     boolean isUsernameInUse(String username, int excludeUserId);
 
+    boolean existsByUsername(String username);
+
     boolean isEmailInUse(String email, int excludeUserId);
     boolean verifyCurrentPassword(int userId, String oldPassword);
 }

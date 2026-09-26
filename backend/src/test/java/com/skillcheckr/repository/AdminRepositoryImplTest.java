@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -109,6 +110,34 @@ class AdminRepositoryImplTest {
 
         assertThat(success).isTrue();
         verify(psUpdate).executeUpdate();
+    }
+
+    @Test
+    void addStudentFromRequest_returnsFalse_whenUsernameTakenBeforeApproval() throws Exception {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT * FROM request WHERE request_id = ?")).thenReturn(psSelect);
+        when(psSelect.executeQuery()).thenReturn(rsSelect);
+        when(rsSelect.next()).thenReturn(true);
+        when(rsSelect.getString("username")).thenReturn("alice");
+        when(rsSelect.getString("password")).thenReturn("plainPass");
+        when(rsSelect.getString("name")).thenReturn("Alice");
+        when(rsSelect.getString("contact")).thenReturn("123");
+        when(rsSelect.getString("email")).thenReturn("alice@test.com");
+
+        when(passwordEncoder.encode("plainPass")).thenReturn("$2a$10$hashedPass");
+
+        when(connection.prepareStatement("SELECT user_id FROM user WHERE username = ?")).thenReturn(psCheck);
+        when(psCheck.executeQuery()).thenReturn(rsCheck);
+        when(rsCheck.next()).thenReturn(false);
+
+        when(connection.prepareStatement(eq("INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)"),
+                eq(PreparedStatement.RETURN_GENERATED_KEYS))).thenReturn(psUser);
+        when(psUser.executeUpdate())
+                .thenThrow(new DuplicateKeyException("Duplicate entry 'alice' for key 'user.username'"));
+
+        boolean success = repository.addStudentFromRequest(1);
+
+        assertThat(success).isFalse();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.skillcheckr.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.service.RegistrationRequestService;
@@ -49,6 +51,19 @@ class RegistrationRequestControllerTest {
         request.setRequestedRole(role);
         request.setStatus(status);
         return request;
+    }
+
+    @Test
+    void saveRequest_returns400_whenUsernameAlreadyExists() throws Exception {
+        when(registrationRequestService.saveRequest(any(RegistrationRequest.class)))
+                .thenThrow(new BadRequestException("Username already exists."));
+
+        mockMvc.perform(post("/api/requests/save")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Sam\",\"username\":\"alice\",\"email\":\"sam@test.com\","
+                                + "\"contact\":\"1234567890\",\"requested_role\":\"Student\",\"password\":\"secret1\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Username already exists."));
     }
 
     @Test

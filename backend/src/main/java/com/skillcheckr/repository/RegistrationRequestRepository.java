@@ -8,6 +8,8 @@ public interface RegistrationRequestRepository {
 
     boolean saveRequest(RegistrationRequest request);
 
+    boolean existsByUsername(String username);
+
     List<RegistrationRequest> getAllRequests();
 
     boolean deleteRequestById(int id);
