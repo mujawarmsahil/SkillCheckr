@@ -12,8 +12,6 @@ public interface AdminService {
 
 	boolean addStudentFromRequest(int requestId);
 
-	boolean isUsernameExist(String username);
-
 	List<Teacher> getAllTeacher();
 
 	List<Student> getAllStudent();

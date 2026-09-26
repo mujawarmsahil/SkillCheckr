@@ -5,7 +5,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Optional;
 
 import javax.sql.DataSource;
 
@@ -169,17 +168,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 	}
 
 	@Override
-	public boolean isUsernameExist(String username) {
-		try {
-			String sql = "SELECT COUNT(*) FROM user WHERE username = ?";
-			Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username);
-			return count != null && count > 0;
-		} catch (Exception e) {
-			return false;
-		}
-	}
-
-	@Override
 	public List<Teacher> getAllTeacher() {
 		return jdbcTemplate.query("SELECT * FROM teacher ORDER BY teacher_id DESC", new RowMapper<Teacher>() {
 			@Override
@@ -335,16 +323,6 @@ public class AdminRepositoryImpl implements AdminRepository {
 		} catch (Exception e) {
 			log.error("Error toggling student status", e);
 			return false;
-		}
-	}
-
-	@Override
-	public Optional<String> getUsernameByRequestId(int requestId) {
-		try {
-			String sql = "SELECT username FROM request WHERE request_id = ?";
-			return Optional.ofNullable(jdbcTemplate.queryForObject(sql, String.class, requestId));
-		} catch (Exception e) {
-			return Optional.empty();
 		}
 	}
 

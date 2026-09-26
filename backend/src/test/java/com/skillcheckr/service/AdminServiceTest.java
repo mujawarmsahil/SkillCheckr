@@ -5,7 +5,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +28,6 @@ class AdminServiceTest {
 
     @Test
     void addStudentFromRequest_returnsTrue_whenRepositorySucceeds() {
-        when(adminRepository.getUsernameByRequestId(1)).thenReturn(Optional.empty());
         when(adminRepository.addStudentFromRequest(1)).thenReturn(true);
 
         boolean result = adminService.addStudentFromRequest(1);
@@ -40,7 +38,6 @@ class AdminServiceTest {
 
     @Test
     void addStudentFromRequest_returnsFalse_whenRepositoryFails() {
-        when(adminRepository.getUsernameByRequestId(2)).thenReturn(Optional.empty());
         when(adminRepository.addStudentFromRequest(2)).thenReturn(false);
 
         boolean result = adminService.addStudentFromRequest(2);
@@ -51,7 +48,6 @@ class AdminServiceTest {
 
     @Test
     void addTeacherFromRequest_returnsTrue_whenRepositorySucceeds() {
-        when(adminRepository.getUsernameByRequestId(3)).thenReturn(Optional.empty());
         when(adminRepository.addTeacherFromRequest(3)).thenReturn(true);
 
         boolean result = adminService.addTeacherFromRequest(3);
@@ -62,21 +58,12 @@ class AdminServiceTest {
 
     @Test
     void addTeacherFromRequest_returnsFalse_whenRepositoryFails() {
-        when(adminRepository.getUsernameByRequestId(4)).thenReturn(Optional.empty());
         when(adminRepository.addTeacherFromRequest(4)).thenReturn(false);
 
         boolean result = adminService.addTeacherFromRequest(4);
 
         assertThat(result).isFalse();
         verify(adminRepository).addTeacherFromRequest(4);
-    }
-
-    @Test
-    void isUsernameExist_delegatesToRepository() {
-        when(adminRepository.isUsernameExist("someone")).thenReturn(true);
-
-        assertThat(adminService.isUsernameExist("someone")).isTrue();
-        verify(adminRepository).isUsernameExist("someone");
     }
 
     @Test

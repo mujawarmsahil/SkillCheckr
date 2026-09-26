@@ -18,23 +18,12 @@ public class AdminServiceImpl implements AdminService {
 
 	@Override
 	public boolean addTeacherFromRequest(int requestId) {
-		if (adminRepository.getUsernameByRequestId(requestId).map(this::isUsernameExist).orElse(false)) {
-			return false;
-		}
 		return adminRepository.addTeacherFromRequest(requestId);
 	}
 
 	@Override
 	public boolean addStudentFromRequest(int requestId) {
-		if (adminRepository.getUsernameByRequestId(requestId).map(this::isUsernameExist).orElse(false)) {
-			return false;
-		}
 		return adminRepository.addStudentFromRequest(requestId);
-	}
-
-	@Override
-	public boolean isUsernameExist(String username) {
-		return adminRepository.isUsernameExist(username);
 	}
 
 	@Override
