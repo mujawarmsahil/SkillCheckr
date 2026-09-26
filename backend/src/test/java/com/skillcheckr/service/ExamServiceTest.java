@@ -1,9 +1,12 @@
 package com.skillcheckr.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.Student;
@@ -40,6 +44,51 @@ class ExamServiceTest {
 
         assertThat(result).isEqualTo(subject);
         verify(examRepository).saveExam(exam);
+    }
+
+    @Test
+    void saveExam_savesExamWithValidNameAndUpcomingDate() {
+        Exam exam = new Exam();
+        exam.setExamName("Java-Programming");
+        exam.setDate(LocalDate.now().plusDays(10) + "T10:00");
+        Subject subject = new Subject(1, "Computer Science", "CS101");
+        when(examRepository.saveExam(exam)).thenReturn(subject);
+
+        assertThat(examService.saveExam(exam)).isEqualTo(subject);
+        verify(examRepository).saveExam(exam);
+    }
+
+    @Test
+    void saveExam_rejectsInvalidExamNameWithoutCallingRepository() {
+        Exam exam = new Exam();
+        exam.setExamName("Java 101");
+
+        assertThatThrownBy(() -> examService.saveExam(exam))
+                .isInstanceOf(BadRequestException.class);
+        verifyNoInteractions(examRepository);
+    }
+
+    @Test
+    void saveExam_rejectsExamDateInsideMinimumLeadTimeWithoutCallingRepository() {
+        Exam exam = new Exam();
+        exam.setExamName("Java Programming");
+        exam.setDate(LocalDate.now().plusDays(9) + "T10:00");
+
+        assertThatThrownBy(() -> examService.saveExam(exam))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Exam date must be at least 10 days from today");
+        verifyNoInteractions(examRepository);
+    }
+
+    @Test
+    void saveExam_rejectsPastExamDateWithoutCallingRepository() {
+        Exam exam = new Exam();
+        exam.setExamName("Java Programming");
+        exam.setDate(LocalDate.now().minusDays(1) + "T10:00");
+
+        assertThatThrownBy(() -> examService.saveExam(exam))
+                .isInstanceOf(BadRequestException.class);
+        verifyNoInteractions(examRepository);
     }
 
     @Test

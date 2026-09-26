@@ -23,4 +23,10 @@ public final class ExamConstants {
     public static final String EXAM_STATUS_APPROVED = "Approved";
     public static final String EXAM_STATUS_REJECTED = "Rejected";
     public static final String EXAM_STATUS_CANCELLED = "Cancelled";
+
+    // Exam names accept letters separated by single spaces or hyphens only
+    public static final String EXAM_NAME_PATTERN = "^[A-Za-z]+(?:[ -][A-Za-z]+)*$";
+
+    // Exams must be scheduled at least this many days in advance of the current day
+    public static final int EXAM_MIN_LEAD_TIME_DAYS = 10;
 }

@@ -112,14 +112,18 @@ Before running the application, make sure you have installed:
 mysql -u root -p < backend/src/main/resources/schema.sql
 ```
 
-3. Configure your database and secret credentials via environment variables (or `.env`):
+3. Configure your database and secret credentials via environment variables. The backend env template lives at [`backend/.env.example`](file:///Users/sahilmujawar/Desktop/projects/SkillCheckr/backend/.env.example) — copy it to `backend/.env`, fill in your real values, and export them before starting the backend (`.env` is git-ignored and must never be committed):
+   ```bash
+   cp backend/.env.example backend/.env      # then fill in the values
+   set -a; source backend/.env; set +a       # then: npm run dev:backend
+   ```
    ```properties
    DB_URL=jdbc:mysql://localhost:3306/exam_application_system
    DB_USERNAME=root
    DB_PASSWORD=your_mysql_password
-   GOOGLE_CLIENT_ID=your_google_client_id
-   GOOGLE_CLIENT_SECRET=your_google_client_secret
    ```
+
+   The frontend reads only the public API location, configured separately in [`FrontEnd/.env.example`](file:///Users/sahilmujawar/Desktop/projects/SkillCheckr/FrontEnd/.env.example) (`VITE_API_URL`). Never place a server credential in a `VITE_*` variable — those are compiled into the browser bundle.
 
 ### 🔑 Default Administrator Login
 - **Username:** `Admin1`
