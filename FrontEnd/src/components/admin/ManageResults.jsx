@@ -17,7 +17,7 @@ export default function ManageResults() {
     try {
       setResults(await getAllResults());
     } catch (err) {
-      showError(err.message || "Failed to load examination results");
+      showError(err.message || "Failed to load results");
     } finally {
       setLoading(false);
     }
@@ -50,18 +50,16 @@ export default function ManageResults() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <Icon name="award" className="w-5 h-5 text-orange-500" />
-          Examination Results & Performance Audit
+          Results
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Review student assessment submissions, scorecards, pass/fail metrics, and proctor integrity logs
+          Review student submissions, scores, and proctoring flags
         </p>
       </div>
 
-      {/* Metrics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Attempts</span>
@@ -81,7 +79,6 @@ export default function ManageResults() {
         </div>
       </div>
 
-      {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative w-full sm:w-80">
           <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -89,7 +86,7 @@ export default function ManageResults() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by candidate name, exam, subject..."
+            placeholder="Search by student, exam, or subject"
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
           />
         </div>
@@ -116,7 +113,6 @@ export default function ManageResults() {
         </div>
       </div>
 
-      {/* Results Table */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -126,7 +122,6 @@ export default function ManageResults() {
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
           <Icon name="award" className="w-10 h-10 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-700">No results recorded</h3>
-          <p className="text-xs text-slate-400">Completed student submissions will appear here automatically.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -135,7 +130,7 @@ export default function ManageResults() {
               <thead className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
                 <tr>
                   <th className="py-3.5 px-4">Result ID</th>
-                  <th className="py-3.5 px-4">Candidate</th>
+                  <th className="py-3.5 px-4">Student</th>
                   <th className="py-3.5 px-4">Exam Title</th>
                   <th className="py-3.5 px-4">Subject</th>
                   <th className="py-3.5 px-4">Score</th>
@@ -156,7 +151,7 @@ export default function ManageResults() {
                   const st = res.status || "Submitted";
                   const isPass = st.toLowerCase().includes("pass");
                   const isFail = st.toLowerCase().includes("fail");
-                  const isDisq = st.toLowerCase().includes("disqualified");
+                  const isDisqualified = st.toLowerCase().includes("disqualified");
 
                   return (
                     <tr key={rId || idx} className="hover:bg-slate-50/70 transition-colors">
@@ -182,14 +177,14 @@ export default function ManageResults() {
                               ? "bg-emerald-100 text-emerald-800"
                               : isFail
                               ? "bg-rose-100 text-rose-800"
-                              : isDisq
+                              : isDisqualified
                               ? "bg-amber-100 text-amber-800"
                               : "bg-blue-100 text-blue-800"
                           }`}
                         >
                           {isPass && <Icon name="check-circle" className="w-3 h-3 text-emerald-600" />}
                           {isFail && <Icon name="x" className="w-3 h-3 text-rose-600" />}
-                          {isDisq && <Icon name="alert" className="w-3 h-3 text-amber-600" />}
+                          {isDisqualified && <Icon name="alert" className="w-3 h-3 text-amber-600" />}
                           {st}
                         </span>
                       </td>
@@ -211,14 +206,13 @@ export default function ManageResults() {
         </div>
       )}
 
-      {/* Result Inspection Modal */}
       {selectedResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg max-h-[85vh] overflow-y-auto animate-scale-up">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                 <Icon name="award" className="w-4 h-4 text-orange-500" />
-                Scorecard Breakdown #{selectedResult.result_id || selectedResult.resultId}
+                Result #{selectedResult.result_id || selectedResult.resultId}
               </h3>
               <button
                 onClick={() => setSelectedResult(null)}
@@ -231,7 +225,7 @@ export default function ManageResults() {
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Candidate</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Student</span>
                   <p className="font-bold text-slate-900 mt-0.5">
                     {selectedResult.student_name || selectedResult.studentName || `Student #${selectedResult.student_id || selectedResult.studentId}`}
                   </p>
@@ -273,7 +267,7 @@ export default function ManageResults() {
 
               {selectedResult.question_breakdown && selectedResult.question_breakdown.length > 0 && (
                 <div className="space-y-2 pt-2">
-                  <span className="text-xs font-bold text-slate-700 block">Question Level Performance</span>
+                  <span className="text-xs font-bold text-slate-700 block">Performance by question</span>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {selectedResult.question_breakdown.map((q, i) => (
                       <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
@@ -283,7 +277,7 @@ export default function ManageResults() {
                             {q.isCorrect ? "Correct" : "Incorrect"}
                           </span>
                         </div>
-                        <div className="text-slate-600">Candidate Choice: <span className="font-semibold">{q.selectedAnswer || "None"}</span></div>
+                        <div className="text-slate-600">Answer: <span className="font-semibold">{q.selectedAnswer || "None"}</span></div>
                         <div className="text-slate-600">Correct Option: <span className="font-semibold text-emerald-700">{q.correctAnswer}</span></div>
                       </div>
                     ))}
@@ -296,7 +290,7 @@ export default function ManageResults() {
                   onClick={() => setSelectedResult(null)}
                   className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all"
                 >
-                  Close Scorecard
+                  Close Result
                 </button>
               </div>
             </div>

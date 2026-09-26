@@ -32,12 +32,12 @@ export default function Signup({ onSignupSuccess }) {
     if (!formData.email.trim()) {
       errs.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errs.email = "Please enter a valid email address";
+      errs.email = "Enter a valid email address";
     }
     if (!formData.contact.trim()) {
       errs.contact = "Contact number is required";
     } else if (!/^\d{10}$/.test(formData.contact.trim())) {
-      errs.contact = "Please enter a valid 10-digit phone number";
+      errs.contact = "Enter a valid 10-digit phone number";
     }
     if (!formData.username.trim()) {
       errs.username = "Username is required";
@@ -50,23 +50,23 @@ export default function Signup({ onSignupSuccess }) {
       errs.password = "Password must be at least 6 characters";
     }
     if (!formData.requested_role || formData.requested_role === "select") {
-      errs.requested_role = "Please select a role";
+      errs.requested_role = "Select a role";
     }
     return errs;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const validationErrors = validate();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
       return;
     }
 
     setLoading(true);
     try {
       await apiClient.post("/api/requests/save", formData);
-      showSuccess("Registration request submitted! An Admin will review and approve your account.");
+      showSuccess("Registration request submitted. An admin will review it.");
       setFormData({
         name: "",
         contact: "",
@@ -79,7 +79,7 @@ export default function Signup({ onSignupSuccess }) {
         onSignupSuccess();
       }
     } catch (err) {
-      showError(err.message || "Failed to submit registration request. Please try again.");
+      showError(err.message || "Failed to submit registration request.");
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,6 @@ export default function Signup({ onSignupSuccess }) {
 
   return (
     <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
-      {/* Full Name */}
       <div>
         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
           Full Name
@@ -105,7 +104,6 @@ export default function Signup({ onSignupSuccess }) {
         {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name}</p>}
       </div>
 
-      {/* Email & Contact in 2 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
@@ -142,7 +140,6 @@ export default function Signup({ onSignupSuccess }) {
         </div>
       </div>
 
-      {/* Role Selection */}
       <div>
         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
           Select Role
@@ -166,7 +163,6 @@ export default function Signup({ onSignupSuccess }) {
         </div>
       </div>
 
-      {/* Username & Password */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
@@ -212,7 +208,6 @@ export default function Signup({ onSignupSuccess }) {
         </div>
       </div>
 
-      {/* Submit Button */}
       <button
         type="submit"
         disabled={loading}

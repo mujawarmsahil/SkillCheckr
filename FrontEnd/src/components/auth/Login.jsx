@@ -39,16 +39,16 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const validationErrors = validate();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
       return;
     }
 
     setLoading(true);
     try {
       const data = await login(formData);
-      showSuccess(`Welcome back! Logged in as ${data.role}`);
+      showSuccess(`Signed in as ${data.role}.`);
 
       const userRole = (data.role || "student").toLowerCase();
       const redirectPath = location.state?.from?.pathname || `/dashboard/${userRole}`;
@@ -62,7 +62,6 @@ export default function Login() {
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
-      {/* Username Field */}
       <div>
         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
           Username
@@ -85,7 +84,6 @@ export default function Login() {
         {errors.username && <p className="mt-1 text-xs text-rose-600">{errors.username}</p>}
       </div>
 
-      {/* Password Field */}
       <div>
         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
           Password
@@ -112,7 +110,6 @@ export default function Login() {
         {errors.password && <p className="mt-1 text-xs text-rose-600">{errors.password}</p>}
       </div>
 
-      {/* Submit Button */}
       <button
         type="submit"
         disabled={loading}

@@ -70,7 +70,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
       localStorage.getItem("profile_image") ||
       "";
 
-    // Immediately pre-populate form with existing state & localStorage so inputs are never blank
+    // Fill from local state first so the form is never blank
     setFormData({
       name: fallbackName,
       username: fallbackUsername,
@@ -132,7 +132,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
           }
         }
       } catch {
-        // Profile fetch is best effort; the pre-populated fallback data is kept
+        // Keep the pre-filled values if the fetch fails
       } finally {
         if (isMounted) {
           setInitialLoading(false);
@@ -157,10 +157,9 @@ export default function EditProfileModal({ isOpen, onClose }) {
     }
   };
 
-  const handlePasswordCheckboxToggle = (e) => {
+  const handlePasswordToggle = (e) => {
     const checked = e.target.checked;
     setChangePassword(checked);
-    // Always keep all three password fields empty when toggled
     setFormData((prev) => ({
       ...prev,
       oldPassword: "",
@@ -181,11 +180,11 @@ export default function EditProfileModal({ isOpen, onClose }) {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setErrors((prev) => ({ ...prev, profileImage: "Please select a valid image file (PNG, JPG, JPEG, WEBP)" }));
+      setErrors((prev) => ({ ...prev, profileImage: "Select a valid image file (PNG, JPG, JPEG, WEBP)" }));
       return;
     }
 
-    // Limit image size to 2.5 MB to keep payload and storage efficient
+    // 2.5 MB cap keeps the base64 payload manageable
     if (file.size > 2.5 * 1024 * 1024) {
       setErrors((prev) => ({ ...prev, profileImage: "Image size must be under 2.5 MB" }));
       return;
@@ -209,20 +208,20 @@ export default function EditProfileModal({ isOpen, onClose }) {
   const validate = () => {
     const errs = {};
     if (!formData.name.trim()) {
-      errs.name = "Full Name is required";
+      errs.name = "Full name is required";
     }
     if (!formData.username.trim()) {
       errs.username = "Username is required";
     }
     if (!formData.email.trim()) {
-      errs.email = "Email Address is required";
+      errs.email = "Email address is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errs.email = "Please enter a valid email address";
+      errs.email = "Enter a valid email address";
     }
 
     if (changePassword) {
       if (!formData.oldPassword) {
-        errs.oldPassword = "Current password is required to change password";
+        errs.oldPassword = "Current password is required";
       }
       if (!formData.newPassword) {
         errs.newPassword = "New password is required";
@@ -241,9 +240,9 @@ export default function EditProfileModal({ isOpen, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const validationErrors = validate();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
       return;
     }
 
@@ -282,7 +281,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
         localStorage.setItem("contact", updatedProfile.contact);
       }
 
-      showSuccess(response.data.message || "Profile updated successfully!");
+      showSuccess(response.data.message || "Profile updated.");
       onClose();
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || "Failed to update profile";
@@ -303,7 +302,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
         className="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150 my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 md:px-8 py-3.5 sm:py-5 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-3 min-w-0 mr-2">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
@@ -328,13 +326,11 @@ export default function EditProfileModal({ isOpen, onClose }) {
         {initialLoading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-500">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-            <span className="text-xs font-semibold">Loading profile information...</span>
+            <span className="text-xs font-semibold">Loading profile...</span>
           </div>
         ) : (
           <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            {/* Scrollable Form Body */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 overscroll-contain">
-              {/* General Error Banner */}
               {errors.general && (
                 <div className="p-3 sm:p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
                   <Icon name="alert" className="w-4 h-4 shrink-0" />
@@ -342,7 +338,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
                 </div>
               )}
 
-              {/* Profile Image Section */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-4 sm:gap-5 p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <div className="relative group shrink-0">
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-xl sm:text-2xl shadow-md overflow-hidden border-2 border-white shrink-0">
@@ -391,9 +386,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Profile Fields Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {/* Full Name */}
                 <div className="space-y-1 sm:space-y-1.5">
                   <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Full Name <span className="text-rose-500">*</span>
@@ -415,7 +408,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
                   {errors.name && <p className="text-[11px] sm:text-xs text-rose-500 font-medium">{errors.name}</p>}
                 </div>
 
-                {/* Username */}
                 <div className="space-y-1 sm:space-y-1.5">
                   <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Username <span className="text-rose-500">*</span>
@@ -439,7 +431,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
                   )}
                 </div>
 
-                {/* Email */}
                 <div className="space-y-1 sm:space-y-1.5">
                   <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Email Address <span className="text-rose-500">*</span>
@@ -461,7 +452,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
                   {errors.email && <p className="text-[11px] sm:text-xs text-rose-500 font-medium">{errors.email}</p>}
                 </div>
 
-                {/* Contact Number */}
                 <div className="space-y-1 sm:space-y-1.5">
                   <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Contact Number
@@ -479,7 +469,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Role Badge (Read-only) */}
               <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                 <span className="font-semibold text-slate-500 text-[11px] sm:text-xs">Account Role</span>
                 <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 bg-orange-100 text-orange-700 font-bold rounded-full capitalize text-[11px] sm:text-xs">
@@ -487,7 +476,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
                 </span>
               </div>
 
-              {/* Password Section */}
               <div className="pt-2 border-t border-slate-100 space-y-3 sm:space-y-4">
                 <label
                   className={`group flex items-center justify-between p-3 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer select-none ${
@@ -501,7 +489,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                       <input
                         type="checkbox"
                         checked={changePassword}
-                        onChange={handlePasswordCheckboxToggle}
+                        onChange={handlePasswordToggle}
                         className="sr-only peer"
                       />
                       <div
@@ -543,7 +531,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
 
                 {changePassword && (
                   <div className="space-y-3.5 sm:space-y-4 p-3.5 sm:p-4 rounded-2xl bg-orange-50/40 border border-orange-100 animate-in fade-in slide-in-from-top-2 duration-150">
-                    {/* Current Password */}
                     <div className="space-y-1 sm:space-y-1.5">
                       <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider">
                         Current Password <span className="text-rose-500">*</span>
@@ -575,9 +562,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
                       )}
                     </div>
 
-                    {/* New Password & Confirm Password Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      {/* New Password */}
                       <div className="space-y-1 sm:space-y-1.5">
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider">
                           New Password <span className="text-rose-500">*</span>
@@ -609,7 +594,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
                         )}
                       </div>
 
-                      {/* Confirm Password */}
                       <div className="space-y-1 sm:space-y-1.5">
                         <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider">
                           Confirm New Password <span className="text-rose-500">*</span>
@@ -646,7 +630,6 @@ export default function EditProfileModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* Sticky Actions Footer */}
             <div className="shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 px-4 sm:px-6 md:px-8 py-3.5 sm:py-4 bg-slate-50/80 border-t border-slate-100">
               <button
                 type="button"

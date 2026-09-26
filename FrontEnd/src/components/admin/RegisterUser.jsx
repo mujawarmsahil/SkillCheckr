@@ -47,7 +47,7 @@ export default function RegisterUser() {
         : `/api/admin/addStudent/${requestId}`;
 
       await apiClient.post(endpoint);
-      showSuccess(`Approved ${request.name || request.username} as a ${targetRole}! Moved to archive.`);
+      showSuccess(`Approved ${request.name || request.username} as ${targetRole}. Moved to archive.`);
 
       setRequests((prev) =>
         prev.map((r) =>
@@ -65,7 +65,7 @@ export default function RegisterUser() {
     const requestId = request.request_id || request.requestId;
     try {
       await apiClient.post(`/api/requests/reject/${requestId}`);
-      showSuccess(`Registration request for ${request.name || request.username} was rejected and moved to archive.`);
+      showSuccess(`Rejected ${request.name || request.username}. Moved to archive.`);
 
       setRequests((prev) =>
         prev.map((r) =>
@@ -80,13 +80,13 @@ export default function RegisterUser() {
   };
 
   const handleDeletePermanently = async (requestId) => {
-    if (!window.confirm("Are you sure you want to permanently delete this archived request?")) {
+    if (!window.confirm("Permanently delete this archived request?")) {
       return;
     }
 
     try {
       await apiClient.delete(`/api/requests/deleteById/${requestId}`);
-      showSuccess("Archived request permanently removed.");
+      showSuccess("Archived request deleted.");
       setRequests((prev) => prev.filter((r) => r.request_id !== requestId && r.requestId !== requestId));
     } catch (err) {
       showError(err.message || "Failed to delete request");
@@ -104,7 +104,6 @@ export default function RegisterUser() {
     return status && status !== "pending";
   });
 
-  // Filter based on active tab, search term, and role/status filters
   const activeList = currentTab === "PENDING" ? pendingRequestsList : archivedRequestsList;
 
   const filteredRequests = activeList.filter((r) => {
@@ -132,7 +131,6 @@ export default function RegisterUser() {
 
   return (
     <div className="space-y-6">
-      {/* Header and Tab Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -140,11 +138,10 @@ export default function RegisterUser() {
             Account Registration Requests
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage incoming student and teacher access requests and inspect approval history
+            Approve or reject student and teacher sign-up requests
           </p>
         </div>
 
-        {/* Pending vs Archive Tab Pill Switcher */}
         <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200 w-full sm:w-auto">
           <button
             onClick={() => {
@@ -192,7 +189,6 @@ export default function RegisterUser() {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative flex-1 w-full">
           <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -209,7 +205,6 @@ export default function RegisterUser() {
           />
         </div>
 
-        {/* Role Filters */}
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
           {[
             { id: "ALL", label: "All Roles" },
@@ -230,7 +225,6 @@ export default function RegisterUser() {
           ))}
         </div>
 
-        {/* Status Filter for Archive Tab */}
         {currentTab === "ARCHIVE" && (
           <div className="flex items-center gap-1.5 w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-slate-200 pt-2 sm:pt-0 sm:pl-3">
             {[
@@ -254,7 +248,6 @@ export default function RegisterUser() {
         )}
       </div>
 
-      {/* Table Content */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -343,7 +336,7 @@ export default function RegisterUser() {
                               <button
                                 onClick={() => handleApprove(req, role)}
                                 className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1"
-                                title="Approve and create user account"
+                                title="Approve request"
                               >
                                 <Icon name="check" className="w-3.5 h-3.5" />
                                 Approve
@@ -351,7 +344,7 @@ export default function RegisterUser() {
                               <button
                                 onClick={() => handleReject(req)}
                                 className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg border border-rose-200 transition-all flex items-center gap-1"
-                                title="Reject and move to archive"
+                                title="Reject request"
                               >
                                 <Icon name="x" className="w-3.5 h-3.5" />
                                 Reject
@@ -378,7 +371,7 @@ export default function RegisterUser() {
                               <button
                                 onClick={() => handleDeletePermanently(reqId)}
                                 className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Permanently delete from database"
+                                title="Delete permanently"
                               >
                                 <Icon name="trash" className="w-4 h-4" />
                               </button>

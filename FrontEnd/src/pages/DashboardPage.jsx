@@ -15,7 +15,7 @@ export default function DashboardPage() {
 
   const activeRole = (urlRole || role || "student").toLowerCase();
 
-  // If user tries to access a dashboard they don't have permission for, redirect to their role
+  // Block access to another role's dashboard
   if (role && role.toLowerCase() !== activeRole) {
     return <Navigate to={`/dashboard/${role.toLowerCase()}`} replace />;
   }
@@ -27,7 +27,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Dashboard Sub-Header / Welcome Banner */}
       <div className="bg-white border-b border-slate-200">
         <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -53,7 +52,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 font-medium truncate">
-                  {user?.email ? `${user.email} • ` : ""}@{user?.username || "user"} • SkillCheckr Academic Portal
+                  {user?.email ? `${user.email} • ` : ""}@{user?.username || "user"} • SkillCheckr
                 </p>
               </div>
             </div>
@@ -78,14 +77,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Dashboard Content Area */}
       <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 py-8">
         {activeRole === "admin" && <AdminDashboard />}
         {activeRole === "teacher" && <TeacherDashboard />}
         {activeRole === "student" && <StudentDashboard />}
       </div>
 
-      {/* Edit Profile Modal */}
       <EditProfileModal
         isOpen={isEditProfileOpen}
         onClose={() => setIsEditProfileOpen(false)}

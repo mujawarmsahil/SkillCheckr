@@ -16,7 +16,7 @@ export default function AdminDashboard() {
     { id: "OVERVIEW", label: "Executive Dashboard", icon: "grid" },
     { id: "REQUESTS", label: "Registration Requests", icon: "user-plus" },
     { id: "USERS", label: "User Directory", icon: "users" },
-    { id: "EXAMS", label: "Examinations", icon: "clock" },
+    { id: "EXAMS", label: "Exams", icon: "clock" },
     { id: "QUESTIONS", label: "Question Bank", icon: "help-circle" },
     { id: "SUBJECTS", label: "Curriculum Subjects", icon: "book" },
     { id: "RESULTS", label: "Exam Results", icon: "award" },
@@ -25,7 +25,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Tab Navigation */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200 scrollbar-thin">
         {tabs.map((tab) => (
           <button
@@ -43,7 +42,6 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* Active Tab Content */}
       <div className="transition-opacity duration-200">
         {activeTab === "OVERVIEW" && <AdminOverview setActiveTab={setActiveTab} />}
         {activeTab === "REQUESTS" && <RegisterUser />}

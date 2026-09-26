@@ -20,7 +20,6 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
     try {
       const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
 
-      // 1. Check if student already submitted this exam
       try {
         const checkRes = await checkStudentExamStatus(examId, studentId);
         if (checkRes?.hasSubmitted && checkRes?.result) {
@@ -31,13 +30,12 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
         }
       } catch (err) {
         if (showError) {
-          showError(err.message || "Unable to load the backend result for this exam");
+          showError(err.message || "Unable to load your result for this exam");
         }
         setLoading(false);
         return;
       }
 
-      // 2. Fetch exam details
       let examDetails = locationState;
       if (!examDetails?.examName || !examDetails?.date) {
         try {
@@ -46,10 +44,10 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
           console.warn("Using fallback exam data");
         }
       }
-      const loadedExam = examDetails || { exam_name: "Examination", exam_type: "MCQ" };
+      const loadedExam = examDetails || { exam_name: "Exam", exam_type: "MCQ" };
       setExam(loadedExam);
 
-      // 3. Registration & Schedule Window Verification
+      // Registration and exam window checks apply to students only
       const userRole = user?.role || localStorage.getItem("role") || "Student";
       let activeAttemptId = null;
 
@@ -74,7 +72,7 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
         if (!isRegistered) {
           setAccessBlocked({
             reason: "NOT_REGISTERED",
-            message: "You are not registered for this examination. Registered candidate access only.",
+            message: "You are not registered for this exam.",
             datePart: schedule.datePart,
             startTimeStr: schedule.startTimeStr,
             endTimeStr: schedule.endTimeStr,
@@ -87,7 +85,7 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
         if (schedule.isExamUpcoming) {
           setAccessBlocked({
             reason: "NOT_STARTED",
-            message: `This examination has not started yet. The examination window opens on ${schedule.datePart} at ${schedule.startTimeStr}.`,
+            message: `This exam has not started yet. It opens on ${schedule.datePart} at ${schedule.startTimeStr}.`,
             datePart: schedule.datePart,
             startTimeStr: schedule.startTimeStr,
             endTimeStr: schedule.endTimeStr,
@@ -100,7 +98,7 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
         if (schedule.isExamExpired) {
           setAccessBlocked({
             reason: "EXPIRED",
-            message: `The scheduled testing window for this examination has ended (${schedule.datePart} ${schedule.endTimeStr}).`,
+            message: `The exam window has closed (${schedule.datePart} ${schedule.endTimeStr}).`,
             datePart: schedule.datePart,
             startTimeStr: schedule.startTimeStr,
             endTimeStr: schedule.endTimeStr,
@@ -109,11 +107,11 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
           return;
         }
 
-        // 4. Start or Resume Attempt
+        // Resumes the open attempt when one already exists
         const attempt = await startExamAttempt(examId);
         const resolvedAttemptId = attempt?.attemptId || attempt?.attempt_id;
         if (!resolvedAttemptId) {
-          throw new Error("The exam attempt could not be started.");
+          throw new Error("Exam attempt could not be started.");
         }
 
         const currentAttempt = {
@@ -128,24 +126,22 @@ export function useExamAttempt({ examId, user, locationState, showError }) {
         saveExamSession(currentAttempt.examId, currentAttempt.attemptId);
       }
 
-      // 5. Fetch Questions
       const fetchedQuestions = await getExamQuestions(examId);
       setQuestions(fetchedQuestions);
 
-      // 6. Restore saved answers from server
       if (activeAttemptId) {
         try {
           const savedAnswers = await getAttemptAnswers(examId, activeAttemptId);
           setInitialAnswers(savedAnswers);
         } catch (err) {
           if (showError) {
-            showError(err.message || "Unable to restore saved exam answers");
+            showError(err.message || "Unable to load saved answers");
           }
         }
       }
     } catch (err) {
       if (showError) {
-        showError(err.message || "Failed to load examination data");
+        showError(err.message || "Failed to load exam");
       }
     } finally {
       setLoading(false);

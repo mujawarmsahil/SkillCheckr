@@ -4,21 +4,21 @@ import Review from "./Review";
 export default function Card() {
   const reviews = [
     {
-      heading: "Efficient Assessment Solution!",
+      heading: "Fast, accurate assessments.",
       description:
-        "SkillCheckr streamlined our examination process by providing reliable assessments and detailed performance analytics. It saved hours of manual evaluation.",
+        "SkillCheckr cut our grading workload and gave us reliable results per question. It saves hours of manual evaluation.",
       name: "Dr. Anita Sharma, Academic Dean, TechNova Institute",
     },
     {
-      heading: "Accurate Skill Evaluation!",
+      heading: "Scores match skill, not luck.",
       description:
-        "The dual support for both MCQ and Descriptive questions allows our faculty to test conceptual understanding alongside speed and accuracy.",
+        "Supporting both MCQ and written answers lets our teachers test conceptual understanding as well as speed.",
       name: "Rajesh Verma, Department Head, FinEdge Academy",
     },
     {
-      heading: "Seamless Student Experience!",
+      heading: "Students can focus on the exam.",
       description:
-        "The distraction-free exam interface and instant scorecard breakdowns make testing transparent, fair, and engaging for all candidates.",
+        "The distraction-free exam view and instant result breakdowns keep testing transparent for every student.",
       name: "Sonal Kapoor, Lead Educator, ByteWorks",
     },
   ];

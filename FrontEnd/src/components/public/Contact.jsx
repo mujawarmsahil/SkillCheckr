@@ -17,13 +17,13 @@ export default function Contact() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      showWarning("Please fill in all fields before submitting");
+      showWarning("Fill in all fields.");
       return;
     }
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      showSuccess("Thank you! Your inquiry has been sent to our support team.");
+      showSuccess("Inquiry sent. We will get back to you.");
       setFormData({ name: "", email: "", message: "" });
     }, 600);
   };
@@ -40,7 +40,6 @@ export default function Contact() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-        {/* Contact Form */}
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-lg font-bold text-slate-800">Send us a Message</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -99,7 +98,6 @@ export default function Contact() {
           </form>
         </div>
 
-        {/* Info & Map Frame */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
             <h3 className="font-bold text-slate-900 text-sm">Academic Support Desk</h3>

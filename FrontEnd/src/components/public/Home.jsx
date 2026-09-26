@@ -9,10 +9,10 @@ export default function Home() {
   const { isAuthenticated, role } = useAuth();
 
   const slogans = [
-    "Assess Your Skills, Track Your Academic Progress!",
-    "Unlock Your Full Potential with Adaptive Testing!",
-    "Accurate MCQ & Descriptive Exam Management!",
-    "Empowering Students, Teachers, and Institutions!",
+    "Assess skills and track progress",
+    "MCQ and written-answer exams",
+    "Instant scoring and results",
+    "Built for students, teachers, and institutions",
   ];
   const [sloganIndex, setSloganIndex] = useState(0);
 
@@ -25,14 +25,13 @@ export default function Home() {
 
   return (
     <div className="space-y-16">
-      {/* Hero Section */}
       <section
         style={{ backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.85)), url(${backgroundImage})` }}
         className="w-full min-h-[85vh] bg-cover bg-center flex items-center justify-center text-white px-4 sm:px-6 lg:px-8 py-16"
       >
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-400 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-            <span>Next-Gen Examination Platform</span>
+            <span>Online Exam Platform</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-tight">
@@ -46,10 +45,9 @@ export default function Home() {
           </div>
 
           <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Conduct seamless multiple-choice (MCQ) tests and comprehensive question-answer theory assessments with real-time analytics and instant grading.
+            Run MCQ and written-answer exams with instant grading.
           </p>
 
-          {/* Action CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             {isAuthenticated ? (
               <Link
@@ -81,11 +79,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Feature Highlights Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            Designed for Modern Academic Rigor
+            Built for coursework
           </h2>
           <p className="text-sm text-slate-500">
             Flexible testing workflows built specifically for students, teachers, and administrators.
@@ -97,9 +94,9 @@ export default function Home() {
             <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center">
               <Icon name="check-circle" className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">MCQ Automated Testing</h3>
+            <h3 className="text-base font-bold text-slate-900">Automatic MCQ Scoring</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Instant evaluation with automated scoring, question timers, answer key verification, and detailed scorecards.
+              Instant grading, per-question timers, and detailed results.
             </p>
           </div>
 
@@ -107,9 +104,9 @@ export default function Home() {
             <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Icon name="file-text" className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Question-Answer Theory</h3>
+            <h3 className="text-base font-bold text-slate-900">Written Answers</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Descriptive question support with live word counters, reference rubrics, draft autosaving, and evaluation workflows.
+              Written answers with word counters, rubrics, and draft autosaving.
             </p>
           </div>
 
@@ -119,13 +116,12 @@ export default function Home() {
             </div>
             <h3 className="text-base font-bold text-slate-900">Institution & Admin Control</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Streamlined registration approval system, user management roster, exam approval pipelines, and platform analytics.
+              Registration approvals, user management, exam approvals, and analytics.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">

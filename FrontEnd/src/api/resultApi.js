@@ -15,7 +15,3 @@ export const getAllResults = async () => {
   return Array.isArray(res.data) ? res.data : [];
 };
 
-export const submitExam = async (submissionPayload) => {
-  const res = await apiClient.post("/api/results/submit", submissionPayload);
-  return res.data;
-};

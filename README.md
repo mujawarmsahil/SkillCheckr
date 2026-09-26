@@ -112,10 +112,9 @@ Before running the application, make sure you have installed:
 mysql -u root -p < backend/src/main/resources/schema.sql
 ```
 
-3. Configure your database and secret credentials via environment variables. The backend env template lives at [`backend/.env.example`](file:///Users/sahilmujawar/Desktop/projects/SkillCheckr/backend/.env.example) — copy it to `backend/.env`, fill in your real values, and export them before starting the backend (`.env` is git-ignored and must never be committed):
+3. Configure your database and secret credentials via environment variables. The backend env template lives at [`backend/.env.example`](backend/.env.example) — copy it to `backend/.env` and fill in your real values (`.env` is git-ignored and must never be committed):
    ```bash
    cp backend/.env.example backend/.env      # then fill in the values
-   set -a; source backend/.env; set +a       # then: npm run dev:backend
    ```
    ```properties
    DB_URL=jdbc:mysql://localhost:3306/exam_application_system
@@ -123,7 +122,7 @@ mysql -u root -p < backend/src/main/resources/schema.sql
    DB_PASSWORD=your_mysql_password
    ```
 
-   The frontend reads only the public API location, configured separately in [`FrontEnd/.env.example`](file:///Users/sahilmujawar/Desktop/projects/SkillCheckr/FrontEnd/.env.example) (`VITE_API_URL`). Never place a server credential in a `VITE_*` variable — those are compiled into the browser bundle.
+   The frontend reads only the public API location, configured separately in [`frontend/.env.example`](frontend/.env.example) (`VITE_API_URL`). Never place a server credential in a `VITE_*` variable — those are compiled into the browser bundle.
 
 ### 🔑 Default Administrator Login
 - **Username:** `Admin1`
@@ -176,8 +175,8 @@ SkillCheckr/
         ├── components/
         │   ├── auth/         # Login, Signup, Role ProtectedRoute
         │   ├── teacher/      # AddExam (MCQ vs Q&A), ManageExams
-        │   ├── student/      # AvailableExams, TakeExam (Timer & Scorecards), StudentResults
-        │   ├── admin/        # RegisterUser, TotalUsers, AcceptExam, TotalExams
+        │   ├── student/      # AvailableExams, TakeExam (timer & proctoring), StudentResults
+        │   ├── admin/        # AdminDashboard + Approvals, Users, Results, Questions, Subjects, Stats
         │   ├── layout/       # Navbar, Footer, Layout
         │   └── public/       # Home, About, Blog, Contact
         └── pages/            # Role Dashboard Page router

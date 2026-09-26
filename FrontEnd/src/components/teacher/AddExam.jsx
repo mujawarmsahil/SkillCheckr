@@ -81,27 +81,27 @@ export default function AddExam({ onExamCreated }) {
   const validateStep1 = () => {
     const examName = examData.examName;
     if (!examName.trim()) {
-      showWarning("Please enter an Exam Name");
+      showWarning("Exam name is required.");
       return false;
     }
     if (examName !== examName.trim()) {
-      showWarning("Exam Name must not start or end with a space");
+      showWarning("Exam name must not start or end with a space.");
       return false;
     }
     if (!EXAM_NAME_PATTERN.test(examName)) {
-      showWarning("Exam Name may only contain letters, single spaces and hyphens");
+      showWarning("Exam name can contain only letters, single spaces, and hyphens.");
       return false;
     }
     if (!examData.subjectName.trim() || !examData.subjectCode.trim()) {
-      showWarning("Please provide Subject Name and Code");
+      showWarning("Subject name and code are required.");
       return false;
     }
     if (!examData.startDate) {
-      showWarning("Please select a valid Exam Date");
+      showWarning("Exam date is required.");
       return false;
     }
     if (isExamDateTooSoon(examData.startDate)) {
-      showWarning(`Exam Date must be at least ${EXAM_MIN_LEAD_TIME_DAYS} days from today`);
+      showWarning(`Exam date must be at least ${EXAM_MIN_LEAD_TIME_DAYS} days from today`);
       return false;
     }
     if (examData.durationMinutes <= 0) {
@@ -113,7 +113,7 @@ export default function AddExam({ onExamCreated }) {
       return false;
     }
     if (examData.passingMarks <= 0 || examData.passingMarks > examData.totalMarks) {
-      showWarning("Passing marks must be between 1 and Total Marks");
+      showWarning("Passing marks must be between 1 and total marks.");
       return false;
     }
     return true;
@@ -152,13 +152,13 @@ export default function AddExam({ onExamCreated }) {
 
       if (subjectId) {
         setSavedSubjectId(subjectId);
-        showSuccess(`Exam created! Now add ${examData.examType === "MCQ" ? "MCQ" : "Question-Answer"} questions.`);
+        showSuccess(`Exam created. Now add ${examData.examType === "MCQ" ? "MCQ" : "question and answer"} questions.`);
         setStep(2);
       } else {
-        showError("Could not retrieve subject ID for question mapping");
+        showError("Could not read the subject ID for this exam.");
       }
     } catch (err) {
-      showError(err.message || "Failed to create exam metadata");
+      showError(err.message || "Failed to create exam");
     } finally {
       setLoading(false);
     }
@@ -166,7 +166,7 @@ export default function AddExam({ onExamCreated }) {
 
   const handleAddQuestion = () => {
     if (!currentQuestion.question.trim()) {
-      showWarning("Question prompt cannot be empty");
+      showWarning("Question text is required.");
       return;
     }
 
@@ -177,11 +177,11 @@ export default function AddExam({ onExamCreated }) {
         !currentQuestion.option3.trim() ||
         !currentQuestion.option4.trim()
       ) {
-        showWarning("Please fill in all 4 options for MCQ");
+        showWarning("All 4 options are required.");
         return;
       }
       if (!currentQuestion.correctOption) {
-        showWarning("Please select the correct option");
+        showWarning("Select the correct option.");
         return;
       }
     }
@@ -207,7 +207,7 @@ export default function AddExam({ onExamCreated }) {
       marks: 1,
       wordLimit: 200,
     });
-    showSuccess("Question added to list!");
+    showSuccess("Question added.");
   };
 
   const handleRemoveQuestion = (index) => {
@@ -216,7 +216,7 @@ export default function AddExam({ onExamCreated }) {
 
   const handleFinalSubmit = async () => {
     if (questionsList.length === 0) {
-      showWarning("Please add at least one question before publishing");
+      showWarning("Add at least one question before publishing.");
       return;
     }
 
@@ -242,7 +242,7 @@ export default function AddExam({ onExamCreated }) {
       }));
 
       await apiClient.post("/api/create/addQues", payload);
-      showSuccess(`Exam & ${questionsList.length} questions published successfully!`);
+      showSuccess(`Exam published with ${questionsList.length} questions.`);
 
       if (onExamCreated) {
         onExamCreated();
@@ -250,7 +250,7 @@ export default function AddExam({ onExamCreated }) {
         navigate("/dashboard/teacher");
       }
     } catch (err) {
-      showError(err.message || "Failed to submit questions");
+      showError(err.message || "Failed to save questions");
     } finally {
       setLoading(false);
     }
@@ -263,14 +263,13 @@ export default function AddExam({ onExamCreated }) {
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <Icon name="plus" className="w-5 h-5 text-orange-500" />
-            Create New Examination
+            Create Exam
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Configure exam format, grading parameters, and question set
           </p>
         </div>
 
-        {/* Step Indicator Pills */}
         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
           <span
             className={`px-3 py-1.5 rounded-lg transition-all ${
@@ -291,7 +290,6 @@ export default function AddExam({ onExamCreated }) {
 
       {step === 1 && (
         <form onSubmit={handleProceedToQuestions} className="space-y-6">
-          {/* Exam Type Selection */}
           <div className="bg-orange-50/60 border border-orange-200/80 rounded-2xl p-5">
             <label className="block text-xs font-bold text-orange-950 uppercase tracking-wider mb-2">
               Select Exam Format
@@ -326,7 +324,6 @@ export default function AddExam({ onExamCreated }) {
                 </div>
               </div>
 
-              {/* Question-Answer / Descriptive Option */}
               <div
                 onClick={() => setExamData((prev) => ({ ...prev, examType: "QUESTION_ANSWER" }))}
                 className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
@@ -341,8 +338,8 @@ export default function AddExam({ onExamCreated }) {
                       Q&A
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-800">Question & Answer (Descriptive)</h4>
-                      <p className="text-xs text-slate-500">Theory, short/long written responses & sample rubric.</p>
+                      <h4 className="text-sm font-bold text-slate-800">Question & Answer</h4>
+                      <p className="text-xs text-slate-500">Written answers graded against a sample answer.</p>
                     </div>
                   </div>
                   <input
@@ -357,7 +354,6 @@ export default function AddExam({ onExamCreated }) {
             </div>
           </div>
 
-          {/* Primary Metadata */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-3">
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
@@ -412,7 +408,7 @@ export default function AddExam({ onExamCreated }) {
                 type="date"
                 name="startDate"
                 min={getMinimumExamDate()}
-                title={`Exam Date must be at least ${EXAM_MIN_LEAD_TIME_DAYS} days from today`}
+                title={`Exam date must be at least ${EXAM_MIN_LEAD_TIME_DAYS} days from today`}
                 value={examData.startDate}
                 onChange={handleExamChange}
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-xl text-slate-800 text-sm outline-none transition-all"
@@ -467,7 +463,6 @@ export default function AddExam({ onExamCreated }) {
             </div>
           </div>
 
-          {/* Marks */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
@@ -501,7 +496,6 @@ export default function AddExam({ onExamCreated }) {
             </div>
           </div>
 
-          {/* Action Button */}
           <div className="flex justify-end pt-2">
             <button
               type="submit"
@@ -516,7 +510,6 @@ export default function AddExam({ onExamCreated }) {
 
       {step === 2 && (
         <div className="space-y-6">
-          {/* Question Builder Box */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-orange-100 text-orange-700">
@@ -527,7 +520,6 @@ export default function AddExam({ onExamCreated }) {
               </span>
             </div>
 
-            {/* Question Text */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
                 Question Prompt
@@ -537,7 +529,7 @@ export default function AddExam({ onExamCreated }) {
                 rows="3"
                 value={currentQuestion.question}
                 onChange={handleQuestionChange}
-                placeholder="Enter the question text clearly..."
+                placeholder="Enter the question text"
                 className="w-full p-3 bg-slate-50 border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-xl text-slate-800 text-sm outline-none transition-all"
               />
             </div>
@@ -546,7 +538,7 @@ export default function AddExam({ onExamCreated }) {
             {examData.examType === "MCQ" ? (
               <div className="space-y-3 pt-2">
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  Options & Correct Answer (Select the radio of the correct option)
+                  Options (select the correct one)
                 </label>
                 {[1, 2, 3, 4].map((num) => {
                   const optKey = `option${num}`;
@@ -568,7 +560,7 @@ export default function AddExam({ onExamCreated }) {
                           if (optVal.trim()) {
                             setCurrentQuestion((prev) => ({ ...prev, correctOption: optVal }));
                           } else {
-                            showWarning(`Please type Option ${num} before selecting it as correct`);
+                            showWarning(`Enter option ${num} before selecting it as correct`);
                           }
                         }}
                         className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
@@ -607,14 +599,14 @@ export default function AddExam({ onExamCreated }) {
               <div className="space-y-4 pt-2">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Reference / Ideal Sample Answer (Optional evaluation guidelines)
+                    Sample Answer (optional)
                   </label>
                   <textarea
                     name="sampleAnswer"
                     rows="3"
                     value={currentQuestion.sampleAnswer}
                     onChange={handleQuestionChange}
-                    placeholder="Provide model answer or rubric points..."
+                    placeholder="Model answer or rubric points..."
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm outline-none"
                   />
                 </div>
@@ -636,7 +628,7 @@ export default function AddExam({ onExamCreated }) {
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                      Max Word Limit (guideline)
+                      Word Limit
                     </label>
                     <input
                       type="number"
@@ -729,7 +721,6 @@ export default function AddExam({ onExamCreated }) {
             </div>
           )}
 
-          {/* Action Footer */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-200">
             <button
               type="button"

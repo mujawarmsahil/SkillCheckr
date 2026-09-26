@@ -25,7 +25,7 @@ export function useAttemptAnswers({
     async (questionId, payload) => {
       if (!attemptId) {
         if (showError) {
-          showError("Your exam attempt is not ready. Please reload the exam and try again.");
+          showError("Exam attempt is not ready. Reload the page and try again.");
         }
         return;
       }
@@ -34,7 +34,7 @@ export function useAttemptAnswers({
         await apiSaveAttemptAnswer(examId, attemptId, questionId, payload);
       } catch (err) {
         if (showError) {
-          showError(err.message || "Unable to save your answer");
+          showError(err.message || "Failed to save answer");
         }
       }
     },
@@ -89,26 +89,26 @@ export function useAttemptAnswers({
   );
 
   const handleSelectOption = useCallback(
-    (currentQ, optionKey, optionText) => {
+    (question, optionKey, optionText) => {
       if (isAttemptExpired) return;
 
-      const currentQId = currentQ?.question_id || currentQ?.questionId;
-      if (!currentQId) return;
+      const questionId = question?.question_id || question?.questionId;
+      if (!questionId) return;
 
       setMcqAnswers((prev) => ({
         ...prev,
-        [currentQId]: optionText,
+        [questionId]: optionText,
       }));
 
-      const selectedAnswerId = getOptionAnswerId(currentQ, optionKey);
+      const selectedAnswerId = getOptionAnswerId(question, optionKey);
       if (!selectedAnswerId) {
         if (showError) {
-          showError("This exam question is missing its answer ID. The MCQ answer could not be saved.");
+          showError("Failed to save answer.");
         }
         return;
       }
 
-      saveAnswerToBackend(currentQId, { selectedAnswerId });
+      saveAnswerToBackend(questionId, { selectedAnswerId });
     },
     [isAttemptExpired, saveAnswerToBackend, showError]
   );

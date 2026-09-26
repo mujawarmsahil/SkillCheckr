@@ -37,7 +37,7 @@ export default function ManageQuestions() {
       setQuestions(Array.isArray(qRes.data) ? qRes.data : []);
       setSubjects(Array.isArray(sRes.data) ? sRes.data : []);
     } catch (err) {
-      showError(err.message || "Failed to load questions data");
+      showError(err.message || "Failed to load questions");
     } finally {
       setLoading(false);
     }
@@ -82,21 +82,21 @@ export default function ManageQuestions() {
   const handleSaveQuestion = async (e) => {
     e.preventDefault();
     if (!formData.question.trim()) {
-      showError("Please enter the question text");
+      showError("Question text is required.");
       return;
     }
     if (!formData.subjectId) {
-      showError("Please select a subject");
+      showError("Select a subject.");
       return;
     }
 
     if (formData.questionType === "MCQ") {
       if (!formData.option1.trim() || !formData.option2.trim()) {
-        showError("Please provide at least Option 1 and Option 2 for MCQ");
+        showError("Add at least Option A and Option B.");
         return;
       }
       if (!formData.correctOption.trim()) {
-        showError("Please specify the correct option value");
+        showError("Select the correct option.");
         return;
       }
     }
@@ -118,10 +118,10 @@ export default function ManageQuestions() {
       if (editingQuestion) {
         const qId = editingQuestion.questionId || editingQuestion.question_id;
         await apiClient.put(`/api/questions/${qId}`, { ...payload, question_id: qId });
-        showSuccess("Question updated successfully!");
+        showSuccess("Question updated.");
       } else {
         await apiClient.post("/api/questions", [payload]);
-        showSuccess("Question created successfully!");
+        showSuccess("Question created.");
       }
 
       setModalOpen(false);
@@ -134,10 +134,10 @@ export default function ManageQuestions() {
   };
 
   const handleDeleteQuestion = async (qId) => {
-    if (!window.confirm("Are you sure you want to permanently delete this question?")) return;
+    if (!window.confirm("Permanently delete this question?")) return;
     try {
       await apiClient.delete(`/api/questions/${qId}`);
-      showSuccess("Question deleted successfully");
+      showSuccess("Question deleted.");
       setQuestions((prev) => prev.filter((q) => (q.questionId || q.question_id) !== qId));
     } catch (err) {
       showError(err.message || "Failed to delete question");
@@ -155,15 +155,14 @@ export default function ManageQuestions() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <Icon name="help-circle" className="w-5 h-5 text-orange-500" />
-            Central Question Bank & Item Repository
+            Question Bank
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Audit, edit, and organize examination questions across all curriculum disciplines
+            Add, edit, and organize questions across subjects
           </p>
         </div>
         <button
@@ -171,11 +170,10 @@ export default function ManageQuestions() {
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
         >
           <Icon name="plus" className="w-4 h-4" />
-          Add New Question
+          Add Question
         </button>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <label className="text-xs font-bold text-slate-600 whitespace-nowrap">Subject:</label>
@@ -203,17 +201,16 @@ export default function ManageQuestions() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search questions by text..."
+            placeholder="Search by question text"
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
           />
         </div>
       </div>
 
-      {/* Questions List */}
       {loading ? (
         <div className="py-12 text-center">
           <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-xs text-slate-500">Loading question items...</p>
+          <p className="text-xs text-slate-500">Loading questions...</p>
         </div>
       ) : filteredQuestions.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
@@ -255,21 +252,20 @@ export default function ManageQuestions() {
                     <button
                       onClick={() => handleOpenEditModal(q)}
                       className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-colors"
-                      title="Edit Question"
+                      title="Edit question"
                     >
                       <Icon name="edit" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteQuestion(qId)}
                       className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                      title="Delete Question"
+                      title="Delete question"
                     >
                       <Icon name="trash" className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Question Options or Rubric */}
                 {isMcq ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 text-xs">
                     {[q.option1, q.option2, q.option3, q.option4].filter(Boolean).map((opt, i) => {
@@ -312,7 +308,6 @@ export default function ManageQuestions() {
         </div>
       )}
 
-      {/* Add / Edit Question Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl max-h-[90vh] overflow-y-auto animate-scale-up">
@@ -341,7 +336,7 @@ export default function ManageQuestions() {
                     onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none focus:border-orange-500 focus:bg-white"
                   >
-                    <option value="">Select a Subject</option>
+                    <option value="">Select a subject</option>
                     {subjects.map((s) => (
                       <option key={s.subjectId || s.subject_id} value={s.subjectId || s.subject_id}>
                         {s.subjectName || s.subject_name}
@@ -370,7 +365,7 @@ export default function ManageQuestions() {
                 <textarea
                   required
                   rows={3}
-                  placeholder="Enter the full question prompt here..."
+                  placeholder="Enter the question"
                   value={formData.question}
                   onChange={(e) => setFormData({ ...formData, question: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
@@ -429,7 +424,7 @@ export default function ManageQuestions() {
                     </label>
                     <input
                       type="text"
-                      placeholder="Exact text matching the correct option (e.g. Option A's text)"
+                      placeholder="Must match the correct option text exactly"
                       value={formData.correctOption}
                       onChange={(e) => setFormData({ ...formData, correctOption: e.target.value })}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
@@ -443,7 +438,7 @@ export default function ManageQuestions() {
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="Provide a benchmark answer or scoring criteria..."
+                    placeholder="Enter a sample answer or scoring criteria"
                     value={formData.sampleAnswer}
                     onChange={(e) => setFormData({ ...formData, sampleAnswer: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-orange-500 focus:bg-white"
