@@ -18,6 +18,9 @@ import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Question;
 import com.skillcheckr.mapper.QuestionRowMapper;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Repository
 public class QuestionRepositoryImpl implements QuestionRepository {
 
@@ -103,17 +106,17 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 					+ "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id ORDER BY q.question_id DESC";
 			List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql);
 
-			List<QuestionDTO> list = new ArrayList<>();
+			List<QuestionDTO> questions = new ArrayList<>();
 			for (Map<String, Object> row : questionRows) {
 				int questionId = ((Number) row.get("question_id")).intValue();
 				int subjectId = row.get("subject_id") != null ? ((Number) row.get("subject_id")).intValue() : 0;
 				String questionText = (String) row.get("question_text");
 				String subjectName = (String) row.get("subject_name");
-				list.add(buildQuestionDto(questionId, subjectId, questionText, subjectName));
+				questions.add(buildQuestionDto(questionId, subjectId, questionText, subjectName));
 			}
-			return list;
+			return questions;
 		} catch (Exception e) {
-			System.err.println("Error fetching all questions: " + e.getMessage());
+			log.error("Error fetching all questions", e);
 			return new ArrayList<>();
 		}
 	}
@@ -132,7 +135,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 			String subjectName = (String) row.get("subject_name");
 			return Optional.of(buildQuestionDto(questionId, subjectId, questionText, subjectName));
 		} catch (Exception e) {
-			System.err.println("Error fetching question by ID: " + e.getMessage());
+			log.error("Error fetching question by ID", e);
 			return Optional.empty();
 		}
 	}
@@ -187,7 +190,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 			}
 			return true;
 		} catch (Exception e) {
-			System.err.println("Error updating question: " + e.getMessage());
+			log.error("Error updating question", e);
 			return false;
 		}
 	}
@@ -198,15 +201,15 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 			String selectQuestionSql = "SELECT question_id, subject_id, question_text FROM question WHERE subject_id = ?";
 			List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql, subjectId);
 
-			List<QuestionDTO> list = new ArrayList<>();
+			List<QuestionDTO> questions = new ArrayList<>();
 			for (Map<String, Object> row : questionRows) {
 				int questionId = ((Number) row.get("question_id")).intValue();
 				String questionText = (String) row.get("question_text");
-				list.add(buildQuestionDto(questionId, subjectId, questionText, null));
+				questions.add(buildQuestionDto(questionId, subjectId, questionText, null));
 			}
-			return list;
+			return questions;
 		} catch (Exception e) {
-			System.err.println("Error fetching questions by subject ID: " + e.getMessage());
+			log.error("Error fetching questions by subject ID", e);
 			return new ArrayList<>();
 		}
 	}
@@ -237,7 +240,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 				return questions;
 			}
 		} catch (Exception e) {
-			System.err.println("Error fetching questions by exam ID: " + e.getMessage());
+			log.error("Error fetching questions by exam ID", e);
 		}
 		return new ArrayList<>();
 	}
@@ -254,7 +257,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 	}
 
 	private List<QuestionDTO> mapQuestionRows(List<Map<String, Object>> questionRows, int examId) {
-		List<QuestionDTO> list = new ArrayList<>();
+		List<QuestionDTO> questions = new ArrayList<>();
 		for (Map<String, Object> row : questionRows) {
 			int questionId = ((Number) row.get("question_id")).intValue();
 			QuestionDTO dto = new QuestionDTO();
@@ -265,9 +268,9 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 			dto.setSubjectName((String) row.get("subject_name"));
 			setQuestionMetadata(dto, row);
 			populateAnswers(dto, questionId);
-			list.add(dto);
+			questions.add(dto);
 		}
-		return list;
+		return questions;
 	}
 
 	private void populateAnswers(QuestionDTO dto, int questionId) {
@@ -332,7 +335,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 			int rows = jdbcTemplate.update("DELETE FROM question WHERE question_id = ?", questionId);
 			return rows > 0;
 		} catch (Exception e) {
-			System.err.println("Error deleting question: " + e.getMessage());
+			log.error("Error deleting question", e);
 			return false;
 		}
 	}

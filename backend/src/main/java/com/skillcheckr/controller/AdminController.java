@@ -27,15 +27,15 @@ public class AdminController {
 	private AdminService adminService;
 
 	@GetMapping({"/viewAllTeacher", "/teachers"})
-	public ResponseEntity<List<Teacher>> viewAllTeacher() {
-		List<Teacher> list = adminService.getAllTeacher();
-		return ResponseEntity.ok(list != null ? list : List.of());
+	public ResponseEntity<List<Teacher>> getAllTeachers() {
+		List<Teacher> teachers = adminService.getAllTeacher();
+		return ResponseEntity.ok(teachers != null ? teachers : List.of());
 	}
 
 	@GetMapping({"/viewAllStudent", "/students"})
-	public ResponseEntity<List<Student>> viewAllStudent() {
-		List<Student> list = adminService.getAllStudent();
-		return ResponseEntity.ok(list != null ? list : List.of());
+	public ResponseEntity<List<Student>> getAllStudents() {
+		List<Student> students = adminService.getAllStudent();
+		return ResponseEntity.ok(students != null ? students : List.of());
 	}
 
 	@PostMapping({"/addStudent/{request_id}", "/students/from-request/{request_id}"})

@@ -200,7 +200,7 @@ class AuthControllerTest {
                         .content(json))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Profile updated successfully"))
+                .andExpect(jsonPath("$.message").value("Profile updated."))
                 .andExpect(jsonPath("$.profile.name").value("Alice Updated"));
     }
 
@@ -226,7 +226,7 @@ class AuthControllerTest {
                         .content(json))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Profile updated successfully"))
+                .andExpect(jsonPath("$.message").value("Profile updated."))
                 .andExpect(jsonPath("$.profile.name").value("Alice Updated"));
     }
 

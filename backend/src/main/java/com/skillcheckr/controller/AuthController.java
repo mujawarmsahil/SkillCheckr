@@ -101,7 +101,6 @@ public class AuthController {
     }
 
     private ProfileUpdateResponse performProfileUpdate(UserProfileDTO profile) {
-        // Validate required fields
         if (profile.getName() == null || profile.getName().trim().isEmpty()) {
             throw new BadRequestException("Name is required");
         }
@@ -124,17 +123,14 @@ public class AuthController {
             profile.setContact(profile.getContact().trim());
         }
 
-        // Check duplicate username
         if (authService.isUsernameInUse(trimmedUsername, profile.getUserId())) {
             throw new BadRequestException("Username is already taken by another account");
         }
 
-        // Check duplicate email
         if (authService.isEmailInUse(trimmedEmail, profile.getUserId())) {
             throw new BadRequestException("Email is already in use by another account");
         }
 
-        // Validate password if provided
         if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
             String newPassword = profile.getPassword().trim();
             if (newPassword.length() < 4) {
@@ -159,7 +155,7 @@ public class AuthController {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found or update failed"));
 
         return ProfileUpdateResponse.builder()
-                .message("Profile updated successfully")
+                .message("Profile updated.")
                 .success(true)
                 .profile(updated)
                 .build();

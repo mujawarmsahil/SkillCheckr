@@ -92,13 +92,13 @@ class ExamServiceTest {
     }
 
     @Test
-    void viewAllExams_delegatesToRepository() {
+    void getAllExams_delegatesToRepository() {
         Exam exam = new Exam();
         exam.setExamId(1);
-        when(examRepository.viewAllExams()).thenReturn(List.of(exam));
+        when(examRepository.getAllExams()).thenReturn(List.of(exam));
 
-        assertThat(examService.viewAllExams()).hasSize(1);
-        verify(examRepository).viewAllExams();
+        assertThat(examService.getAllExams()).hasSize(1);
+        verify(examRepository).getAllExams();
     }
 
     @Test
@@ -118,24 +118,24 @@ class ExamServiceTest {
     }
 
     @Test
-    void viewAllUpcomingExam_delegatesToRepository() {
+    void getAllUpcomingExams_delegatesToRepository() {
         Exam upcoming = new Exam();
         upcoming.setStatus("Upcoming");
         upcoming.setStartTime(LocalTime.of(9, 0));
-        when(examRepository.viewAllUpcomingExam()).thenReturn(List.of(upcoming));
+        when(examRepository.getAllUpcomingExams()).thenReturn(List.of(upcoming));
 
-        assertThat(examService.viewAllUpcomingExam()).hasSize(1);
-        verify(examRepository).viewAllUpcomingExam();
+        assertThat(examService.getAllUpcomingExams()).hasSize(1);
+        verify(examRepository).getAllUpcomingExams();
     }
 
     @Test
-    void viewAllCompletedExam_delegatesToRepository() {
+    void getAllCompletedExams_delegatesToRepository() {
         Exam completed = new Exam();
         completed.setStatus("Completed");
-        when(examRepository.viewAllCompletedExam()).thenReturn(List.of(completed));
+        when(examRepository.getAllCompletedExams()).thenReturn(List.of(completed));
 
-        assertThat(examService.viewAllCompletedExam()).hasSize(1);
-        verify(examRepository).viewAllCompletedExam();
+        assertThat(examService.getAllCompletedExams()).hasSize(1);
+        verify(examRepository).getAllCompletedExams();
     }
 
     @Test

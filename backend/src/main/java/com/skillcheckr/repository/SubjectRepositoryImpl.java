@@ -18,6 +18,9 @@ import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.Subject;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Repository
 public class SubjectRepositoryImpl implements SubjectRepository {
 
@@ -40,7 +43,7 @@ public class SubjectRepositoryImpl implements SubjectRepository {
         try {
             return jdbcTemplate.query("SELECT * FROM subject ORDER BY subject_id DESC", subjectRowMapper);
         } catch (Exception e) {
-            System.err.println("Error fetching subjects: " + e.getMessage());
+            log.error("Error fetching subjects", e);
             return new ArrayList<>();
         }
     }
@@ -53,7 +56,7 @@ public class SubjectRepositoryImpl implements SubjectRepository {
         } catch (EmptyResultDataAccessException e) {
             return Optional.empty();
         } catch (Exception e) {
-            System.err.println("Error fetching subject by ID: " + e.getMessage());
+            log.error("Error fetching subject by ID", e);
             return Optional.empty();
         }
     }
@@ -70,7 +73,6 @@ public class SubjectRepositoryImpl implements SubjectRepository {
                 : generateSubjectCode(name);
 
         try {
-            // Check if code already exists
             Integer existingCount = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM subject WHERE subject_code = ?", Integer.class, code);
             if (existingCount != null && existingCount > 0) {
@@ -93,7 +95,7 @@ public class SubjectRepositoryImpl implements SubjectRepository {
             int newId = id != null ? id.intValue() : 0;
             return new Subject(newId, name, finalCode);
         } catch (Exception e) {
-            System.err.println("Error adding subject: " + e.getMessage());
+            log.error("Error adding subject", e);
             return null;
         }
     }
@@ -114,7 +116,7 @@ public class SubjectRepositoryImpl implements SubjectRepository {
             int rows = jdbcTemplate.update(updateSql, name, code, subjectId);
             return rows > 0;
         } catch (Exception e) {
-            System.err.println("Error updating subject: " + e.getMessage());
+            log.error("Error updating subject", e);
             return false;
         }
     }
@@ -122,7 +124,6 @@ public class SubjectRepositoryImpl implements SubjectRepository {
     @Override
     public boolean deleteSubjectById(int subjectId) {
         try {
-            // Cascade delete dependent questions and answers safely
             List<Integer> questionIds = jdbcTemplate.query(
                     "SELECT question_id FROM question WHERE subject_id = ?",
                     (rs, rowNum) -> rs.getInt("question_id"), subjectId);
@@ -132,13 +133,12 @@ public class SubjectRepositoryImpl implements SubjectRepository {
             }
             jdbcTemplate.update("DELETE FROM question WHERE subject_id = ?", subjectId);
 
-            // Cascade delete exams associated with subject
             jdbcTemplate.update("DELETE FROM exam WHERE subject_id = ?", subjectId);
 
             int rows = jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId);
             return rows > 0;
         } catch (Exception e) {
-            System.err.println("Error deleting subject: " + e.getMessage());
+            log.error("Error deleting subject", e);
             return false;
         }
     }

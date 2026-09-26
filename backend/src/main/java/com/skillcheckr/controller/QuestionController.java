@@ -39,8 +39,8 @@ public class QuestionController {
 
 	@GetMapping({"", "/all"})
 	public ResponseEntity<List<QuestionDTO>> getAllQuestions() {
-		List<QuestionDTO> list = questionService.getAllQuestions();
-		return ResponseEntity.ok(list != null ? list : List.of());
+		List<QuestionDTO> questions = questionService.getAllQuestions();
+		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
 
 	@GetMapping("/{questionId}")
@@ -66,14 +66,14 @@ public class QuestionController {
 
 	@GetMapping("/subject/{subjectId}")
 	public ResponseEntity<List<QuestionDTO>> getQuestionsBySubject(@PathVariable("subjectId") Integer subjectId) {
-		List<QuestionDTO> list = questionService.getQuestionsBySubjectId(subjectId);
-		return ResponseEntity.ok(list != null ? list : List.of());
+		List<QuestionDTO> questions = questionService.getQuestionsBySubjectId(subjectId);
+		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
 
 	@GetMapping("/exam/{examId}")
 	public ResponseEntity<List<QuestionDTO>> getQuestionsByExam(@PathVariable("examId") Integer examId) {
-		List<QuestionDTO> list = questionService.getQuestionsByExamId(examId);
-		return ResponseEntity.ok(list != null ? list : List.of());
+		List<QuestionDTO> questions = questionService.getQuestionsByExamId(examId);
+		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
 
 	@DeleteMapping("/{questionId}")

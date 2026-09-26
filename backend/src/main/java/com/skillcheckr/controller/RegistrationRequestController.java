@@ -35,7 +35,7 @@ public class RegistrationRequestController {
         if (result) {
             return ResponseEntity.ok(new ApiResponse(
                     true,
-                    "Registration request submitted successfully! Awaiting Admin approval."
+                    "Registration request submitted. Awaiting admin approval."
             ));
         }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -44,11 +44,11 @@ public class RegistrationRequestController {
 
     @GetMapping({"/viewAllRegisterUsers", ""})
     public ResponseEntity<List<RegistrationRequest>> getAllRequests() {
-        List<RegistrationRequest> list = registrationRequestService.getAllRequests();
-        if (list == null || list.isEmpty()) {
+        List<RegistrationRequest> requests = registrationRequestService.getAllRequests();
+        if (requests == null || requests.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
         }
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(requests);
     }
 
     @PutMapping({"/status/{request_id}", "/{request_id}/status"})

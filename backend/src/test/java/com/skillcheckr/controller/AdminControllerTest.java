@@ -43,7 +43,7 @@ class AdminControllerTest {
     }
 
     @Test
-    void viewAllTeacher_returnsEmptyList_whenEmpty() throws Exception {
+    void getAllTeachers_returnsEmptyList_whenEmpty() throws Exception {
         when(adminService.getAllTeacher()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/Admin/viewAllTeacher"))
@@ -52,7 +52,7 @@ class AdminControllerTest {
     }
 
     @Test
-    void viewAllTeacher_returnsTeachers() throws Exception {
+    void getAllTeachers_returnsTeachers() throws Exception {
         Teacher teacher = new Teacher();
         teacher.setTeacherId(1);
         teacher.setTeacherName("Alice");
@@ -67,7 +67,7 @@ class AdminControllerTest {
     }
 
     @Test
-    void viewAllStudent_returnsEmptyList_whenEmpty() throws Exception {
+    void getAllStudents_returnsEmptyList_whenEmpty() throws Exception {
         when(adminService.getAllStudent()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/Admin/viewAllStudent"))
@@ -76,7 +76,7 @@ class AdminControllerTest {
     }
 
     @Test
-    void viewAllStudent_returnsStudents() throws Exception {
+    void getAllStudents_returnsStudents() throws Exception {
         Student student = new Student();
         student.setStudentId(2);
         student.setStudentName("Bob");

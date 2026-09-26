@@ -14,8 +14,13 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.Exam;
+import com.skillcheckr.model.ExamRegistration;
+import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Repository
 public class ExamRepositoryImpl implements ExamRepository {
 
@@ -63,12 +68,12 @@ public class ExamRepositoryImpl implements ExamRepository {
 	public Subject saveExam(Exam exam) {
 		try {
 			if (exam.getDate() == null || exam.getDate().isEmpty()) {
-				System.err.println("Error: Exam date is null or empty.");
+				log.error("Exam date is null or empty.");
 				return null;
 			}
 
 			if (exam.getStartTime() == null || exam.getEndTime() == null) {
-				System.err.println("Error: Start time or End time is null.");
+				log.error("Exam start time or end time is null.");
 				return null;
 			}
 
@@ -76,22 +81,17 @@ public class ExamRepositoryImpl implements ExamRepository {
 			String subjectName = exam.getSubject() != null ? exam.getSubject().getSubjectName() : "General";
 			int subjectId;
 
-			// Step 1: Check if subject exists
 			String checkSubjectQuery = "SELECT COUNT(*) FROM subject WHERE subject_code = ?";
 			Integer count = jdbcTemplate.queryForObject(checkSubjectQuery, Integer.class, subjectCode);
 
-			if (count != null && count > 0) {
-				String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ? LIMIT 1";
-				subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, Integer.class, subjectCode);
-			} else {
+			if (count == null || count == 0) {
 				String insertSubjectQuery = "INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)";
 				jdbcTemplate.update(insertSubjectQuery, subjectName, subjectCode);
-
-				String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ? LIMIT 1";
-				subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, Integer.class, subjectCode);
 			}
 
-			// Step 2: Validate teacher ID if possible
+			String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ? LIMIT 1";
+			subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, Integer.class, subjectCode);
+
 			int teacherId = exam.getTeacherId();
 			if (teacherId > 0) {
 				String checkTeacherQuery = "SELECT COUNT(*) FROM teacher WHERE teacher_id = ?";
@@ -134,7 +134,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 			return subject;
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Error saving exam", e);
 			return null;
 		}
 	}
@@ -162,7 +162,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 			return true;
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Error deleting exam", e);
 			return false;
 		}
 	}
@@ -192,7 +192,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 	@Override
-	public List<Exam> viewAllUpcomingExam() {
+	public List<Exam> getAllUpcomingExams() {
 		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
@@ -206,7 +206,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 	@Override
-	public List<Exam> viewAllCompletedExam() {
+	public List<Exam> getAllCompletedExams() {
 		syncExamStatuses();
 		String selectQuery = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
@@ -223,7 +223,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 	@Override
-	public List<Exam> viewAllExams() {
+	public List<Exam> getAllExams() {
 		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id ORDER BY e.exam_id DESC";
 		return jdbcTemplate.query(query, getExamRowMapper());
@@ -233,8 +233,8 @@ public class ExamRepositoryImpl implements ExamRepository {
 	@Override
 	public Optional<Exam> getExamById(int examId) {
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id WHERE e.exam_id = ?";
-		List<Exam> list = jdbcTemplate.query(query, getExamRowMapper(), examId);
-		return list.stream().findFirst();
+		List<Exam> exams = jdbcTemplate.query(query, getExamRowMapper(), examId);
+		return exams.stream().findFirst();
 	}
 
 	@Override
@@ -270,7 +270,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 	@Override
-	public List<com.skillcheckr.model.ExamRegistration> getRegistrationsByStudentId(int studentId) {
+	public List<ExamRegistration> getRegistrationsByStudentId(int studentId) {
 		String sql = "SELECT r.*, e.exam_name, e.exam_type, e.exam_date, e.start_time, e.end_time, e.duration_minutes, e.total_marks, e.pass_marks, e.status as exam_status, s.subject_id, s.subject_name, s.subject_code "
 				+ "FROM exam_registration r "
 				+ "JOIN exam e ON r.exam_id = e.exam_id "
@@ -278,7 +278,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 				+ "WHERE r.student_id = ? "
 				+ "ORDER BY r.registration_id DESC";
 		return jdbcTemplate.query(sql, (rs, rowNum) -> {
-			com.skillcheckr.model.ExamRegistration reg = new com.skillcheckr.model.ExamRegistration();
+			ExamRegistration reg = new ExamRegistration();
 			reg.setRegistrationId(rs.getInt("registration_id"));
 			reg.setStudentId(rs.getInt("student_id"));
 			reg.setExamId(rs.getInt("exam_id"));
@@ -311,10 +311,10 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 	@Override
-	public List<com.skillcheckr.model.Student> getRegisteredStudentsByExamId(int examId) {
+	public List<Student> getRegisteredStudentsByExamId(int examId) {
 		String sql = "SELECT s.* FROM exam_registration r JOIN student s ON r.student_id = s.student_id WHERE r.exam_id = ? ORDER BY s.student_id ASC";
 		return jdbcTemplate.query(sql, (rs, rowNum) -> {
-			com.skillcheckr.model.Student s = new com.skillcheckr.model.Student();
+			Student s = new Student();
 			s.setStudentId(rs.getInt("student_id"));
 			s.setStudentName(rs.getString("name"));
 			s.setStudentContact(rs.getString("contact"));

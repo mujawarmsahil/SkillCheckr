@@ -15,6 +15,9 @@ import org.springframework.stereotype.Repository;
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Repository
 public class AuthRepositoryImpl implements AuthRepository {
 
@@ -186,7 +189,6 @@ public class AuthRepositoryImpl implements AuthRepository {
         }
 
         try {
-            // Update user table
             if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
                 String encodedPassword = passwordEncoder.encode(profile.getPassword().trim());
                 jdbcTemplate.update(
@@ -198,7 +200,6 @@ public class AuthRepositoryImpl implements AuthRepository {
                         profile.getUsername(), profile.getProfileImage(), profile.getUserId());
             }
 
-            // Determine role
             String roleSql = "SELECT user_role FROM user WHERE user_id = ?";
             String role = jdbcTemplate.queryForObject(roleSql, String.class, profile.getUserId());
             String roleStr = role != null ? role.trim().toLowerCase() : "";
@@ -220,7 +221,7 @@ public class AuthRepositoryImpl implements AuthRepository {
 
             return getUserProfile(profile.getUserId());
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error updating user profile", e);
             return Optional.empty();
         }
     }

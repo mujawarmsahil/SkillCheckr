@@ -46,7 +46,7 @@ public class SubjectServiceImpl implements SubjectService {
     @Override
     public List<Map<String, Object>> getAllSubjectsWithStats() {
         List<Subject> subjects = subjectRepository.getAllSubjects();
-        List<Map<String, Object>> list = new ArrayList<>();
+        List<Map<String, Object>> subjectStats = new ArrayList<>();
         for (Subject s : subjects) {
             Map<String, Object> map = new HashMap<>();
             map.put("subjectId", s.getSubjectId());
@@ -57,8 +57,8 @@ public class SubjectServiceImpl implements SubjectService {
             map.put("subject_code", s.getSubjectCode());
             map.put("questionCount", subjectRepository.getQuestionCountBySubjectId(s.getSubjectId()));
             map.put("examCount", subjectRepository.getExamCountBySubjectId(s.getSubjectId()));
-            list.add(map);
+            subjectStats.add(map);
         }
-        return list;
+        return subjectStats;
     }
 }

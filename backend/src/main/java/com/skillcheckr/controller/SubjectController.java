@@ -30,14 +30,14 @@ public class SubjectController {
 
     @GetMapping({"", "/all"})
     public ResponseEntity<List<Subject>> getAllSubjects() {
-        List<Subject> list = subjectService.getAllSubjects();
-        return ResponseEntity.ok(list != null ? list : List.of());
+        List<Subject> subjects = subjectService.getAllSubjects();
+        return ResponseEntity.ok(subjects != null ? subjects : List.of());
     }
 
     @GetMapping("/with-stats")
     public ResponseEntity<List<Map<String, Object>>> getAllSubjectsWithStats() {
-        List<Map<String, Object>> list = subjectService.getAllSubjectsWithStats();
-        return ResponseEntity.ok(list != null ? list : List.of());
+        List<Map<String, Object>> subjectStats = subjectService.getAllSubjectsWithStats();
+        return ResponseEntity.ok(subjectStats != null ? subjectStats : List.of());
     }
 
     @GetMapping("/{subjectId}")

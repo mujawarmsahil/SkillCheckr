@@ -39,8 +39,8 @@ public class ResultRepositoryImpl implements ResultRepository {
 				+ "LEFT JOIN exam e ON r.exam_id = e.exam_id "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 				+ "WHERE r.exam_id = ? AND r.student_id = ? ORDER BY r.result_id DESC LIMIT 1";
-		List<ExamResultDTO> list = jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE, examId, studentId);
-		return list.stream().findFirst();
+		List<ExamResultDTO> results = jdbcTemplate.query(sql, ExamResultRowMapper.INSTANCE, examId, studentId);
+		return results.stream().findFirst();
 	}
 
 	@Override

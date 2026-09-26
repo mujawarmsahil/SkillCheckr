@@ -121,7 +121,7 @@ public class AttemptAnswerServiceImpl implements AttemptAnswerService {
         return responses;
     }
 
-    private int countWords(String value) {
-        return value.trim().split("\\s+").length;
+    private int countWords(String text) {
+        return text.trim().split("\\s+").length;
     }
 }

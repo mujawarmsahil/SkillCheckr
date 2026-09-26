@@ -15,6 +15,9 @@ import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.RegistrationRequest;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Repository
 public class RegistrationRequestRepositoryImpl implements RegistrationRequestRepository {
 
@@ -48,7 +51,7 @@ public class RegistrationRequestRepositoryImpl implements RegistrationRequestRep
 
             result = ps.executeUpdate();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error saving registration request", e);
         }
         return result > 0;
     }
@@ -73,13 +76,13 @@ public class RegistrationRequestRepositoryImpl implements RegistrationRequestRep
 
     @Override
     public boolean deleteRequestById(int id) {
-        int value = jdbcTemplate.update("DELETE FROM request WHERE request_id = ?", id);
-        return value > 0;
+        int deleted = jdbcTemplate.update("DELETE FROM request WHERE request_id = ?", id);
+        return deleted > 0;
     }
 
     @Override
     public boolean updateRequestStatus(int id, String status) {
-        int value = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ?", status, id);
-        return value > 0;
+        int updated = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ?", status, id);
+        return updated > 0;
     }
 }

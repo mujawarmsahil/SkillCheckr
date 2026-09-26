@@ -4,13 +4,15 @@ import java.util.List;
 import java.util.Optional;
 
 import com.skillcheckr.model.Exam;
+import com.skillcheckr.model.ExamRegistration;
+import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 
 public interface ExamRepository {
 
 	Subject saveExam(Exam exam);
 
-	List<Exam> viewAllExams();
+	List<Exam> getAllExams();
 
 	boolean deleteExamById(int examId);
 
@@ -18,9 +20,9 @@ public interface ExamRepository {
 
 	boolean updateExamStatus(int examId, String status);
 
-	List<Exam> viewAllUpcomingExam();
+	List<Exam> getAllUpcomingExams();
 
-	List<Exam> viewAllCompletedExam();
+	List<Exam> getAllCompletedExams();
 
 	Optional<Exam> getExamById(int examId);
 
@@ -32,9 +34,9 @@ public interface ExamRepository {
 
 	List<Integer> getRegisteredExamIdsForStudent(int studentId);
 
-	List<com.skillcheckr.model.ExamRegistration> getRegistrationsByStudentId(int studentId);
+	List<ExamRegistration> getRegistrationsByStudentId(int studentId);
 
-	List<com.skillcheckr.model.Student> getRegisteredStudentsByExamId(int examId);
+	List<Student> getRegisteredStudentsByExamId(int examId);
 
 	int getRegistrationCountByExamId(int examId);
 
