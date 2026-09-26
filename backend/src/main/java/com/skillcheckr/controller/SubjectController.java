@@ -1,7 +1,6 @@
 package com.skillcheckr.controller;
 
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -19,6 +18,7 @@ import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.Subject;
+import com.skillcheckr.model.SubjectStatsResponse;
 import com.skillcheckr.service.SubjectService;
 
 @RestController
@@ -35,8 +35,8 @@ public class SubjectController {
     }
 
     @GetMapping("/with-stats")
-    public ResponseEntity<List<Map<String, Object>>> getAllSubjectsWithStats() {
-        List<Map<String, Object>> subjectStats = subjectService.getAllSubjectsWithStats();
+    public ResponseEntity<List<SubjectStatsResponse>> getAllSubjectsWithStats() {
+        List<SubjectStatsResponse> subjectStats = subjectService.getAllSubjectsWithStats();
         return ResponseEntity.ok(subjectStats != null ? subjectStats : List.of());
     }
 
