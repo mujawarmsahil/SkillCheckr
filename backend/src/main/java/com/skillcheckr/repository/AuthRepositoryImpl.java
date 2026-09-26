@@ -245,6 +245,13 @@ public class AuthRepositoryImpl implements AuthRepository {
     }
 
     @Override
+    public boolean existsByUsername(String username) {
+        String sql = "SELECT COUNT(*) FROM user WHERE username = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username);
+        return count != null && count > 0;
+    }
+
+    @Override
     public boolean isEmailInUse(String email, int excludeUserId) {
         if (email == null || email.trim().isEmpty()) {
             return false;

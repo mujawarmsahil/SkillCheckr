@@ -57,6 +57,13 @@ public class RegistrationRequestRepositoryImpl implements RegistrationRequestRep
     }
 
     @Override
+    public boolean existsByUsername(String username) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM request WHERE username = ?", Integer.class, username);
+        return count != null && count > 0;
+    }
+
+    @Override
     public List<RegistrationRequest> getAllRequests() {
         return jdbcTemplate.query("SELECT * FROM Request ORDER BY request_id DESC", new RowMapper<RegistrationRequest>() {
             @Override

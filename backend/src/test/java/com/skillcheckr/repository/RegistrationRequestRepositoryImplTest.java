@@ -98,6 +98,22 @@ class RegistrationRequestRepositoryImplTest {
     }
 
     @Test
+    void existsByUsername_returnsTrue_whenRequestExists() {
+        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE username = ?", Integer.class, "sam"))
+                .thenReturn(1);
+
+        assertThat(repository.existsByUsername("sam")).isTrue();
+    }
+
+    @Test
+    void existsByUsername_returnsFalse_whenFree() {
+        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE username = ?", Integer.class, "free"))
+                .thenReturn(0);
+
+        assertThat(repository.existsByUsername("free")).isFalse();
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void getAllRequests_returnsMappedRequests() throws Exception {
         RegistrationRequest req = new RegistrationRequest();

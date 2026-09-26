@@ -151,6 +151,22 @@ class AuthRepositoryImplTest {
     }
 
     @Test
+    void existsByUsername_returnsTrue_whenTaken() {
+        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM user WHERE username = ?", Integer.class, "takenUser"))
+                .thenReturn(1);
+
+        assertThat(repository.existsByUsername("takenUser")).isTrue();
+    }
+
+    @Test
+    void existsByUsername_returnsFalse_whenFree() {
+        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM user WHERE username = ?", Integer.class, "freeUser"))
+                .thenReturn(0);
+
+        assertThat(repository.existsByUsername("freeUser")).isFalse();
+    }
+
+    @Test
     void isEmailInUse_returnsTrue_whenFoundInStudent() {
         when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM student WHERE email = ? AND (user_id != ? OR user_id IS NULL)"), eq(Integer.class), eq("test@test.com"), eq(1)))
                 .thenReturn(1);
