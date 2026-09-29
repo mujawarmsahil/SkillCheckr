@@ -18,14 +18,21 @@ import com.skillcheckr.model.LoginResponse;
 import com.skillcheckr.model.ProfileUpdateResponse;
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
+import com.skillcheckr.security.AuthGuard;
+import com.skillcheckr.security.TokenService;
 import com.skillcheckr.service.AuthService;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
-@RequestMapping({"/api/authentication", "/api/auth", "/api/user", "/api/users"})
+@RequestMapping("/api/auth")
 public class AuthController {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private TokenService tokenService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
@@ -67,36 +74,34 @@ public class AuthController {
                 .role(user.getRole())
                 .userId(user.getUserId())
                 .roleId(roleId)
-                .token("jwt-mock-" + user.getUserId() + "-" + System.currentTimeMillis())
+                .token(tokenService.issueToken(user.getUserId(), roleId, user.getRole(), user.getUsername()))
                 .build());
     }
 
-    @GetMapping({"/profile/{userId}", "/user/profile/{userId}"})
-    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable("userId") Integer userId) {
+    @GetMapping("/profile/{userId}")
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable("userId") Integer userId,
+            HttpServletRequest request) {
         if (userId == null || userId <= 0) {
             throw new BadRequestException("Valid User ID is required");
         }
+
+        AuthGuard.requireSelfOrAdmin(request, userId);
 
         UserProfileDTO profile = authService.getUserProfile(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return ResponseEntity.ok(profile);
     }
 
-    @PutMapping({"/profile/{userId}", "/user/profile/{userId}"})
+    @PutMapping("/profile/{userId}")
     public ResponseEntity<ProfileUpdateResponse> updateProfile(@PathVariable("userId") Integer userId,
-            @RequestBody UserProfileDTO profileRequest) {
+            @RequestBody UserProfileDTO profileRequest, HttpServletRequest request) {
         if (userId == null || userId <= 0 || profileRequest == null) {
             throw new BadRequestException("Invalid profile update data");
         }
-        profileRequest.setUserId(userId);
-        return ResponseEntity.ok(performProfileUpdate(profileRequest));
-    }
 
-    @PostMapping({"/profile/update", "/profile"})
-    public ResponseEntity<ProfileUpdateResponse> updateProfilePost(@RequestBody UserProfileDTO profileRequest) {
-        if (profileRequest == null || profileRequest.getUserId() <= 0) {
-            throw new BadRequestException("Valid User ID is required in profile data");
-        }
+        AuthGuard.requireSelfOrAdmin(request, userId);
+
+        profileRequest.setUserId(userId);
         return ResponseEntity.ok(performProfileUpdate(profileRequest));
     }
 

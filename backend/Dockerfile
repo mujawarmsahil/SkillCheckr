@@ -41,5 +41,10 @@ COPY --from=build /app/target/*.jar app.jar
 ENV PORT=8080
 EXPOSE 8080
 
+# Activate the production profile so the deployment is validated as a real deployment:
+# TOKEN_SECRET becomes mandatory, and the CORS defaults drop the loopback origins.
+# Override at runtime only to run the container as a local development instance.
+ENV SPRING_PROFILES_ACTIVE=prod
+
 # Configure container startup with quick entropy generation
 ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]

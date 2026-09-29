@@ -30,6 +30,7 @@ public class AttemptAnswerRowMapper implements RowMapper<AttemptAnswer> {
                 .selectedAnswer(selectedAnswer)
                 .textAnswer(rs.getString("text_answer"))
                 .marksObtained((Integer) rs.getObject("marks_obtained"))
+                .correctOptionText(rs.getString("correct_option_text"))
                 .build();
     }
 }

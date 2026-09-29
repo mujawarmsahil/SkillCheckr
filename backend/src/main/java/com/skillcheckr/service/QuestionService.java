@@ -17,6 +17,10 @@ public interface QuestionService {
 
 	List<QuestionDTO> getQuestionsByExamId(int examId);
 
+	List<QuestionDTO> getStudentQuestionsByExamId(int examId);
+
+	int attachQuestionsToExam(int examId, List<Integer> questionIds);
+
 	boolean updateQuestion(QuestionDTO question);
 
 	boolean deleteQuestionById(int questionId);

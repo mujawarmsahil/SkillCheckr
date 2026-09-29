@@ -14,13 +14,12 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Question;
 import com.skillcheckr.mapper.QuestionRowMapper;
 
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 @Repository
 public class QuestionRepositoryImpl implements QuestionRepository {
 
@@ -36,7 +35,13 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 		for (int questionIndex = 0; questionIndex < questions.size(); questionIndex++) {
 			QuestionDTO dto = questions.get(questionIndex);
 			if (dto == null || dto.getQuestion() == null || dto.getQuestion().trim().isEmpty()) {
-				continue;
+				throw new BadRequestException("Every question needs question text");
+			}
+			if (dto.getSubjectId() <= 0) {
+				throw new BadRequestException("Every question needs a subject");
+			}
+			if (dto.getExamId() != null && dto.getExamId() > 0) {
+				validateExamSubject(dto.getExamId(), dto.getSubjectId());
 			}
 
 			String insertQuestionSql = "INSERT INTO question(subject_id, question_text, question_type, marks, word_limit) VALUES(?, ?, ?, ?, ?)";
@@ -86,7 +91,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 				}
 			} else {
 				if (dto.getSampleAnswer() != null && !dto.getSampleAnswer().trim().isEmpty()) {
-					String insertAnswerSql = "INSERT INTO answer(question_id, option_text, is_correct) VALUES(?, ?, ?)";
+					String insertAnswerSql = "INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)";
 					jdbcTemplate.update(insertAnswerSql, questionId, dto.getSampleAnswer().trim(), true);
 				}
 			}
@@ -94,50 +99,51 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 	}
 
 	private void saveOption(String option, String correctOption, int questionId) {
-		String insertAnswerSql = "INSERT INTO answer(question_id, option_text, is_correct) VALUES(?, ?, ?)";
+		String insertAnswerSql = "INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)";
 		boolean isCorrect = option != null && correctOption != null && option.trim().equalsIgnoreCase(correctOption.trim());
 		jdbcTemplate.update(insertAnswerSql, questionId, option, isCorrect);
 	}
 
-	@Override
-	public List<QuestionDTO> getAllQuestions() {
-		try {
-			String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, s.subject_name "
-					+ "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id ORDER BY q.question_id DESC";
-			List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql);
-
-			List<QuestionDTO> questions = new ArrayList<>();
-			for (Map<String, Object> row : questionRows) {
-				int questionId = ((Number) row.get("question_id")).intValue();
-				int subjectId = row.get("subject_id") != null ? ((Number) row.get("subject_id")).intValue() : 0;
-				String questionText = (String) row.get("question_text");
-				String subjectName = (String) row.get("subject_name");
-				questions.add(buildQuestionDto(questionId, subjectId, questionText, subjectName));
-			}
-			return questions;
-		} catch (Exception e) {
-			log.error("Error fetching all questions", e);
-			return new ArrayList<>();
+	private void validateExamSubject(int examId, int subjectId) {
+		List<Integer> examSubjects = jdbcTemplate.query("SELECT subject_id FROM exam WHERE exam_id = ?",
+				(rs, rowNum) -> rs.getInt("subject_id"), examId);
+		if (examSubjects.isEmpty()) {
+			throw new ResourceNotFoundException("Exam " + examId + " does not exist");
+		}
+		if (examSubjects.get(0) != subjectId) {
+			throw new BadRequestException("The question subject must match the exam subject");
 		}
 	}
 
 	@Override
-	public Optional<QuestionDTO> getQuestionById(int questionId) {
-		try {
-			String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, s.subject_name "
-					+ "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id WHERE q.question_id = ?";
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(selectQuestionSql, questionId);
-			if (rows.isEmpty()) return Optional.empty();
+	public List<QuestionDTO> getAllQuestions() {
+		String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, s.subject_name "
+				+ "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id ORDER BY q.question_id DESC";
+		List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql);
 
-			Map<String, Object> row = rows.get(0);
+		List<QuestionDTO> questions = new ArrayList<>();
+		for (Map<String, Object> row : questionRows) {
+			int questionId = ((Number) row.get("question_id")).intValue();
 			int subjectId = row.get("subject_id") != null ? ((Number) row.get("subject_id")).intValue() : 0;
 			String questionText = (String) row.get("question_text");
 			String subjectName = (String) row.get("subject_name");
-			return Optional.of(buildQuestionDto(questionId, subjectId, questionText, subjectName));
-		} catch (Exception e) {
-			log.error("Error fetching question by ID", e);
-			return Optional.empty();
+			questions.add(buildQuestionDto(questionId, subjectId, questionText, subjectName));
 		}
+		return questions;
+	}
+
+	@Override
+	public Optional<QuestionDTO> getQuestionById(int questionId) {
+		String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, s.subject_name "
+				+ "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id WHERE q.question_id = ?";
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(selectQuestionSql, questionId);
+		if (rows.isEmpty()) return Optional.empty();
+
+		Map<String, Object> row = rows.get(0);
+		int subjectId = row.get("subject_id") != null ? ((Number) row.get("subject_id")).intValue() : 0;
+		String questionText = (String) row.get("question_text");
+		String subjectName = (String) row.get("subject_name");
+		return Optional.of(buildQuestionDto(questionId, subjectId, questionText, subjectName));
 	}
 
 	@Override
@@ -151,98 +157,67 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 	@Override
 	public boolean updateQuestion(QuestionDTO dto) {
 		if (dto == null || dto.getQuestionId() <= 0) return false;
-		try {
-			int questionId = dto.getQuestionId();
-			if (dto.getSubjectId() > 0) {
-				jdbcTemplate.update("UPDATE question SET question_text = ?, subject_id = ?, question_type = ?, marks = ?, word_limit = ? WHERE question_id = ?",
-						dto.getQuestion(), dto.getSubjectId(), normalizedQuestionType(dto), dto.getMarks() > 0 ? dto.getMarks() : 1,
-						dto.getWordLimit(), questionId);
-			} else {
-				jdbcTemplate.update("UPDATE question SET question_text = ?, question_type = ?, marks = ?, word_limit = ? WHERE question_id = ?",
-						dto.getQuestion(), normalizedQuestionType(dto), dto.getMarks() > 0 ? dto.getMarks() : 1,
-						dto.getWordLimit(), questionId);
-			}
-
-			jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", questionId);
-
-			boolean isMcq = (dto.getOption1() != null && !dto.getOption1().trim().isEmpty())
-					|| (dto.getOption2() != null && !dto.getOption2().trim().isEmpty())
-					|| ExamConstants.QUESTION_TYPE_MCQ.equalsIgnoreCase(dto.getQuestionType());
-
-			if (isMcq) {
-				if (dto.getOption1() != null && !dto.getOption1().trim().isEmpty()) {
-					saveOption(dto.getOption1().trim(), dto.getCorrectOption(), questionId);
-				}
-				if (dto.getOption2() != null && !dto.getOption2().trim().isEmpty()) {
-					saveOption(dto.getOption2().trim(), dto.getCorrectOption(), questionId);
-				}
-				if (dto.getOption3() != null && !dto.getOption3().trim().isEmpty()) {
-					saveOption(dto.getOption3().trim(), dto.getCorrectOption(), questionId);
-				}
-				if (dto.getOption4() != null && !dto.getOption4().trim().isEmpty()) {
-					saveOption(dto.getOption4().trim(), dto.getCorrectOption(), questionId);
-				}
-			} else {
-				if (dto.getSampleAnswer() != null && !dto.getSampleAnswer().trim().isEmpty()) {
-					String insertAnswerSql = "INSERT INTO answer(question_id, option_text, is_correct) VALUES(?, ?, ?)";
-					jdbcTemplate.update(insertAnswerSql, questionId, dto.getSampleAnswer().trim(), true);
-				}
-			}
-			return true;
-		} catch (Exception e) {
-			log.error("Error updating question", e);
-			return false;
+		int questionId = dto.getQuestionId();
+		if (dto.getSubjectId() > 0) {
+			jdbcTemplate.update("UPDATE question SET question_text = ?, subject_id = ?, question_type = ?, marks = ?, word_limit = ? WHERE question_id = ?",
+					dto.getQuestion(), dto.getSubjectId(), normalizedQuestionType(dto), dto.getMarks() > 0 ? dto.getMarks() : 1,
+					dto.getWordLimit(), questionId);
+		} else {
+			jdbcTemplate.update("UPDATE question SET question_text = ?, question_type = ?, marks = ?, word_limit = ? WHERE question_id = ?",
+					dto.getQuestion(), normalizedQuestionType(dto), dto.getMarks() > 0 ? dto.getMarks() : 1,
+					dto.getWordLimit(), questionId);
 		}
+
+		jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", questionId);
+
+		boolean isMcq = (dto.getOption1() != null && !dto.getOption1().trim().isEmpty())
+				|| (dto.getOption2() != null && !dto.getOption2().trim().isEmpty())
+				|| ExamConstants.QUESTION_TYPE_MCQ.equalsIgnoreCase(dto.getQuestionType());
+
+		if (isMcq) {
+			if (dto.getOption1() != null && !dto.getOption1().trim().isEmpty()) {
+				saveOption(dto.getOption1().trim(), dto.getCorrectOption(), questionId);
+			}
+			if (dto.getOption2() != null && !dto.getOption2().trim().isEmpty()) {
+				saveOption(dto.getOption2().trim(), dto.getCorrectOption(), questionId);
+			}
+			if (dto.getOption3() != null && !dto.getOption3().trim().isEmpty()) {
+				saveOption(dto.getOption3().trim(), dto.getCorrectOption(), questionId);
+			}
+			if (dto.getOption4() != null && !dto.getOption4().trim().isEmpty()) {
+				saveOption(dto.getOption4().trim(), dto.getCorrectOption(), questionId);
+			}
+		} else {
+			if (dto.getSampleAnswer() != null && !dto.getSampleAnswer().trim().isEmpty()) {
+				String insertAnswerSql = "INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)";
+				jdbcTemplate.update(insertAnswerSql, questionId, dto.getSampleAnswer().trim(), true);
+			}
+		}
+		return true;
 	}
 
 	@Override
 	public List<QuestionDTO> getQuestionsBySubjectId(int subjectId) {
-		try {
-			String selectQuestionSql = "SELECT question_id, subject_id, question_text FROM question WHERE subject_id = ?";
-			List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql, subjectId);
+		String selectQuestionSql = "SELECT question_id, subject_id, question_text FROM question WHERE subject_id = ?";
+		List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql, subjectId);
 
-			List<QuestionDTO> questions = new ArrayList<>();
-			for (Map<String, Object> row : questionRows) {
-				int questionId = ((Number) row.get("question_id")).intValue();
-				String questionText = (String) row.get("question_text");
-				questions.add(buildQuestionDto(questionId, subjectId, questionText, null));
-			}
-			return questions;
-		} catch (Exception e) {
-			log.error("Error fetching questions by subject ID", e);
-			return new ArrayList<>();
+		List<QuestionDTO> questions = new ArrayList<>();
+		for (Map<String, Object> row : questionRows) {
+			int questionId = ((Number) row.get("question_id")).intValue();
+			String questionText = (String) row.get("question_text");
+			questions.add(buildQuestionDto(questionId, subjectId, questionText, null));
 		}
+		return questions;
 	}
 
 	@Override
 	public List<QuestionDTO> getQuestionsByExamId(int examId) {
-		try {
-			String assignmentSql = "SELECT q.question_id, q.subject_id, q.question_text, q.question_type, q.marks, q.word_limit, "
-					+ "s.subject_name, eq.question_order FROM exam_question eq "
-					+ "JOIN question q ON q.question_id = eq.question_id "
-					+ "LEFT JOIN subject s ON s.subject_id = q.subject_id "
-					+ "WHERE eq.exam_id = ? ORDER BY eq.question_order ASC";
-			List<Map<String, Object>> assignedRows;
-			try {
-				assignedRows = jdbcTemplate.queryForList(assignmentSql, examId);
-			} catch (Exception ignored) {
-				assignedRows = null;
-			}
-			if (assignedRows != null && !assignedRows.isEmpty()) {
-				return mapQuestionRows(assignedRows, examId);
-			}
-
-			String getSubjectSql = "SELECT subject_id FROM exam WHERE exam_id = ?";
-			Integer subjectId = jdbcTemplate.queryForObject(getSubjectSql, Integer.class, examId);
-			if (subjectId != null) {
-				List<QuestionDTO> questions = getQuestionsBySubjectId(subjectId);
-				for (QuestionDTO q : questions) q.setExamId(examId);
-				return questions;
-			}
-		} catch (Exception e) {
-			log.error("Error fetching questions by exam ID", e);
-		}
-		return new ArrayList<>();
+		String assignmentSql = "SELECT q.question_id, q.subject_id, q.question_text, q.question_type, q.marks, q.word_limit, "
+				+ "s.subject_name, eq.question_order FROM exam_question eq "
+				+ "JOIN question q ON q.question_id = eq.question_id "
+				+ "LEFT JOIN subject s ON s.subject_id = q.subject_id "
+				+ "WHERE eq.exam_id = ? ORDER BY eq.question_order ASC";
+		return mapQuestionRows(jdbcTemplate.queryForList(assignmentSql, examId), examId);
 	}
 
 	private QuestionDTO buildQuestionDto(int questionId, int subjectId, String questionText, String subjectName) {
@@ -315,13 +290,9 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 	}
 
 	private void loadQuestionMetadata(QuestionDTO dto) {
-		try {
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-					"SELECT question_type, marks, word_limit FROM question WHERE question_id = ?", dto.getQuestionId());
-			if (rows != null && !rows.isEmpty()) setQuestionMetadata(dto, rows.get(0));
-		} catch (Exception ignored) {
-			// Metadata is optional for legacy records and test fixtures.
-		}
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+				"SELECT question_type, marks, word_limit FROM question WHERE question_id = ?", dto.getQuestionId());
+		if (rows != null && !rows.isEmpty()) setQuestionMetadata(dto, rows.get(0));
 	}
 
 	private String normalizedQuestionType(QuestionDTO dto) {
@@ -330,13 +301,8 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
 	@Override
 	public boolean deleteQuestionById(int questionId) {
-		try {
-			jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", questionId);
-			int rows = jdbcTemplate.update("DELETE FROM question WHERE question_id = ?", questionId);
-			return rows > 0;
-		} catch (Exception e) {
-			log.error("Error deleting question", e);
-			return false;
-		}
+		jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", questionId);
+		int rows = jdbcTemplate.update("DELETE FROM question WHERE question_id = ?", questionId);
+		return rows > 0;
 	}
 }

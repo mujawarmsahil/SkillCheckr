@@ -20,7 +20,9 @@ public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {
     @Override
     public List<AttemptAnswer> findByAttemptId(int attemptId) {
         String sql = "SELECT aa.attempt_answer_id, aa.attempt_id, aa.question_id, aa.selected_answer_id, "
-                + "aa.text_answer, aa.marks_obtained, a.option_text, a.is_correct "
+                + "aa.text_answer, aa.marks_obtained, a.option_text, a.is_correct, "
+                + "(SELECT c.option_text FROM answer c WHERE c.question_id = aa.question_id "
+                + "  AND c.is_correct = 1 ORDER BY c.answer_id ASC LIMIT 1) AS correct_option_text "
                 + "FROM attempt_answer aa LEFT JOIN answer a ON a.answer_id = aa.selected_answer_id "
                 + "WHERE aa.attempt_id = ? ORDER BY aa.question_id";
         return jdbcTemplate.query(sql, AttemptAnswerRowMapper.INSTANCE, attemptId);
@@ -58,5 +60,13 @@ public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {
     public boolean updateMarks(int attemptId, int questionId, Integer marksObtained) {
         return jdbcTemplate.update("UPDATE attempt_answer SET marks_obtained = ? "
                 + "WHERE attempt_id = ? AND question_id = ?", marksObtained, attemptId, questionId) > 0;
+    }
+
+    @Override
+    public boolean hasAttemptHistory(int questionId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM attempt_answer WHERE question_id = ?",
+                Integer.class, questionId);
+        return count != null && count > 0;
     }
 }

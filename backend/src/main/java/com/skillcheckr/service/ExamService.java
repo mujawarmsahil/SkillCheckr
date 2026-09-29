@@ -3,15 +3,14 @@ package com.skillcheckr.service;
 import java.util.List;
 import java.util.Optional;
 
+import com.skillcheckr.model.AttemptStartResult;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamRegistration;
-import com.skillcheckr.model.AttemptStartResult;
 import com.skillcheckr.model.Student;
-import com.skillcheckr.model.Subject;
 
 public interface ExamService {
 
-	Subject saveExam(Exam exam);
+	Exam saveExam(Exam exam, int teacherId);
 
 	List<Exam> getAllExams();
 
@@ -31,7 +30,7 @@ public interface ExamService {
 
 	List<Exam> getExamsByTeacherId(int teacherId);
 
-	boolean registerStudentForExam(int studentId, int examId);
+	void registerStudentForExam(int studentId, int examId);
 
 	boolean isStudentRegisteredForExam(int studentId, int examId);
 
@@ -43,5 +42,5 @@ public interface ExamService {
 
 	int getRegistrationCountByExamId(int examId);
 
-	boolean unregisterStudentFromExam(int studentId, int examId);
+	void unregisterStudentFromExam(int studentId, int examId);
 }

@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.model.SubjectStatsResponse;
@@ -38,6 +39,7 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    @Transactional
     public boolean deleteSubjectById(int subjectId) {
         return subjectRepository.deleteSubjectById(subjectId);
     }

@@ -7,12 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
-import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.skillcheckr.model.RegistrationRequest;
 
@@ -29,77 +23,46 @@ import com.skillcheckr.model.RegistrationRequest;
 class RegistrationRequestRepositoryImplTest {
 
     @Mock
-    private DataSource dataSource;
-
-    @Mock
     private JdbcTemplate jdbcTemplate;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
-
-    @Mock
-    private Connection connection;
-
-    @Mock
-    private PreparedStatement preparedStatement;
-
-    @Mock
-    private ResultSet resultSet;
 
     @InjectMocks
     private RegistrationRequestRepositoryImpl repository;
 
     @Test
-    void saveRequest_returnsTrue_whenInsertSucceeds() throws Exception {
+    void saveRequest_returnsTrue_whenInsertSucceeds() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Sam");
         req.setContact("1234567890");
         req.setEmail("sam@test.com");
         req.setRequestedRole("Student");
         req.setUsername("sam");
-        req.setPassword("plainPass");
+        req.setPassword("$2a$10$hashedPass");
 
-        when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
-        when(passwordEncoder.encode("plainPass")).thenReturn("$2a$10$hashedPass");
-        when(preparedStatement.executeUpdate()).thenReturn(1);
+        when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
 
         boolean saved = repository.saveRequest(req);
 
         assertThat(saved).isTrue();
-        verify(preparedStatement).setString(1, "Sam");
-        verify(preparedStatement).setString(7, "$2a$10$hashedPass");
+        verify(jdbcTemplate).update(anyString(), eq("Sam"), eq("1234567890"), eq("sam@test.com"),
+                eq("Student"), eq("Pending"), eq("sam"), eq("$2a$10$hashedPass"));
     }
 
     @Test
-    void saveRequest_preservesAlreadyHashedPassword() throws Exception {
+    void saveRequest_returnsFalse_whenNoRowsInserted() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Sam");
-        req.setPassword("$2a$10$alreadyHashed");
+        req.setPassword("$2a$10$hashedPass");
 
-        when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
-        when(preparedStatement.executeUpdate()).thenReturn(1);
+        when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
 
-        boolean saved = repository.saveRequest(req);
-
-        assertThat(saved).isTrue();
-        verify(preparedStatement).setString(7, "$2a$10$alreadyHashed");
-    }
-
-    @Test
-    void saveRequest_returnsFalse_whenSqlExceptionThrown() throws Exception {
-        RegistrationRequest req = new RegistrationRequest();
-        when(dataSource.getConnection()).thenThrow(new SQLException("DB error"));
-
-        boolean saved = repository.saveRequest(req);
-
-        assertThat(saved).isFalse();
+        assertThat(repository.saveRequest(req)).isFalse();
     }
 
     @Test
     void existsByUsername_returnsTrue_whenRequestExists() {
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE username = ?", Integer.class, "sam"))
+        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE LOWER(username) = LOWER(?)", Integer.class, "sam"))
                 .thenReturn(1);
 
         assertThat(repository.existsByUsername("sam")).isTrue();
@@ -107,7 +70,7 @@ class RegistrationRequestRepositoryImplTest {
 
     @Test
     void existsByUsername_returnsFalse_whenFree() {
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE username = ?", Integer.class, "free"))
+        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE LOWER(username) = LOWER(?)", Integer.class, "free"))
                 .thenReturn(0);
 
         assertThat(repository.existsByUsername("free")).isFalse();

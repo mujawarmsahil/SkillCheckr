@@ -67,19 +67,7 @@ public class ExamResultDTO {
 
 	private double percentage;
 
-	private String status; // "Pass", "Fail", "Submitted for Review", "Disqualified"
-
-	@JsonProperty("violations_count")
-	@JsonAlias({"violationsCount"})
-	private int violationsCount;
-
-	@JsonProperty("is_disqualified")
-	@JsonAlias({"isDisqualified", "disqualified"})
-	private boolean disqualified;
-
-	@JsonProperty("disqualification_reason")
-	@JsonAlias({"disqualificationReason"})
-	private String disqualificationReason;
+	private String status; // "Pass", "Fail" or "Submitted for Evaluation"
 
 	@JsonProperty("submitted_at")
 	@JsonAlias({"submittedAt"})

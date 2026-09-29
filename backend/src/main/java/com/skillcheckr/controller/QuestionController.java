@@ -3,7 +3,6 @@ package com.skillcheckr.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,32 +18,56 @@ import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.QuestionsAddResponse;
+import com.skillcheckr.security.AuthGuard;
+import com.skillcheckr.security.AuthPrincipal;
+import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.QuestionService;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
-@RequestMapping({"/api/create", "/api/questions"})
+@RequestMapping("/api/questions")
 public class QuestionController {
 
 	@Autowired
 	private QuestionService questionService;
 
-	@PostMapping({"/addQues", ""})
-	public ResponseEntity<QuestionsAddResponse> addAllQuestion(@RequestBody List<QuestionDTO> questions) {
+	@Autowired
+	private ExamService examService;
+
+	@PostMapping("")
+	public ResponseEntity<QuestionsAddResponse> addAllQuestion(@RequestBody List<QuestionDTO> questions,
+			HttpServletRequest request) {
+		AuthPrincipal principal = AuthGuard.requireStaff(request);
+		if (questions == null || questions.isEmpty()) {
+			throw new BadRequestException("At least one question is required");
+		}
+		for (QuestionDTO question : questions) {
+			if (question != null && question.getExamId() != null && question.getExamId() > 0) {
+				// A teacher may only add questions to the exams they own.
+				AuthGuard.requireExamAccess(request,
+						examService.getExamById(question.getExamId())
+								.orElseThrow(() -> new ResourceNotFoundException("Exam not found")));
+			}
+		}
 		questionService.saveQuestionsWithAnswers(questions);
 		return ResponseEntity.ok(QuestionsAddResponse.builder()
 				.message("Questions added successfully")
-				.count(questions != null ? questions.size() : 0)
+				.count(questions.size())
 				.build());
 	}
 
-	@GetMapping({"", "/all"})
-	public ResponseEntity<List<QuestionDTO>> getAllQuestions() {
+	@GetMapping("")
+	public ResponseEntity<List<QuestionDTO>> getAllQuestions(HttpServletRequest request) {
+		AuthGuard.requireStaff(request);
 		List<QuestionDTO> questions = questionService.getAllQuestions();
 		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
 
 	@GetMapping("/{questionId}")
-	public ResponseEntity<QuestionDTO> getQuestionById(@PathVariable("questionId") Integer questionId) {
+	public ResponseEntity<QuestionDTO> getQuestionById(@PathVariable("questionId") Integer questionId,
+			HttpServletRequest request) {
+		AuthGuard.requireStaff(request);
 		QuestionDTO q = questionService.getQuestionById(questionId)
 				.orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 		return ResponseEntity.ok(q);
@@ -52,7 +75,8 @@ public class QuestionController {
 
 	@PutMapping("/{questionId}")
 	public ResponseEntity<QuestionDTO> updateQuestion(@PathVariable("questionId") Integer questionId,
-			@RequestBody QuestionDTO question) {
+			@RequestBody QuestionDTO question, HttpServletRequest request) {
+		AuthGuard.requireAdmin(request);
 		if (question == null) {
 			throw new BadRequestException("Invalid question payload");
 		}
@@ -65,23 +89,30 @@ public class QuestionController {
 	}
 
 	@GetMapping("/subject/{subjectId}")
-	public ResponseEntity<List<QuestionDTO>> getQuestionsBySubject(@PathVariable("subjectId") Integer subjectId) {
+	public ResponseEntity<List<QuestionDTO>> getQuestionsBySubject(@PathVariable("subjectId") Integer subjectId,
+			HttpServletRequest request) {
+		AuthGuard.requireStaff(request);
 		List<QuestionDTO> questions = questionService.getQuestionsBySubjectId(subjectId);
 		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
 
 	@GetMapping("/exam/{examId}")
-	public ResponseEntity<List<QuestionDTO>> getQuestionsByExam(@PathVariable("examId") Integer examId) {
+	public ResponseEntity<List<QuestionDTO>> getQuestionsByExam(@PathVariable("examId") Integer examId,
+			HttpServletRequest request) {
+		AuthGuard.requireStaff(request);
 		List<QuestionDTO> questions = questionService.getQuestionsByExamId(examId);
 		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
 
 	@DeleteMapping("/{questionId}")
-	public ResponseEntity<ApiResponse> deleteQuestion(@PathVariable("questionId") Integer questionId) {
+	public ResponseEntity<ApiResponse> deleteQuestion(@PathVariable("questionId") Integer questionId,
+			HttpServletRequest request) {
+		AuthGuard.requireAdmin(request);
 		boolean deleted = questionService.deleteQuestionById(questionId);
 		if (deleted) {
 			return ResponseEntity.ok(new ApiResponse(true, "Question deleted successfully"));
 		}
-		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Question not found"));
+		return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+				.body(new ApiResponse(false, "Question not found"));
 	}
 }

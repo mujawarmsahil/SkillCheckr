@@ -4,46 +4,26 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import javax.sql.DataSource;
-
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.web.servlet.MockMvc;
 
+/**
+ * Covers the CORS behaviour of a real deployment. No profile is active here on purpose:
+ * that is exactly the production default, and it must not trust loopback origins.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 class CorsIntegrationTest {
-
-    @TestConfiguration
-    static class TestConfig {
-        @Bean
-        @Primary
-        public DataSource dataSource() throws Exception {
-            DataSource ds = Mockito.mock(DataSource.class);
-            Connection conn = Mockito.mock(Connection.class);
-            DatabaseMetaData meta = Mockito.mock(DatabaseMetaData.class);
-            Mockito.when(ds.getConnection()).thenReturn(conn);
-            Mockito.when(conn.getMetaData()).thenReturn(meta);
-            Mockito.when(meta.getDatabaseProductName()).thenReturn("MySQL");
-            Mockito.when(conn.isValid(Mockito.anyInt())).thenReturn(true);
-            return ds;
-        }
-    }
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
     void testCorsPreflightForVercelFrontend() throws Exception {
-        mockMvc.perform(options("/api/authentication/login")
+        mockMvc.perform(options("/api/auth/login")
                 .header("Origin", "https://skill-checkr.vercel.app")
                 .header("Access-Control-Request-Method", "POST")
                 .header("Access-Control-Request-Headers", "Content-Type,Authorization"))
@@ -53,13 +33,33 @@ class CorsIntegrationTest {
     }
 
     @Test
-    void testCorsPreflightForLocalhost() throws Exception {
-        mockMvc.perform(options("/api/authentication/login")
+    void loopbackOriginIsRejectedInTheProductionDefault() throws Exception {
+        // A previous version appended http://localhost:* and http://127.0.0.1:* to every
+        // configuration, so a deployed instance accepted authenticated cross-origin requests
+        // from any loopback port. Those origins now only exist in the `dev` profile.
+        mockMvc.perform(options("/api/auth/login")
                 .header("Origin", "http://localhost:5173")
                 .header("Access-Control-Request-Method", "POST")
                 .header("Access-Control-Request-Headers", "Content-Type,Authorization"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
-                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    void arbitraryLoopbackPortIsRejectedInTheProductionDefault() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                .header("Origin", "http://localhost:9999")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "Content-Type,Authorization"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unrelatedSiteIsRejected() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                .header("Origin", "https://evil.example.com")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "Content-Type,Authorization"))
+                .andExpect(status().isForbidden());
     }
 }

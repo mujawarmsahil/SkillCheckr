@@ -1,18 +1,29 @@
 package com.skillcheckr.repository;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.DateTimeException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ExamInUseException;
+import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.Student;
@@ -65,109 +76,139 @@ public class ExamRepositoryImpl implements ExamRepository {
 	}
 
 	@Override
-	public Subject saveExam(Exam exam) {
-		try {
-			if (exam.getDate() == null || exam.getDate().isEmpty()) {
-				log.error("Exam date is null or empty.");
-				return null;
-			}
-
-			if (exam.getStartTime() == null || exam.getEndTime() == null) {
-				log.error("Exam start time or end time is null.");
-				return null;
-			}
-
-			String subjectCode = exam.getSubject() != null ? exam.getSubject().getSubjectCode() : "GEN101";
-			String subjectName = exam.getSubject() != null ? exam.getSubject().getSubjectName() : "General";
-			int subjectId;
-
-			String checkSubjectQuery = "SELECT COUNT(*) FROM subject WHERE subject_code = ?";
-			Integer count = jdbcTemplate.queryForObject(checkSubjectQuery, Integer.class, subjectCode);
-
-			if (count == null || count == 0) {
-				String insertSubjectQuery = "INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)";
-				jdbcTemplate.update(insertSubjectQuery, subjectName, subjectCode);
-			}
-
-			String getSubjectIdQuery = "SELECT subject_id FROM subject WHERE subject_code = ? LIMIT 1";
-			subjectId = jdbcTemplate.queryForObject(getSubjectIdQuery, Integer.class, subjectCode);
-
-			int teacherId = exam.getTeacherId();
-			if (teacherId > 0) {
-				String checkTeacherQuery = "SELECT COUNT(*) FROM teacher WHERE teacher_id = ?";
-				Integer teacherCount = jdbcTemplate.queryForObject(checkTeacherQuery, Integer.class, teacherId);
-				if (teacherCount == null || teacherCount == 0) {
-					// Fallback to first teacher if any exists
-					try {
-						Integer firstTeacher = jdbcTemplate.queryForObject("SELECT teacher_id FROM teacher LIMIT 1", Integer.class);
-						if (firstTeacher != null) teacherId = firstTeacher;
-					} catch (Exception ignored) {}
-				}
-			}
-
-			if (exam.getStatus() == null || exam.getStatus().isEmpty()) {
-				exam.setStatus("Pending");
-			}
-
-			if (exam.getExamType() == null || exam.getExamType().isEmpty()) {
-				exam.setExamType("MCQ");
-			}
-
-			Timestamp examDate;
-			try {
-				examDate = Timestamp.valueOf(LocalDateTime.parse(exam.getDate()));
-			} catch (Exception e) {
-				examDate = new Timestamp(System.currentTimeMillis());
-			}
-
-			String insertExamQuery = "INSERT INTO exam (subject_id, teacher_id, exam_name, exam_type, exam_date, duration_minutes, total_marks, pass_marks, status, start_time, end_time) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-			jdbcTemplate.update(insertExamQuery, subjectId, teacherId, exam.getExamName(), exam.getExamType(),
-					examDate, exam.getDurationMinutes(), exam.getTotalMarks(), exam.getPassingMarks(),
-					exam.getStatus(), exam.getStartTime(), exam.getEndTime());
-
-			Subject subject = new Subject();
-			subject.setSubjectId(subjectId);
-			subject.setSubjectName(subjectName);
-			subject.setSubjectCode(subjectCode);
-
-			return subject;
-
-		} catch (Exception e) {
-			log.error("Error saving exam", e);
-			return null;
+	public Exam saveExam(Exam exam) {
+		if (exam.getDate() == null || exam.getDate().isEmpty()) {
+			throw new BadRequestException("Exam date is required");
 		}
+		if (exam.getStartTime() == null || exam.getEndTime() == null) {
+			throw new BadRequestException("Exam start and end times are required");
+		}
+
+		String subjectCode = exam.getSubject() != null ? exam.getSubject().getSubjectCode() : null;
+		if (subjectCode == null || subjectCode.isBlank()) {
+			throw new BadRequestException("A valid subject is required");
+		}
+
+		Subject subject = findSubjectByCode(subjectCode.trim())
+				.orElseThrow(() -> new ResourceNotFoundException(
+						"Subject '" + subjectCode.trim() + "' does not exist. Subjects are managed by an administrator."));
+
+		int teacherId = exam.getTeacherId();
+		if (teacherId > 0 && !teacherExists(teacherId)) {
+			throw new ResourceNotFoundException("Teacher " + teacherId + " does not exist");
+		}
+
+		if (exam.getStatus() == null || exam.getStatus().isBlank()) {
+			exam.setStatus(ExamConstants.EXAM_STATUS_PENDING);
+		}
+
+		if (exam.getExamType() == null || exam.getExamType().isBlank()) {
+			exam.setExamType(ExamConstants.QUESTION_TYPE_MCQ);
+		}
+
+		Timestamp examDate;
+		try {
+			examDate = Timestamp.valueOf(parseExamDate(exam.getDate()));
+		} catch (DateTimeException ex) {
+			throw new BadRequestException("Exam date must be a valid date and time value");
+		}
+
+		String insertExamQuery = "INSERT INTO exam (subject_id, teacher_id, exam_name, exam_type, exam_date, duration_minutes, total_marks, pass_marks, status, start_time, end_time) "
+				+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		KeyHolder keyHolder = new GeneratedKeyHolder();
+		jdbcTemplate.update(connection -> {
+			PreparedStatement ps = connection.prepareStatement(insertExamQuery, Statement.RETURN_GENERATED_KEYS);
+			ps.setInt(1, subject.getSubjectId());
+			if (teacherId > 0) {
+				ps.setInt(2, teacherId);
+			} else {
+				ps.setNull(2, java.sql.Types.INTEGER);
+			}
+			ps.setString(3, exam.getExamName());
+			ps.setString(4, exam.getExamType());
+			ps.setTimestamp(5, examDate);
+			ps.setInt(6, exam.getDurationMinutes());
+			ps.setInt(7, exam.getTotalMarks());
+			ps.setInt(8, exam.getPassingMarks());
+			ps.setString(9, exam.getStatus());
+			ps.setObject(10, exam.getStartTime());
+			ps.setObject(11, exam.getEndTime());
+			return ps;
+		}, keyHolder);
+
+		Number generatedKey = keyHolder.getKey();
+		if (generatedKey == null) {
+			throw new IllegalStateException("Unable to add exam.");
+		}
+
+		exam.setExamId(generatedKey.intValue());
+		exam.setSubject(subject);
+		return exam;
+	}
+
+	/**
+	 * Accepts the date shapes a client may send: an ISO date time, the same value with a space
+	 * instead of the "T" separator, and a plain calendar date.
+	 */
+	private LocalDateTime parseExamDate(String rawExamDate) {
+		String value = rawExamDate.trim();
+		try {
+			return LocalDateTime.parse(value);
+		} catch (DateTimeParseException ignored) {
+			// fall through to the more forgiving shapes
+		}
+		try {
+			return LocalDateTime.parse(value.replace(' ', 'T'));
+		} catch (DateTimeParseException ignored) {
+			// fall through to a date only value
+		}
+		return LocalDate.parse(value.split("[ T]")[0]).atStartOfDay();
+	}
+
+	private Optional<Subject> findSubjectByCode(String subjectCode) {
+		String sql = "SELECT subject_id, subject_name, subject_code FROM subject WHERE subject_code = ? LIMIT 1";
+		List<Subject> subjects = jdbcTemplate.query(sql, (rs, rowNum) -> {
+			Subject subject = new Subject();
+			subject.setSubjectId(rs.getInt("subject_id"));
+			subject.setSubjectName(rs.getString("subject_name"));
+			subject.setSubjectCode(rs.getString("subject_code"));
+			return subject;
+		}, subjectCode);
+		return subjects.stream().findFirst();
+	}
+
+	private boolean teacherExists(int teacherId) {
+		Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM teacher WHERE teacher_id = ?",
+				Integer.class, teacherId);
+		return count != null && count > 0;
 	}
 
 	@Override
 	public boolean deleteExamById(int examId) {
-		try {
-			String getSubjectIdSql = "SELECT subject_id FROM exam WHERE exam_id = ?";
-			List<Integer> subjectIds = jdbcTemplate.query(getSubjectIdSql, (rs, rowNum) -> rs.getInt("subject_id"), examId);
-
-			if (subjectIds.isEmpty()) {
-				return false;
-			}
-			int subjectId = subjectIds.get(0);
-
-			List<Integer> questionIds = jdbcTemplate.query("SELECT question_id FROM question WHERE subject_id = ?",
-					(rs, rowNum) -> rs.getInt("question_id"), subjectId);
-
-			for (Integer qid : questionIds) {
-				jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", qid);
-			}
-
-			jdbcTemplate.update("DELETE FROM question WHERE subject_id = ?", subjectId);
-			jdbcTemplate.update("DELETE FROM exam WHERE exam_id = ?", examId);
-
-			return true;
-		} catch (Exception e) {
-			log.error("Error deleting exam", e);
+		if (!examExists(examId)) {
 			return false;
 		}
+		Integer attemptCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?", Integer.class, examId);
+		if (attemptCount != null && attemptCount > 0) {
+			throw new ExamInUseException("This exam already has student attempts and cannot be deleted. "
+					+ "Cancel the exam instead to keep the recorded results.");
+		}
+
+		// Only the exam and its question assignments belong to this exam. Questions and
+		// answers are subject level records shared with other exams and must survive.
+		jdbcTemplate.update("DELETE FROM exam_question WHERE exam_id = ?", examId);
+		return jdbcTemplate.update("DELETE FROM exam WHERE exam_id = ?", examId) > 0;
 	}
 
-	private void syncExamStatuses() {
+	private boolean examExists(int examId) {
+		Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE exam_id = ?",
+				Integer.class, examId);
+		return count != null && count > 0;
+	}
+
+	@Override
+	public void syncExamStatuses() {
 		String updateQuery = "UPDATE exam SET status = 'Completed' "
 				+ "WHERE (status = 'Upcoming' OR status = 'Approved') "
 				+ "AND ("

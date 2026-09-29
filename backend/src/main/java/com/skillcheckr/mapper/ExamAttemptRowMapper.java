@@ -21,25 +21,11 @@ public class ExamAttemptRowMapper implements RowMapper<ExamAttempt> {
         Timestamp expires = rs.getTimestamp("expires_at");
         Timestamp submitted = rs.getTimestamp("submitted_at");
 
-        Exam exam = null;
-        try {
-            int examId = rs.getInt("exam_id");
-            if (examId > 0) {
-                exam = Exam.builder().examId(examId).build();
-            }
-        } catch (SQLException ignored) {
-            // column not present in some projections
-        }
+        int examId = rs.getInt("exam_id");
+        Exam exam = examId > 0 ? Exam.builder().examId(examId).build() : null;
 
-        Student student = null;
-        try {
-            int studentId = rs.getInt("student_id");
-            if (studentId > 0) {
-                student = Student.builder().studentId(studentId).build();
-            }
-        } catch (SQLException ignored) {
-            // column not present in some projections
-        }
+        int studentId = rs.getInt("student_id");
+        Student student = studentId > 0 ? Student.builder().studentId(studentId).build() : null;
 
         return ExamAttempt.builder()
                 .attemptId(rs.getInt("attempt_id"))

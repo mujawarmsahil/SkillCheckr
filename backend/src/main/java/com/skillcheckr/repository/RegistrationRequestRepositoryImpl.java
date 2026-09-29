@@ -1,65 +1,37 @@
 package com.skillcheckr.repository;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
-import javax.sql.DataSource;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.RegistrationRequest;
 
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 @Repository
 public class RegistrationRequestRepositoryImpl implements RegistrationRequestRepository {
 
     @Autowired
-    private DataSource dataSource;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @Override
     public boolean saveRequest(RegistrationRequest request) {
-        int result = 0;
-        String sql = "INSERT INTO Request (name, contact, email, requested_role, status, username, password) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, request.getName());
-            ps.setString(2, request.getContact());
-            ps.setString(3, request.getEmail());
-            ps.setString(4, request.getRequestedRole());
-            ps.setString(5, "Pending");
-            ps.setString(6, request.getUsername());
-            // Hash password with BCrypt before storing
-            String rawPassword = request.getPassword();
-            String hashedPassword = (rawPassword != null && !rawPassword.startsWith("$2a$"))
-                ? passwordEncoder.encode(rawPassword)
-                : rawPassword;
-            ps.setString(7, hashedPassword);
-
-            result = ps.executeUpdate();
-        } catch (Exception e) {
-            log.error("Error saving registration request", e);
-        }
+        int result = jdbcTemplate.update(
+                "INSERT INTO request (name, contact, email, requested_role, status, username, password) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                request.getName(), request.getContact(), request.getEmail(), request.getRequestedRole(),
+                "Pending", request.getUsername(), request.getPassword());
         return result > 0;
     }
 
     @Override
     public boolean existsByUsername(String username) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM request WHERE username = ?", Integer.class, username);
+                "SELECT COUNT(*) FROM request WHERE LOWER(username) = LOWER(?)", Integer.class, username);
         return count != null && count > 0;
     }
 
@@ -91,5 +63,20 @@ public class RegistrationRequestRepositoryImpl implements RegistrationRequestRep
     public boolean updateRequestStatus(int id, String status) {
         int updated = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ?", status, id);
         return updated > 0;
+    }
+
+    @Override
+    public boolean updateRequestStatusIfCurrent(int id, String status, String expectedStatus) {
+        int updated = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ? AND status = ?",
+                status, id, expectedStatus);
+        return updated > 0;
+    }
+
+    @Override
+    public Optional<String> getRequestStatus(int id) {
+        return jdbcTemplate.query("SELECT status FROM request WHERE request_id = ?",
+                (rs, rowNum) -> rs.getString("status"), id)
+                .stream()
+                .findFirst();
     }
 }

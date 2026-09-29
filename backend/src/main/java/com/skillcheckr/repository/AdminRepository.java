@@ -1,28 +1,42 @@
 package com.skillcheckr.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.skillcheckr.model.AdminStatsResponse;
+import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 
 public interface AdminRepository {
 
-	boolean addTeacherFromRequest(int requestId);
+    Optional<RegistrationRequest> findRequestById(int requestId);
 
-	boolean addStudentFromRequest(int requestId);
+    boolean existsUserByUsername(String username);
 
-	List<Teacher> getAllTeacher();
+    boolean existsTeacherByEmail(String email);
 
-	List<Student> getAllStudent();
+    boolean existsStudentByEmail(String email);
 
-	boolean deleteTeacherById(int teacherId);
+    int createUser(String username, String encodedPassword, String role);
 
-	boolean deleteStudentById(int studentId);
+    void createTeacher(int userId, String name, String contact, String email);
 
-	boolean toggleTeacherStatus(int teacherId, String status);
+    void createStudent(int userId, String name, String contact, String email);
 
-	boolean toggleStudentStatus(int studentId, String status);
+    boolean updateRequestStatus(int requestId, String status);
 
-	AdminStatsResponse getAdminStats();
+    List<Teacher> getAllTeacher();
+
+    List<Student> getAllStudent();
+
+    boolean deleteTeacherById(int teacherId);
+
+    boolean deleteStudentById(int studentId);
+
+    boolean toggleTeacherStatus(int teacherId, String status);
+
+    boolean toggleStudentStatus(int studentId, String status);
+
+    AdminStatsResponse getAdminStats();
 }

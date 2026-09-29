@@ -17,14 +17,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
+import com.skillcheckr.exception.AccountDisabledException;
 import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.User;
 import com.skillcheckr.service.AuthService;
 import com.skillcheckr.model.UserProfileDTO;
+import com.skillcheckr.support.TestAuth;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
@@ -37,15 +41,25 @@ class AuthControllerTest {
 
     private MockMvc mockMvc;
 
-    private static final String LOGIN_URL = "/api/authentication/login";
+    private static final String LOGIN_URL = "/api/auth/login";
     private static final String LOGIN_BODY = "{\"username\":\"%s\",\"password\":\"%s\"}";
 
     @BeforeEach
     void setUp() {
+        // The real token service is used so the login response carries a verifiable signature.
+        ReflectionTestUtils.setField(authController, "tokenService", TestAuth.tokenService());
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .addInterceptors(TestAuth.authInterceptor())
                 .build();
     }
+
+    /**
+     * The student account id and the student row id differ in the database, so the ownership
+     * checks are exercised with both values.
+     */
+    private static final RequestPostProcessor STUDENT = TestAuth.asStudentAccount(10, 7);
+    private static final RequestPostProcessor ADMIN = TestAuth.asAdminAccount(30, 1);
 
     private User userWith(String username, String role, int userId) {
         User user = new User();
@@ -74,6 +88,32 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(LOGIN_BODY.formatted("ghost", "bad")))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void login_returnsForbidden_whenTheAccountWasDeactivated() throws Exception {
+        when(authService.login("student1", "pass"))
+                .thenThrow(new AccountDisabledException(
+                        "This account has been deactivated. Please contact your administrator."));
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("student1", "pass")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("This account has been deactivated. Please contact your administrator."));
+    }
+
+    @Test
+    void login_doesNotIssueATokenForADeactivatedAccount() throws Exception {
+        when(authService.login("student1", "pass"))
+                .thenThrow(new AccountDisabledException("This account has been deactivated."));
+
+        mockMvc.perform(post(LOGIN_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY.formatted("student1", "pass")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.token").doesNotExist());
     }
 
     @Test
@@ -163,7 +203,7 @@ class AuthControllerTest {
                 .build();
         when(authService.getUserProfile(10)).thenReturn(Optional.of(profile));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/10"))
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/10").with(STUDENT))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user_id").value(10))
                 .andExpect(jsonPath("$.username").value("student1"))
@@ -175,8 +215,21 @@ class AuthControllerTest {
     void getUserProfile_returns404_whenUserDoesNotExist() throws Exception {
         when(authService.getUserProfile(999)).thenReturn(Optional.empty());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/999"))
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/999").with(ADMIN))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getUserProfile_isRefusedForAnotherUsersAccount() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/999").with(STUDENT))
+                .andExpect(status().isForbidden());
+        verify(authService, never()).getUserProfile(999);
+    }
+
+    @Test
+    void getUserProfile_requiresAToken() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/profile/10"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -196,6 +249,7 @@ class AuthControllerTest {
         String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\"}";
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .with(STUDENT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isOk())
@@ -222,6 +276,7 @@ class AuthControllerTest {
         String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"old_password\":\"oldSecret123\",\"password\":\"newSecret123\"}";
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .with(STUDENT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isOk())
@@ -239,6 +294,7 @@ class AuthControllerTest {
         String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"current_password\":\"wrongOldPass\",\"password\":\"newSecret123\"}";
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .with(STUDENT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isBadRequest())
@@ -253,6 +309,7 @@ class AuthControllerTest {
         String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"password\":\"newSecret123\"}";
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .with(STUDENT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isBadRequest())
@@ -266,6 +323,7 @@ class AuthControllerTest {
         String json = "{\"username\":\"existing_user\",\"name\":\"Alice\",\"email\":\"alice@test.com\"}";
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .with(STUDENT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isBadRequest())
@@ -280,6 +338,7 @@ class AuthControllerTest {
         String json = "{\"username\":\"alice\",\"name\":\"Alice\",\"email\":\"existing@test.com\"}";
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .with(STUDENT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isBadRequest())

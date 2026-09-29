@@ -2,12 +2,14 @@ package com.skillcheckr.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.repository.AuthRepository;
 import com.skillcheckr.repository.RegistrationRequestRepository;
@@ -131,10 +134,61 @@ class RegistrationRequestServiceTest {
     }
 
     @Test
-    void updateRequestStatus_delegatesToRepository() {
-        when(registrationRequestRepository.updateRequestStatus(4, "Approved")).thenReturn(true);
+    void updateRequestStatus_rejectsAPendingRequest() {
+        when(registrationRequestRepository.getRequestStatus(4)).thenReturn(Optional.of("Pending"));
+        when(registrationRequestRepository.updateRequestStatusIfCurrent(4, "Rejected", "Pending")).thenReturn(true);
 
-        assertThat(registrationRequestService.updateRequestStatus(4, "Approved")).isTrue();
-        verify(registrationRequestRepository).updateRequestStatus(4, "Approved");
+        assertThat(registrationRequestService.updateRequestStatus(4, "Rejected")).isTrue();
+        verify(registrationRequestRepository).updateRequestStatusIfCurrent(4, "Rejected", "Pending");
+    }
+
+    @Test
+    void updateRequestStatus_normalisesTheTargetStatus() {
+        when(registrationRequestRepository.getRequestStatus(4)).thenReturn(Optional.of("Pending"));
+        when(registrationRequestRepository.updateRequestStatusIfCurrent(4, "Rejected", "Pending")).thenReturn(true);
+
+        assertThat(registrationRequestService.updateRequestStatus(4, " rejected ")).isTrue();
+    }
+
+    @Test
+    void updateRequestStatus_refusesToApproveWithoutCreatingTheAccount() {
+        assertThatThrownBy(() -> registrationRequestService.updateRequestStatus(4, "Approved"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("cannot be marked approved directly");
+        verify(registrationRequestRepository, never()).updateRequestStatusIfCurrent(anyInt(), anyString(), anyString());
+    }
+
+    @Test
+    void updateRequestStatus_refusesAnUnknownStatus() {
+        assertThatThrownBy(() -> registrationRequestService.updateRequestStatus(4, "Archived"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("not a valid target status");
+    }
+
+    @Test
+    void updateRequestStatus_refusesToReopenAProcessedRequest() {
+        when(registrationRequestRepository.getRequestStatus(4)).thenReturn(Optional.of("Rejected"));
+
+        assertThatThrownBy(() -> registrationRequestService.updateRequestStatus(4, "Rejected"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Only a pending registration request can be rejected");
+        verify(registrationRequestRepository, never()).updateRequestStatusIfCurrent(anyInt(), anyString(), anyString());
+    }
+
+    @Test
+    void updateRequestStatus_reportsAMissingRequest() {
+        when(registrationRequestRepository.getRequestStatus(99)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> registrationRequestService.updateRequestStatus(99, "Rejected"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Registration request not found");
+    }
+
+    @Test
+    void updateRequestStatus_reportsAFailedTransition() {
+        when(registrationRequestRepository.getRequestStatus(4)).thenReturn(Optional.of("Pending"));
+        when(registrationRequestRepository.updateRequestStatusIfCurrent(4, "Rejected", "Pending")).thenReturn(false);
+
+        assertThat(registrationRequestService.updateRequestStatus(4, "Rejected")).isFalse();
     }
 }

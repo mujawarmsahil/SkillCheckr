@@ -11,8 +11,6 @@ public interface AuthService {
 
     int getStudentIdByUserId(int userId);
 
-    int getStudentIdFromAuthorization(String authorizationHeader);
-
     int getTeacherIdByUserId(int userId);
 
     int getAdminIdByUserId(int userId);
