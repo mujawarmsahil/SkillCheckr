@@ -7,49 +7,46 @@ export const getExamById = async (examId) => {
 
 export const getExamQuestions = async (examId) => {
   const res = await apiClient.get(`/api/exams/${examId}/questions`);
-  return Array.isArray(res.data) ? res.data : [];
+  return res.data;
 };
 
 export const getUpcomingExams = async () => {
-  const res = await apiClient.get("/api/exams/viewAllUpComingExam");
+  const res = await apiClient.get("/api/exams/upcoming");
   return Array.isArray(res.data) ? res.data : [];
 };
 
 export const getAllExams = async () => {
-  const res = await apiClient.get("/api/exams/viewAllExams");
+  const res = await apiClient.get("/api/exams");
   return Array.isArray(res.data) ? res.data : [];
 };
 
 export const getTeacherExams = async (teacherId) => {
   const res = await apiClient.get(`/api/exams/teacher/${teacherId}`);
-  return Array.isArray(res.data) ? res.data : [];
+  return res.data;
 };
 
 export const approveExam = async (examId) => {
-  const res = await apiClient.post(`/api/exams/approve/${examId}`);
+  const res = await apiClient.post(`/api/exams/${examId}/approve`);
   return res.data;
 };
 
 export const rejectExam = async (examId) => {
-  const res = await apiClient.post(`/api/exams/reject/${examId}`);
+  const res = await apiClient.post(`/api/exams/${examId}/reject`);
   return res.data;
 };
 
 export const cancelExam = async (examId) => {
-  const res = await apiClient.post(`/api/exams/cancel/${examId}`);
+  const res = await apiClient.post(`/api/exams/${examId}/cancel`);
   return res.data;
 };
 
 export const deleteExam = async (examId) => {
-  const res = await apiClient.delete(`/api/exams/deleteExamById/${examId}`);
+  const res = await apiClient.delete(`/api/exams/${examId}`);
   return res.data;
 };
 
-export const registerForExam = async (examId, studentId) => {
-  const res = await apiClient.post(`/api/exams/${examId}/register`, {
-    studentId: parseInt(studentId, 10),
-    examId: parseInt(examId, 10),
-  });
+export const registerForExam = async (examId) => {
+  const res = await apiClient.post(`/api/exams/${examId}/register`);
   return res.data;
 };
 

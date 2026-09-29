@@ -18,8 +18,8 @@ export default function TotalUsers() {
     setLoading(true);
     try {
       const [tRes, sRes] = await Promise.all([
-        apiClient.get("/api/admin/viewAllTeacher"),
-        apiClient.get("/api/admin/viewAllStudent"),
+        apiClient.get("/api/admin/teachers"),
+        apiClient.get("/api/admin/students"),
       ]);
       setTeachers(Array.isArray(tRes.data) ? tRes.data : []);
       setStudents(Array.isArray(sRes.data) ? sRes.data : []);
@@ -41,12 +41,12 @@ export default function TotalUsers() {
 
     try {
       if (role === "STUDENTS") {
-        await apiClient.put(`/api/admin/student/${id}/status`, { status: nextStatus });
+        await apiClient.put(`/api/admin/students/${id}/status`, { status: nextStatus });
         setStudents((prev) =>
           prev.map((s) => ((s.student_id || s.studentId) === id ? { ...s, status: nextStatus } : s))
         );
       } else {
-        await apiClient.put(`/api/admin/teacher/${id}/status`, { status: nextStatus });
+        await apiClient.put(`/api/admin/teachers/${id}/status`, { status: nextStatus });
         setTeachers((prev) =>
           prev.map((t) => ((t.teacher_id || t.teacherId) === id ? { ...t, status: nextStatus } : t))
         );
@@ -60,7 +60,7 @@ export default function TotalUsers() {
   const handleDeleteStudent = async (studentId) => {
     if (!window.confirm("Deactivate this student account? Accounts with exam history stay deactivated to protect records.")) return;
     try {
-      await apiClient.delete(`/api/admin/studentDeleteById/${studentId}`);
+      await apiClient.delete(`/api/admin/students/${studentId}`);
       showSuccess("Student account deactivated.");
       fetchUsers();
     } catch (err) {
@@ -71,7 +71,7 @@ export default function TotalUsers() {
   const handleDeleteTeacher = async (teacherId) => {
     if (!window.confirm("Deactivate this teacher account? Accounts with active exams stay deactivated.")) return;
     try {
-      await apiClient.delete(`/api/admin/teacherDeleteById/${teacherId}`);
+      await apiClient.delete(`/api/admin/teachers/${teacherId}`);
       showSuccess("Teacher account deactivated.");
       fetchUsers();
     } catch (err) {

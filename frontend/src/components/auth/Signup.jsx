@@ -65,7 +65,7 @@ export default function Signup({ onSignupSuccess }) {
 
     setLoading(true);
     try {
-      await apiClient.post("/api/requests/save", formData);
+      await apiClient.post("/api/requests", formData);
       showSuccess("Registration request submitted. An admin will review it.");
       setFormData({
         name: "",
