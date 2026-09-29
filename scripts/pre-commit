@@ -16,9 +16,7 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 # 1. FRONTEND LINTING (ESLint)
 echo "🔍 [1/2] Running Frontend ESLint checks..."
 FRONTEND_DIR=""
-if [ -d "$ROOT_DIR/FrontEnd" ]; then
-    FRONTEND_DIR="$ROOT_DIR/FrontEnd"
-elif [ -d "$ROOT_DIR/frontend" ]; then
+if [ -d "$ROOT_DIR/frontend" ]; then
     FRONTEND_DIR="$ROOT_DIR/frontend"
 fi
 
