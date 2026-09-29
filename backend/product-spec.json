@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "backend:dev": "./mvnw spring-boot:run",
+    "backend:dev": "SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run",
     "backend:build": "./mvnw clean package -DskipTests",
     "backend:compile": "./mvnw clean compile",
     "backend:test": "./mvnw test",
@@ -28,8 +28,8 @@
     "authentication": {
       "roles": ["Admin", "Teacher", "Student"],
       "endpoints": {
-        "login": "POST /api/authentication/login",
-        "register": "POST /api/requests/save"
+        "login": "POST /api/auth/login",
+        "register": "POST /api/requests"
       }
     },
     "examination_engine": {
@@ -44,10 +44,10 @@
         }
       },
       "endpoints": {
-        "create_exam": "POST /api/exams/addExams",
-        "add_questions": "POST /api/create/addQues",
+        "create_exam": "POST /api/exams",
+        "add_questions": "POST /api/questions",
         "get_questions": "GET /api/exams/{id}/questions",
-        "submit_exam": "POST /api/results/submit",
+        "submit_exam": "POST /api/exams/{exam_id}/attempts/{attempt_id}/submit",
         "get_student_results": "GET /api/results/student/{studentId}"
       }
     },
@@ -59,13 +59,13 @@
         "Monitor aggregate platform distribution statistics"
       ],
       "endpoints": {
-        "pending_requests": "GET /api/requests/viewAllRegisterUsers",
-        "approve_teacher": "POST /api/admin/addTeacher/{requestId}",
-        "approve_student": "POST /api/admin/addStudent/{requestId}",
-        "delete_request": "DELETE /api/requests/deleteById/{requestId}",
+        "pending_requests": "GET /api/requests",
+        "approve_teacher": "POST /api/admin/teachers/from-request/{requestId}",
+        "approve_student": "POST /api/admin/students/from-request/{requestId}",
+        "delete_request": "DELETE /api/requests/{requestId}",
         "all_teachers": "GET /api/admin/teachers",
         "all_students": "GET /api/admin/students",
-        "approve_exam": "POST /api/exams/upComingExamStatus/{examId}",
+        "approve_exam": "POST /api/exams/{examId}/approve",
         "stats": "GET /api/admin/stats"
       }
     }
@@ -75,14 +75,18 @@
     "schema_file": "src/main/resources/schema.sql",
     "tables": [
       "user",
-      "admin",
-      "teacher",
       "student",
-      "request",
+      "teacher",
+      "admin",
       "subject",
+      "request",
       "exam",
       "question",
       "answer",
+      "exam_question",
+      "exam_registration",
+      "exam_attempt",
+      "attempt_answer",
       "result"
     ]
   },
