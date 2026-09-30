@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 import { registerForExam } from "../../api/examApi";
@@ -15,35 +14,15 @@ export default function TakeExam() {
   const { examId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { showSuccess, showError, showWarning } = useToast();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flagged, setFlagged] = useState(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  // Proctoring state
-  const [copyStrikes, setCopyStrikes] = useState(0);
-  const [tabStrikes, setTabStrikes] = useState(0);
-  const [activeViolationModal, setActiveViolationModal] = useState(null);
-
-  const [detectedPersonsCount, setDetectedPersonsCount] = useState(1);
-  const [multiplePersonsDurationSeconds, setMultiplePersonsDurationSeconds] = useState(0);
-
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState(null);
-  const [screenShieldActive, setScreenShieldActive] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenWarning, setFullscreenWarning] = useState(false);
-
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
   const isSubmittingRef = useRef(false);
-  const faceDetectorRef = useRef(null);
-  const consecutiveMultiPersonFramesRef = useRef(0);
-  const isTabHiddenRef = useRef(false);
 
   const {
     exam,
@@ -59,7 +38,6 @@ export default function TakeExam() {
     loadExamAndAttempt,
   } = useExamAttempt({
     examId,
-    user,
     locationState: location.state,
     showError,
   });
@@ -68,110 +46,14 @@ export default function TakeExam() {
     (exam?.exam_type || exam?.examType || questions[currentIndex]?.questionType || QUESTION_TYPES.MCQ).toUpperCase() ===
     QUESTION_TYPES.MCQ;
 
-  const stopWebcam = useCallback(() => {
-    if (streamRef.current) {
-      try {
-        const tracks = streamRef.current.getTracks();
-        tracks.forEach((track) => {
-          try {
-            track.stop();
-            track.enabled = false;
-          } catch {
-            // ignore
-          }
-        });
-      } catch (err) {
-        console.warn("Track cleanup warning:", err);
-      }
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      try {
-        const srcObj = videoRef.current.srcObject;
-        if (srcObj && typeof srcObj.getTracks === "function") {
-          srcObj.getTracks().forEach((track) => {
-            try {
-              track.stop();
-              track.enabled = false;
-            } catch {
-              // ignore
-            }
-          });
-        }
-        videoRef.current.pause();
-        videoRef.current.srcObject = null;
-      } catch (err) {
-        console.warn("Video cleanup warning:", err);
-      }
-    }
-    setIsCameraActive(false);
-  }, []);
-
-  const startWebcam = useCallback(async () => {
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: "user" },
-          audio: false,
-        });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setIsCameraActive(true);
-        setCameraError(null);
-
-        if (typeof window !== "undefined" && "FaceDetector" in window) {
-          try {
-            // @ts-ignore
-            faceDetectorRef.current = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 10 });
-          } catch {
-            faceDetectorRef.current = null;
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("Camera access warning:", err);
-      setCameraError("Camera access is recommended for proctoring.");
-    }
-  }, []);
-
-  const submitExam = useCallback(
-    async () => {
-      if (isSubmittingRef.current) return;
-      isSubmittingRef.current = true;
-      setIsSubmitting(true);
-      setShowSubmitModal(false);
-
-      stopWebcam();
-
-      try {
-        const activeAttemptId = attemptSession?.attemptId;
-        if (!activeAttemptId) {
-          throw new Error("Exam attempt is not ready. Reload the page and try again.");
-        }
-
-        const result = await submitExamAttempt(examId, activeAttemptId);
-
-        const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
-        localStorage.removeItem(draftKey);
-
-        setResultData(result);
-        showSuccess("Exam submitted.");
-      } catch (err) {
-        showError(err.message || "Failed to submit exam.");
-      } finally {
-        setIsSubmitting(false);
-        stopWebcam();
-      }
-    },
-    [attemptSession?.attemptId, examId, stopWebcam, showError, showSuccess, setResultData, user?.userId]
-  );
+  // useExamTimer, useAttemptAnswers and submitExam reference each other: the timer needs
+  // submitExam, submitExam needs flushPendingSaves, and useAttemptAnswers needs isAttemptExpired
+  // from the timer. The ref breaks the cycle so the hooks can be declared in dependency order.
+  const submitExamRef = useRef(null);
 
   const { timeLeftSeconds, isAttemptExpired, formattedTime } = useExamTimer({
     expiresAt: attemptSession?.expiresAt,
-    onExpire: submitExam,
+    onExpire: () => submitExamRef.current?.(),
     active: !resultData && !loading,
     showWarning,
   });
@@ -179,12 +61,13 @@ export default function TakeExam() {
   const {
     mcqAnswers,
     textAnswers,
-    setMcqAnswers,
-    setTextAnswers,
     restoreSavedAnswers,
     handleSelectOption,
     handleTextAnswerChange,
     answeredCount,
+    flushPendingSaves,
+    suspendSaves,
+    resumeSaves,
   } = useAttemptAnswers({
     examId,
     attemptId: attemptSession?.attemptId,
@@ -194,6 +77,55 @@ export default function TakeExam() {
     isMcqExam: isMcq,
   });
 
+  const submitExam = useCallback(async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setShowSubmitModal(false);
+
+    try {
+      const activeAttemptId = attemptSession?.attemptId;
+      if (!activeAttemptId) {
+        throw new Error("Exam attempt is not ready. Reload the page and try again.");
+      }
+
+      // Scoring, expiry and the final status are decided by the server.
+      // Nothing may be submitted while an answer is still unsaved: the server rejects an answer
+      // for an attempt that is already submitted, so a late save would silently lose the text.
+      const answersSaved = await flushPendingSaves();
+      if (!answersSaved) {
+        showError("Some answers could not be saved, so the exam was not submitted. Please try again.");
+        return;
+      }
+
+      suspendSaves();
+      const result = await submitExamAttempt(examId, activeAttemptId);
+
+      setResultData(result);
+      showSuccess("Exam submitted.");
+    } catch (err) {
+      // The attempt is still open, so the student has to be able to keep editing and saving.
+      resumeSaves();
+      showError(err.message || "Failed to submit exam.");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  }, [
+    attemptSession?.attemptId,
+    examId,
+    flushPendingSaves,
+    resumeSaves,
+    showError,
+    showSuccess,
+    setResultData,
+    suspendSaves,
+  ]);
+
+  useEffect(() => {
+    submitExamRef.current = submitExam;
+  }, [submitExam]);
+
   useEffect(() => {
     if (initialAnswers.length > 0 && questions.length > 0) {
       restoreSavedAnswers(initialAnswers, questions);
@@ -201,358 +133,8 @@ export default function TakeExam() {
   }, [initialAnswers, questions, restoreSavedAnswers]);
 
   useEffect(() => {
-    const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
-    const savedDraft = localStorage.getItem(draftKey);
-    if (savedDraft) {
-      try {
-        const parsed = JSON.parse(savedDraft);
-        if (parsed.mcqAnswers) setMcqAnswers(parsed.mcqAnswers);
-        if (parsed.textAnswers) setTextAnswers(parsed.textAnswers);
-      } catch {
-        console.warn("Could not parse draft");
-      }
-    }
-  }, [examId, setMcqAnswers, setTextAnswers, user?.userId]);
-
-  useEffect(() => {
-    if (questions.length > 0 && !resultData) {
-      const draftKey = `draft_exam_${examId}_${user?.userId || "guest"}`;
-      localStorage.setItem(
-        draftKey,
-        JSON.stringify({ mcqAnswers, textAnswers, timestamp: Date.now() })
-      );
-    }
-  }, [mcqAnswers, textAnswers, examId, user, questions, resultData]);
-
-  useEffect(() => {
     loadExamAndAttempt();
-    return () => {
-      stopWebcam();
-    };
-  }, [loadExamAndAttempt, stopWebcam]);
-
-  useEffect(() => {
-    if (!loading && !accessBlocked && !resultData && !alreadySubmitted) {
-      startWebcam();
-    } else if (resultData || alreadySubmitted || accessBlocked) {
-      stopWebcam();
-    }
-  }, [loading, accessBlocked, resultData, alreadySubmitted, startWebcam, stopWebcam]);
-
-  useEffect(() => {
-    const handleUnload = () => {
-      stopWebcam();
-    };
-    window.addEventListener("beforeunload", handleUnload);
-    window.addEventListener("pagehide", handleUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleUnload);
-      window.removeEventListener("pagehide", handleUnload);
-      stopWebcam();
-    };
-  }, [stopWebcam]);
-
-  const handleCopyViolation = useCallback(
-    (actionType = "Copying") => {
-      if (resultData || isSubmittingRef.current) return;
-
-      setCopyStrikes((prevStrikes) => {
-        const newStrikes = prevStrikes + 1;
-
-        if (newStrikes === 1) {
-          setActiveViolationModal({
-            title: "⚠️ Copying is not allowed (1 of 3)",
-            message: `${actionType} questions or options is not allowed. This violation has been logged. 2 strikes remaining.`,
-            strike: 1,
-            isDisqualified: false,
-          });
-          showWarning("Copying is not allowed (1/3).");
-        } else if (newStrikes === 2) {
-          setActiveViolationModal({
-            title: "⚠️ Final warning (2 of 3)",
-            message: "One more copy violation will disqualify you and submit the exam with 0 marks.",
-            strike: 2,
-            isDisqualified: false,
-          });
-          showError("One more copy violation will disqualify you (2/3).");
-        } else if (newStrikes >= 3) {
-          setActiveViolationModal({
-            title: "🚫 Exam submitted and disqualified",
-            message: "The copy limit was reached. Your exam has been submitted and you are disqualified.",
-            strike: 3,
-            isDisqualified: true,
-          });
-          submitExam();
-        }
-
-        return newStrikes;
-      });
-    },
-    [resultData, submitExam, showError, showWarning]
-  );
-
-  const handleSecondaryDeviceDetected = useCallback(
-    () => {
-      if (resultData || isSubmittingRef.current) return;
-
-      setScreenShieldActive(true);
-      setActiveViolationModal({
-        title: "🚫 Exam Terminated: Secondary Device Detected",
-        message:
-          "Screen capture or a secondary device was detected. Your exam has been submitted and you are disqualified.",
-        strike: 3,
-        isDisqualified: true,
-      });
-      submitExam();
-    },
-    [resultData, submitExam]
-  );
-
-  useEffect(() => {
-    if (resultData) return;
-
-    const handleKeyDown = (e) => {
-      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-      const key = e.key ? e.key.toLowerCase() : "";
-
-      if (isCmdOrCtrl && (key === "c" || key === "x")) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleCopyViolation(key === "c" ? "Copying" : "Cutting");
-        return false;
-      }
-
-      if (isCmdOrCtrl && (key === "u" || key === "p" || key === "s")) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleCopyViolation("Shortcut action");
-        return false;
-      }
-
-      if (
-        key === "printscreen" ||
-        (isCmdOrCtrl && e.shiftKey && (key === "3" || key === "4" || key === "5" || key === "s"))
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleSecondaryDeviceDetected();
-        return false;
-      }
-
-      if (
-        key === "f12" ||
-        (isCmdOrCtrl && e.shiftKey && key === "i") ||
-        (e.altKey && isCmdOrCtrl && key === "i")
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleCopyViolation("Developer tools inspection");
-        return false;
-      }
-    };
-
-    const handleNativeCopy = (e) => {
-      e.preventDefault();
-      handleCopyViolation("Copying text");
-    };
-
-    const handleNativeCut = (e) => {
-      e.preventDefault();
-      handleCopyViolation("Cutting text");
-    };
-
-    const handleContextMenu = (e) => {
-      e.preventDefault();
-      showWarning("Right-click is disabled during the exam.");
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setScreenShieldActive(true);
-        if (isTabHiddenRef.current) return;
-        isTabHiddenRef.current = true;
-
-        setTabStrikes((prev) => {
-          const next = prev + 1;
-          if (next >= 3) {
-            handleSecondaryDeviceDetected();
-          } else {
-            showWarning(`⚠️ Tab switch detected (${next}/3). Stay on the exam window.`);
-          }
-          return next;
-        });
-      } else {
-        isTabHiddenRef.current = false;
-        setScreenShieldActive(false);
-      }
-    };
-
-    const handleFullscreenChange = () => {
-      const inFullscreen = !!document.fullscreenElement;
-      setIsFullscreen(inFullscreen);
-      if (!inFullscreen && !resultData) {
-        setFullscreenWarning(true);
-      } else {
-        setFullscreenWarning(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    document.addEventListener("copy", handleNativeCopy, true);
-    document.addEventListener("cut", handleNativeCut, true);
-    document.addEventListener("contextmenu", handleContextMenu, true);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      document.removeEventListener("copy", handleNativeCopy, true);
-      document.removeEventListener("cut", handleNativeCut, true);
-      document.removeEventListener("contextmenu", handleContextMenu, true);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, [resultData, handleCopyViolation, handleSecondaryDeviceDetected, showWarning]);
-
-  // Face-count polling; skin-tone heuristic when the browser has no FaceDetector
-  useEffect(() => {
-    if (!isCameraActive || resultData) return;
-
-    const interval = setInterval(async () => {
-      if (!videoRef.current || !canvasRef.current) return;
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-
-      if (video.readyState >= 2) {
-        let personsDetectedThisFrame = 1;
-
-        if (faceDetectorRef.current) {
-          try {
-            const faces = await faceDetectorRef.current.detect(video);
-            if (Array.isArray(faces)) {
-              if (faces.length > 1) {
-                consecutiveMultiPersonFramesRef.current += 1;
-                if (consecutiveMultiPersonFramesRef.current >= 2) {
-                  personsDetectedThisFrame = faces.length;
-                } else {
-                  personsDetectedThisFrame = 1;
-                }
-              } else {
-                consecutiveMultiPersonFramesRef.current = 0;
-                personsDetectedThisFrame = 1;
-              }
-            }
-          } catch {
-            personsDetectedThisFrame = 1;
-          }
-        } else {
-          canvas.width = 96;
-          canvas.height = 72;
-          ctx.drawImage(video, 0, 0, 96, 72);
-
-          try {
-            const imgData = ctx.getImageData(0, 0, 96, 72);
-            const data = imgData.data;
-            let leftUpperFace = 0;
-            let centerUpperFace = 0;
-            let rightUpperFace = 0;
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-
-              const pixelIndex = i / 4;
-              const y = Math.floor(pixelIndex / 96);
-              const x = pixelIndex % 96;
-
-              if (y < 40) {
-                const isSkin =
-                  r > 110 &&
-                  g > 55 &&
-                  b > 35 &&
-                  Math.max(r, g, b) - Math.min(r, g, b) > 18 &&
-                  Math.abs(r - g) > 15 &&
-                  r > g &&
-                  r > b;
-                if (isSkin) {
-                  if (x < 28) leftUpperFace++;
-                  else if (x >= 34 && x <= 62) centerUpperFace++;
-                  else if (x > 68) rightUpperFace++;
-                }
-              }
-            }
-
-            const isMultiHeadDetected =
-              (leftUpperFace > 70 && centerUpperFace > 70) ||
-              (centerUpperFace > 70 && rightUpperFace > 70) ||
-              (leftUpperFace > 60 && rightUpperFace > 60);
-
-            if (isMultiHeadDetected) {
-              consecutiveMultiPersonFramesRef.current += 1;
-              if (consecutiveMultiPersonFramesRef.current >= 3) {
-                personsDetectedThisFrame = 2;
-              } else {
-                personsDetectedThisFrame = 1;
-              }
-            } else {
-              consecutiveMultiPersonFramesRef.current = Math.max(
-                0,
-                consecutiveMultiPersonFramesRef.current - 1
-              );
-              personsDetectedThisFrame = 1;
-            }
-          } catch {
-            personsDetectedThisFrame = 1;
-          }
-        }
-
-        setDetectedPersonsCount(personsDetectedThisFrame);
-
-        if (personsDetectedThisFrame > 1) {
-          setMultiplePersonsDurationSeconds((prevDuration) => {
-            const nextDuration = prevDuration + 2.5;
-
-            if (nextDuration >= 180 && prevDuration < 180) {
-              setActiveViolationModal({
-                title: "⚠️ Security Warning: Multiple Persons Detected",
-                message:
-                  "Multiple people have been in frame for over 3 minutes. Be alone in a private room, otherwise you will be disqualified.",
-                strike: 1,
-                isDisqualified: false,
-              });
-              showWarning("⚠️ Multiple people detected for 3+ minutes. Be alone.");
-            } else if (nextDuration >= 240 && prevDuration < 240) {
-              setActiveViolationModal({
-                title: "🚫 Exam Terminated: Unauthorized Persons Present",
-                message:
-                  "Multiple people remained in the room for over 4 minutes. Your exam has ended.",
-                strike: 3,
-                isDisqualified: true,
-              });
-              submitExam();
-            }
-
-            return nextDuration;
-          });
-        } else {
-          setMultiplePersonsDurationSeconds((prev) => Math.max(0, prev - 2.5));
-        }
-      }
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [isCameraActive, resultData, submitExam, showWarning]);
-
-  const requestFullscreen = () => {
-    try {
-      if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen();
-      }
-    } catch (err) {
-      console.warn("Fullscreen request error:", err);
-    }
-  };
+  }, [loadExamAndAttempt]);
 
   const currentQuestion = questions[currentIndex];
   const currentQuestionId = currentQuestion?.question_id || currentQuestion?.questionId || currentIndex + 1;
@@ -627,30 +209,30 @@ export default function TakeExam() {
               {isNotRegistered && accessBlocked.isRegistrationOpen && (
                 <button
                   type="button"
+                  disabled={isRegistering}
                   onClick={async () => {
-                    const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
+                    setIsRegistering(true);
                     try {
-                      await registerForExam(examId, studentId);
+                      await registerForExam(examId);
                       showSuccess("Registered. Opening exam...");
                       setAccessBlocked(null);
                       loadExamAndAttempt();
                     } catch (err) {
-                      showError(err.response?.data?.message || "Failed to register for this exam");
+                      showError(err.message || "Failed to register for this exam");
+                    } finally {
+                      setIsRegistering(false);
                     }
                   }}
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 disabled:opacity-60 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
                 >
                   <Icon name="check-circle" className="w-4 h-4" />
-                  <span>Register &amp; Start Exam →</span>
+                  <span>{isRegistering ? "Registering..." : "Register & Start Exam →"}</span>
                 </button>
               )}
 
               <button
                 type="button"
-                onClick={() => {
-                  stopWebcam();
-                  navigate("/dashboard/student");
-                }}
+                onClick={() => navigate("/dashboard/student")}
                 className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
               >
                 Back to Available Exams
@@ -663,64 +245,39 @@ export default function TakeExam() {
   }
 
   if (resultData) {
-    const isDisqualified = !!(resultData.disqualified || resultData.is_disqualified);
-    const isPass = !isDisqualified && resultData.status === RESULT_STATUS.PASS;
+    const isPass = resultData.status === RESULT_STATUS.PASS;
+    const isFail = resultData.status === RESULT_STATUS.FAIL;
     const isPendingEvaluation = resultData.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION;
 
-    const marksObtained = resultData.marks_obtained ?? resultData.marksObtained ?? resultData.score;
-    const totalMarks = resultData.total_marks ?? resultData.totalMarks ?? resultData.total;
-    const percentage = resultData.percentage;
+    const marksObtained = resultData.marks_obtained ?? resultData.marksObtained ?? 0;
+    const totalMarks = resultData.total_marks ?? resultData.totalMarks ?? 0;
+    const percentage = resultData.percentage ?? 0;
 
     const examName =
-      resultData.exam_name ||
-      resultData.examName ||
-      exam?.exam_name ||
-      exam?.examName ||
-      `Exam #${examId}`;
-
+      resultData.exam_name || resultData.examName || exam?.exam_name || `Exam #${examId}`;
     const subjectName =
-      resultData.subject_name ||
-      resultData.subjectName ||
-      exam?.subject?.subject_name ||
-      exam?.subject?.subjectName ||
-      "General";
+      resultData.subject_name || resultData.subjectName || exam?.subject?.subject_name || "General";
 
-    const disqReason =
-      resultData.disqualification_reason ||
-      resultData.disqualificationReason ||
-      "Academic Integrity Violation";
-
-    const violationsCount =
-      resultData.violations_count !== undefined
-        ? resultData.violations_count
-        : resultData.violationsCount !== undefined
-        ? resultData.violationsCount
-        : null;
-
-    const breakdownList =
-      resultData.question_breakdown ||
-      resultData.questionBreakdown ||
-      resultData.breakdown ||
-      [];
+    const breakdownList = resultData.question_breakdown || resultData.questionBreakdown || [];
 
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 select-none">
         <div className="w-full max-w-2xl bg-white text-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
           <div
             className={`p-8 text-center ${
-              isDisqualified ? "bg-rose-600 text-white" : isPass ? "bg-emerald-600 text-white" : "bg-slate-900 text-white"
+              isPass ? "bg-emerald-600 text-white" : isFail ? "bg-rose-600 text-white" : "bg-slate-900 text-white"
             }`}
           >
             <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-3">
-              <Icon name={isDisqualified ? "x-circle" : isPass ? "check-circle" : "award"} className="w-8 h-8 text-white" />
+              <Icon name={isPass ? "check-circle" : isFail ? "x-circle" : "award"} className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-2xl font-black">
               {alreadySubmitted
                 ? "Exam Already Submitted"
-                : isDisqualified
-                ? "Exam Disqualified"
                 : isPass
                 ? "Exam Passed"
+                : isFail
+                ? "Exam Not Passed"
                 : "Exam Submitted"}
             </h2>
             <p className="text-xs text-white/90 mt-1">
@@ -746,18 +303,6 @@ export default function TakeExam() {
             </div>
           )}
 
-          {isDisqualified && (
-            <div className="bg-rose-50 border-b border-rose-200 p-4 text-center">
-              <p className="text-xs font-bold text-rose-800 uppercase tracking-wide">Academic Integrity Violation</p>
-              <p className="text-sm font-semibold text-rose-900 mt-1">
-                {disqReason}
-              </p>
-              <p className="text-xs text-rose-700 mt-1">
-                Total Security Flags: {violationsCount}
-              </p>
-            </div>
-          )}
-
           <div className="p-6 sm:p-8 space-y-6">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -769,38 +314,34 @@ export default function TakeExam() {
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Percentage</span>
-                <p className={`text-2xl font-extrabold mt-1 ${isDisqualified ? "text-rose-600" : "text-orange-600"}`}>
+                <p className={`text-2xl font-extrabold mt-1 ${isPass ? "text-orange-600" : "text-slate-700"}`}>
                   {percentage ?? "-"}{percentage !== undefined && "%"}
                 </p>
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <span className="text-xs text-slate-500 font-semibold uppercase">Outcome</span>
-                <p className={`text-base font-bold mt-2 ${isDisqualified ? "text-rose-600" : isPass ? "text-emerald-600" : "text-amber-600"}`}>
-                  {isDisqualified ? "Disqualified" : resultData.status || "Submitted"}
+                <p className={`text-base font-bold mt-2 ${isPass ? "text-emerald-600" : isFail ? "text-rose-600" : "text-amber-600"}`}>
+                  {resultData.status || "Submitted"}
                 </p>
               </div>
             </div>
 
-            {!isDisqualified && breakdownList.length > 0 && (
+            {breakdownList.length > 0 && (
               <div className="space-y-3 pt-2">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Question Review ({breakdownList.length})
                 </h4>
                 <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                   {breakdownList.map((item, idx) => {
-                    const selectedAnswer = item.selected_answer || item.selectedAnswer || item.answer || item.chosen || "None";
-                    const correctAnswer = item.correct_answer || item.correctAnswer || item.correctOption || "";
-                    const isItemCorrect =
-                      item.is_correct !== undefined
-                        ? !!item.is_correct
-                        : item.isCorrect !== undefined
-                        ? !!item.isCorrect
-                        : null;
+                    const isMcq = (item.questionType || "").toUpperCase() === "MCQ";
+                    const selectedAnswer = isMcq ? item.selectedAnswer || "None" : item.textAnswer || "No answer";
+                    const correctAnswer = item.correctAnswer || "";
+                    const isItemCorrect = item.isCorrect;
 
                     return (
                       <div
-                        key={idx}
+                        key={item.questionId ?? idx}
                         className={`p-3 rounded-xl border text-xs space-y-1 ${
                           isItemCorrect === true
                             ? "bg-emerald-50/70 border-emerald-200"
@@ -814,7 +355,7 @@ export default function TakeExam() {
                             {idx + 1}. {item.question}
                           </p>
                           <span
-                            className={`font-bold px-2 py-0.5 rounded text-[10px] ${
+                            className={`font-bold px-2 py-0.5 rounded text-[10px] whitespace-nowrap ${
                               isItemCorrect === true
                                 ? "bg-emerald-200 text-emerald-800"
                                 : isItemCorrect === false
@@ -822,7 +363,11 @@ export default function TakeExam() {
                                 : "bg-slate-200 text-slate-700"
                             }`}
                           >
-                            {isItemCorrect === true ? "Correct" : isItemCorrect === false ? "Incorrect" : "Reviewed"}
+                            {isItemCorrect === true
+                              ? "Correct"
+                              : isItemCorrect === false
+                              ? "Incorrect"
+                              : `${item.awardedMarks ?? 0} / ${item.marks ?? 0} marks`}
                           </span>
                         </div>
                         <p className="text-slate-600">
@@ -840,10 +385,7 @@ export default function TakeExam() {
 
             <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
               <button
-                onClick={() => {
-                  stopWebcam();
-                  navigate("/dashboard/student");
-                }}
+                onClick={() => navigate("/dashboard/student")}
                 className="flex-1 py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-sm transition-all text-center"
               >
                 Return to Student Dashboard
@@ -855,42 +397,53 @@ export default function TakeExam() {
     );
   }
 
+  // Loading finished without a result, an access block, or a live attempt: the attempt
+  // could not be prepared. Offer a retry instead of rendering an empty question paper.
+  if (!attemptSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
+        <div className="w-full max-w-md bg-white text-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 text-center">
+          <div className="p-8 bg-rose-600 text-white">
+            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
+              <Icon name="alert-triangle" className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-black">Exam Unavailable</h2>
+            <p className="text-xs text-white/90 mt-1">
+              {exam?.exam_name || `Exam #${examId}`}
+            </p>
+          </div>
+          <div className="p-6 space-y-3">
+            <p className="text-sm text-slate-600">
+              The exam attempt could not be prepared. This is usually a temporary connection
+              problem.
+            </p>
+            <button
+              type="button"
+              onClick={() => loadExamAndAttempt()}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all"
+            >
+              Try Again
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard/student")}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+            >
+              Back to Available Exams
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col select-none relative overflow-x-hidden">
-      <canvas ref={canvasRef} className="hidden" />
-
-      {screenShieldActive && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4 border border-amber-500/30 animate-pulse">
-            <Icon name="shield" className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-black text-white">Security Shield Active</h2>
-          <p className="text-sm text-slate-300 max-w-md mt-2">
-            The exam window lost focus or a screenshot shortcut was detected. Return focus to the exam window to continue.
-          </p>
-          <button
-            onClick={() => setScreenShieldActive(false)}
-            className="mt-6 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-bold shadow-lg transition-all"
-          >
-            Resume Exam
-          </button>
-        </div>
-      )}
-
-      <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden opacity-[0.045] flex flex-wrap gap-16 p-8 rotate-[-12deg] select-none">
-        {Array.from({ length: 48 }).map((_, idx) => (
-          <div key={idx} className="text-white text-xs font-mono font-black tracking-widest whitespace-nowrap">
-            {user?.username || "CANDIDATE"} • ID #{user?.userId || user?.roleId || "STUDENT"} • EXAM #{examId} • SKILLCHECKR PROCTOR
-          </div>
-        ))}
-      </div>
-
       <header className="h-20 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-4">
           <button
             onClick={() => {
-              if (window.confirm("Exit exam? Your saved answers will be retained.")) {
-                stopWebcam();
+              if (window.confirm("Exit exam? Your saved answers are already stored on the server.")) {
                 navigate("/dashboard/student");
               }
             }}
@@ -907,56 +460,11 @@ export default function TakeExam() {
               <span className="text-xs text-slate-400 font-medium">
                 {exam?.subject?.subject_name || "General"} • {isMcq ? "MCQ Exam" : "Written Q&A"}
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                AI Proctor Active
-              </span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
-          <div className="relative group flex items-center gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700">
-            <div className="w-9 h-7 sm:w-11 sm:h-8 rounded-lg overflow-hidden bg-slate-950 relative border border-slate-700 flex items-center justify-center">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              {!isCameraActive && (
-                <Icon name="camera" className="w-3.5 h-3.5 text-slate-500 absolute" />
-              )}
-            </div>
-            <div className="hidden sm:block text-left">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block leading-none">
-                {detectedPersonsCount > 1 ? "⚠️ Alert" : "Shield"}
-              </span>
-              <span
-                className={`text-[11px] font-bold flex items-center gap-1 leading-none mt-0.5 ${
-                  detectedPersonsCount > 1 ? "text-amber-400" : "text-emerald-400"
-                }`}
-              >
-                {detectedPersonsCount > 1 ? `${detectedPersonsCount} Persons` : "1 Person"}
-              </span>
-            </div>
-          </div>
-
-          <div
-            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-              copyStrikes === 0
-                ? "bg-slate-800 border-slate-700 text-slate-300"
-                : copyStrikes === 1
-                ? "bg-amber-950/60 border-amber-500/60 text-amber-400"
-                : "bg-rose-950/80 border-rose-500 text-rose-400 animate-bounce"
-            }`}
-            title="Copy violations (3 strikes before disqualification)"
-          >
-            <span>Strikes:</span>
-            <span className="font-mono font-black">{copyStrikes} / 3</span>
-          </div>
-
           <div
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-black border transition-colors ${
               isAttemptExpired || timeLeftSeconds < 300
@@ -972,22 +480,10 @@ export default function TakeExam() {
             onClick={() => setShowSubmitModal(true)}
             className="py-2.5 px-4 sm:px-5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs sm:text-sm font-black rounded-xl shadow-lg transition-all"
           >
-            Finish & Submit
+            Finish &amp; Submit
           </button>
         </div>
       </header>
-
-      {(!isFullscreen || fullscreenWarning) && (
-        <div className="bg-orange-500/15 border-b border-orange-500/30 px-4 py-2 text-center text-xs font-semibold text-orange-300 flex items-center justify-center gap-3">
-          <span>🔒 Fullscreen mode is recommended during the exam.</span>
-          <button
-            onClick={requestFullscreen}
-            className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-[11px] transition-all"
-          >
-            Enable Fullscreen
-          </button>
-        </div>
-      )}
 
       <main className="flex-1 max-w-[1536px] w-full mx-auto p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3 flex flex-col justify-between bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-10 backdrop-blur-sm space-y-8 relative">
@@ -1065,7 +561,7 @@ export default function TakeExam() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
                   <span>Write your answer:</span>
-                  <span>Word Limit: ~{currentQuestion?.wordLimit || 250} words</span>
+                  <span>Word Limit: ~{currentQuestion?.word_limit || currentQuestion?.wordLimit || 250} words</span>
                 </div>
                 <textarea
                   rows={8}
@@ -1111,55 +607,6 @@ export default function TakeExam() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 backdrop-blur-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <span className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
-                <Icon name="shield" className="w-4 h-4 text-emerald-400" />
-                Integrity Shield
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                Active
-              </span>
-            </div>
-
-            <ul className="text-xs space-y-2.5 text-slate-400">
-              <li className="flex items-center justify-between">
-                <span>Copy Protection:</span>
-                <span className="font-bold text-emerald-400">3-Strike Lock</span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Tab Focus Monitor:</span>
-                <span className="font-bold text-amber-400">{tabStrikes} / 3 Strikes</span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Camera Monitor:</span>
-                <span className="font-bold text-emerald-400">
-                  {cameraError ? "Perm Needed" : isCameraActive ? "Connected" : "Active"}
-                </span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Room Presence:</span>
-                <span
-                  className={`font-bold ${
-                    detectedPersonsCount > 1
-                      ? multiplePersonsDurationSeconds >= 120
-                        ? "text-rose-400 animate-pulse"
-                        : "text-amber-400"
-                      : "text-emerald-400"
-                  }`}
-                >
-                  {detectedPersonsCount > 1
-                    ? `⚠️ >1 Person (${Math.floor(multiplePersonsDurationSeconds)}s/180s)`
-                    : "1 Person (Normal)"}
-                </span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Photo / Leak Shield:</span>
-                <span className="font-bold text-emerald-400">Watermarked</span>
-              </li>
-            </ul>
-          </div>
-
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm space-y-5">
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
               Question Navigator ({questions.length})
@@ -1213,51 +660,17 @@ export default function TakeExam() {
               </div>
             </div>
           </div>
-        </div>
-      </main>
 
-      {activeViolationModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
-            <div
-              className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center ${
-                activeViolationModal.isDisqualified
-                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse"
-                  : activeViolationModal.strike === 2
-                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                  : "bg-orange-500/20 text-orange-400 border border-orange-500/40"
-              }`}
-            >
-              <Icon
-                name={activeViolationModal.isDisqualified ? "x-circle" : "shield"}
-                className="w-8 h-8"
-              />
-            </div>
-
-            <div>
-              <h3 className="text-xl font-black text-white">{activeViolationModal.title}</h3>
-              <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-                {activeViolationModal.message}
-              </p>
-            </div>
-
-            <div className="pt-2">
-              {!activeViolationModal.isDisqualified ? (
-                <button
-                  onClick={() => setActiveViolationModal(null)}
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-all shadow-lg"
-                >
-                  I Understand & Acknowledge
-                </button>
-              ) : (
-                <p className="text-xs text-rose-400 font-bold uppercase tracking-wider">
-                  Session Terminated
-                </p>
-              )}
-            </div>
+          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm text-xs text-slate-400 space-y-2">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Before you submit</h3>
+            <ul className="space-y-1.5 list-disc list-inside">
+              <li>Every answer you give is saved on the server as you type.</li>
+              <li>The countdown follows the attempt window set by the server.</li>
+              <li>You can review and change answers until you submit or time runs out.</li>
+            </ul>
           </div>
         </div>
-      )}
+      </main>
 
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
