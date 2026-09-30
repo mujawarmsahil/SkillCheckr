@@ -33,11 +33,15 @@ export default function AvailableExams() {
   const loadExams = useCallback(async () => {
     setLoading(true);
     try {
-      const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
+      const studentId = user?.roleId ? parseInt(user.roleId, 10) : null;
+      if (!studentId) {
+        throw new Error("Your student account could not be identified. Please sign in again.");
+      }
 
       const fetchedExams = await getUpcomingExams();
       setExams(fetchedExams);
 
+      // Registration state always comes from the server, never from a local cache.
       try {
         const regIds = await getStudentRegistrations(studentId);
         const regMap = {};
@@ -50,13 +54,8 @@ export default function AvailableExams() {
         });
         setRegisteredExamsMap(regMap);
       } catch (regErr) {
-        console.warn("Could not fetch registrations from server:", regErr);
-        try {
-          const localRegs = JSON.parse(localStorage.getItem(`student_${studentId}_registered_exams`) || "{}");
-          setRegisteredExamsMap(localRegs);
-        } catch {
-          // no local copy either
-        }
+        showError(regErr.message || "Failed to load your exam registrations");
+        setRegisteredExamsMap({});
       }
 
       // Completed exams stay visible; the backend allows one attempt each
@@ -86,22 +85,13 @@ export default function AvailableExams() {
   }, [loadExams]);
 
   const handleRegister = async (examId, examName) => {
-    const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
     setRegisteringId(examId);
 
     try {
-      const res = await registerForExam(examId, studentId);
+      const res = await registerForExam(examId);
 
       showSuccess(res?.message || `Registered for ${examName}.`);
-      setRegisteredExamsMap((prev) => {
-        const updated = { ...prev, [examId]: true };
-        try {
-          localStorage.setItem(`student_${studentId}_registered_exams`, JSON.stringify(updated));
-        } catch {
-          // local cache is optional
-        }
-        return updated;
-      });
+      setRegisteredExamsMap((prev) => ({ ...prev, [examId]: true }));
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || "Failed to register for this exam";
       showError(errorMsg);

@@ -15,7 +15,7 @@ export default function RegisterUser() {
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get("/api/requests/viewAllRegisterUsers");
+      const res = await apiClient.get("/api/requests");
       setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       if (err.status === 404) {
@@ -43,8 +43,8 @@ export default function RegisterUser() {
 
     try {
       const endpoint = targetRole === "Teacher"
-        ? `/api/admin/addTeacher/${requestId}`
-        : `/api/admin/addStudent/${requestId}`;
+        ? `/api/admin/teachers/from-request/${requestId}`
+        : `/api/admin/students/from-request/${requestId}`;
 
       await apiClient.post(endpoint);
       showSuccess(`Approved ${request.name || request.username} as ${targetRole}. Moved to archive.`);
@@ -85,7 +85,7 @@ export default function RegisterUser() {
     }
 
     try {
-      await apiClient.delete(`/api/requests/deleteById/${requestId}`);
+      await apiClient.delete(`/api/requests/${requestId}`);
       showSuccess("Archived request deleted.");
       setRequests((prev) => prev.filter((r) => r.request_id !== requestId && r.requestId !== requestId));
     } catch (err) {

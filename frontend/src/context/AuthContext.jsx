@@ -19,8 +19,10 @@ export function AuthProvider({ children }) {
       const storedUserId = localStorage.getItem("user_id");
       const storedTeacherId = localStorage.getItem("teacher_id");
       const storedStudentId = localStorage.getItem("student_id");
+      const storedToken = localStorage.getItem("token");
 
-      if (storedRole && storedUserId) {
+      // A session without a server issued token is not authenticated.
+      if (storedRole && storedUserId && storedToken) {
         const roleId = storedRole === "Teacher" ? storedTeacherId : storedRole === "Student" ? storedStudentId : null;
         setUser({
           username: storedUsername || "User",
@@ -42,7 +44,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async ({ username, password }) => {
-    const response = await apiClient.post("/api/authentication/login", {
+    const response = await apiClient.post("/api/auth/login", {
       username: username.trim(),
       password,
     });
@@ -51,7 +53,15 @@ export function AuthProvider({ children }) {
     const userRole = data.role;
     const userId = data.userId || data.user_id;
     const roleId = data.roleId || data.role_id;
-    const userToken = data.token || "session-token-" + userId;
+    const userToken = data.token;
+
+    if (!userToken) {
+      throw new Error("The server did not return an authentication token.");
+    }
+    if (!userId) {
+      throw new Error("The server did not return a user id.");
+    }
+
     const resolvedUsername = data.username || username.trim();
     const resolvedName = data.name || resolvedUsername;
     const resolvedEmail = data.email || data.student_email || data.teacher_email || data.admin_email || "";
@@ -143,7 +153,12 @@ export function AuthProvider({ children }) {
     const userRole = data.role || "Student";
     const userId = data.userId || data.user_id;
     const roleId = data.roleId || data.role_id;
-    const userToken = data.token || "session-token-" + userId;
+    const userToken = data.token;
+
+    if (!userToken) {
+      throw new Error("An authentication token is required to start a session.");
+    }
+
     const resolvedUsername = data.username || "User";
     const resolvedName = data.name || resolvedUsername;
     const resolvedEmail = data.email || "";
@@ -154,7 +169,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem("name", resolvedName);
     localStorage.setItem("role", userRole);
     if (userId) localStorage.setItem("user_id", userId);
-    if (userToken) localStorage.setItem("token", userToken);
+    localStorage.setItem("token", userToken);
     if (resolvedEmail) localStorage.setItem("email", resolvedEmail);
     if (resolvedContact) localStorage.setItem("contact", resolvedContact);
     if (resolvedProfileImage) {

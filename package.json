@@ -5,16 +5,24 @@
   "description": "SkillCheckr Monorepo Workspace - Spring Boot + React Vite",
   "scripts": {
     "dev:frontend": "npm run dev --prefix frontend",
-    "dev:backend": "cd backend && ./mvnw spring-boot:run",
+    "dev:backend": "cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=${SPRING_PROFILES_ACTIVE:-dev}",
     "build": "npm run build --prefix frontend && cd backend && ./mvnw clean package -DskipTests",
     "build:frontend": "npm run build --prefix frontend",
     "build:backend": "cd backend && ./mvnw clean package -DskipTests",
     "lint": "npm run lint:frontend && npm run lint:backend",
     "lint:frontend": "npm run lint --prefix frontend",
     "lint:backend": "cd backend && ./mvnw checkstyle:check",
-    "test": "cd backend && ./mvnw test",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "npm test --prefix frontend",
+    "test:backend": "cd backend && ./mvnw test",
     "install:hooks": "cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit",
     "precommit": "./.git/hooks/pre-commit"
   },
-  "keywords": ["exam", "education", "spring-boot", "react", "assessment"]
+  "keywords": [
+    "exam",
+    "education",
+    "spring-boot",
+    "react",
+    "assessment"
+  ]
 }

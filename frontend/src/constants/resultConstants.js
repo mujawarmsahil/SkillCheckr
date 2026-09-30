@@ -3,3 +3,8 @@ export const RESULT_STATUS = Object.freeze({
   FAIL: "Fail",
   SUBMITTED_FOR_EVALUATION: "Submitted for Evaluation",
 });
+
+export const ATTEMPT_STATUS = Object.freeze({
+  IN_PROGRESS: "IN_PROGRESS",
+  SUBMITTED: "SUBMITTED",
+});

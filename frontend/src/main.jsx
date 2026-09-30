@@ -66,7 +66,7 @@ const router = createBrowserRouter(
       <Route
         path="/take-exam/:examId"
         element={
-          <ProtectedRoute allowedRoles={["Student", "Admin", "Teacher"]}>
+          <ProtectedRoute allowedRoles={["Student"]}>
             <TakeExam />
           </ProtectedRoute>
         }

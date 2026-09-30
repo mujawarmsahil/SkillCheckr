@@ -13,6 +13,17 @@ export function useAttemptAnswers({
   const [mcqAnswers, setMcqAnswers] = useState({});
   const [textAnswers, setTextAnswers] = useState({});
   const answerSaveTimersRef = useRef({});
+  // Latest value per question that has not been handed to the save queue yet. This is what
+  // flushPendingSaves() sends, and it is the only place a pending value lives, so a value can
+  // never be sent twice or dropped. The original question id is kept next to the value because the
+  // map key is a string and the API must receive the id in its original type.
+  const pendingTextRef = useRef({});
+  // One promise per question, chained so two saves for the same question are never in flight at
+  // the same time. An earlier, slower save landing after a later one would restore stale text.
+  const inFlightRef = useRef({});
+  // Set once submission has started. After that no further save may be sent, because the backend
+  // rejects answers for a submitted attempt.
+  const savesSuspendedRef = useRef(false);
 
   useEffect(() => {
     const timers = answerSaveTimersRef.current;
@@ -23,22 +34,49 @@ export function useAttemptAnswers({
 
   const saveAnswerToBackend = useCallback(
     async (questionId, payload) => {
+      if (savesSuspendedRef.current) {
+        return false;
+      }
       if (!attemptId) {
         if (showError) {
           showError("Exam attempt is not ready. Reload the page and try again.");
         }
-        return;
+        return false;
       }
 
       try {
         await apiSaveAttemptAnswer(examId, attemptId, questionId, payload);
+        return true;
       } catch (err) {
         if (showError) {
           showError(err.message || "Failed to save answer");
         }
+        return false;
       }
     },
     [attemptId, examId, showError]
+  );
+
+  /**
+   * Appends a save behind any save already running for the same question and returns a promise
+   * that resolves to true when the answer was persisted. A failure of an earlier save does not
+   * block the queue, it is only reported through the promise this call hands back.
+   */
+  const enqueueSave = useCallback(
+    (questionId, payload) => {
+      const previous = inFlightRef.current[questionId] || Promise.resolve();
+      const next = previous
+        .catch(() => false)
+        .then(() => saveAnswerToBackend(questionId, payload))
+        .finally(() => {
+          if (inFlightRef.current[questionId] === next) {
+            delete inFlightRef.current[questionId];
+          }
+        });
+      inFlightRef.current[questionId] = next;
+      return next;
+    },
+    [saveAnswerToBackend]
   );
 
   const restoreSavedAnswers = useCallback(
@@ -108,9 +146,11 @@ export function useAttemptAnswers({
         return;
       }
 
-      saveAnswerToBackend(questionId, { selectedAnswerId });
+      // MCQ keeps its immediate save, unchanged, but it goes through the same per-question queue
+      // so a flush can wait for it.
+      enqueueSave(questionId, { selectedAnswerId });
     },
-    [isAttemptExpired, saveAnswerToBackend, showError]
+    [enqueueSave, isAttemptExpired, showError]
   );
 
   const queueTextAnswerSave = useCallback(
@@ -118,25 +158,32 @@ export function useAttemptAnswers({
       const timerKey = String(questionId);
       if (answerSaveTimersRef.current[timerKey]) {
         clearTimeout(answerSaveTimersRef.current[timerKey]);
+        delete answerSaveTimersRef.current[timerKey];
       }
 
       if (value.trim() === "") {
-        delete answerSaveTimersRef.current[timerKey];
-        saveAnswerToBackend(questionId, {});
+        // Clearing was already an immediate save before this change and stays one, so there is
+        // nothing left pending for this question.
+        delete pendingTextRef.current[timerKey];
+        enqueueSave(questionId, {});
         return;
       }
 
+      pendingTextRef.current[timerKey] = { questionId, value };
       answerSaveTimersRef.current[timerKey] = setTimeout(() => {
         delete answerSaveTimersRef.current[timerKey];
-        saveAnswerToBackend(questionId, { textAnswer: value });
+        const queued = pendingTextRef.current[timerKey];
+        if (queued === undefined) return;
+        delete pendingTextRef.current[timerKey];
+        enqueueSave(queued.questionId, { textAnswer: queued.value });
       }, 500);
     },
-    [saveAnswerToBackend]
+    [enqueueSave]
   );
 
   const handleTextAnswerChange = useCallback(
     (questionId, val) => {
-      if (isAttemptExpired) return;
+      if (isAttemptExpired || savesSuspendedRef.current) return;
 
       setTextAnswers((prev) => ({
         ...prev,
@@ -146,6 +193,47 @@ export function useAttemptAnswers({
     },
     [isAttemptExpired, queueTextAnswerSave]
   );
+
+  /**
+   * Sends every text answer that is still sitting behind the debounce and waits until all saves
+   * are finished. Callers must not submit the exam until this resolves, otherwise the submission
+   * reaches the server before the answer and the server rejects the late save.
+   *
+   * @returns true when every answer reached the server, false when at least one save failed
+   */
+  const flushPendingSaves = useCallback(async () => {
+    const timers = answerSaveTimersRef.current;
+    Object.keys(timers).forEach((key) => {
+      clearTimeout(timers[key]);
+    });
+    answerSaveTimersRef.current = {};
+
+    const pending = pendingTextRef.current;
+    pendingTextRef.current = {};
+
+    const flushed = Object.values(pending).map((entry) =>
+      enqueueSave(entry.questionId, { textAnswer: entry.value })
+    );
+
+    // Saves that were already running when the flush started have to be awaited too, otherwise
+    // the exam could be submitted while one of them is still in flight.
+    const running = Object.values(inFlightRef.current);
+
+    const results = await Promise.all([...flushed, ...running]);
+    return results.every(Boolean);
+  }, [enqueueSave]);
+
+  const suspendSaves = useCallback(() => {
+    savesSuspendedRef.current = true;
+  }, []);
+
+  /**
+   * Re-enables saving after a failed submission. The attempt is still open in that case, so the
+   * student has to be able to correct the answer and try again.
+   */
+  const resumeSaves = useCallback(() => {
+    savesSuspendedRef.current = false;
+  }, []);
 
   const answeredCount = useMemo(() => {
     if (isMcqExam) {
@@ -161,11 +249,12 @@ export function useAttemptAnswers({
   return {
     mcqAnswers,
     textAnswers,
-    setMcqAnswers,
-    setTextAnswers,
     restoreSavedAnswers,
     handleSelectOption,
     handleTextAnswerChange,
     answeredCount,
+    flushPendingSaves,
+    suspendSaves,
+    resumeSaves,
   };
 }

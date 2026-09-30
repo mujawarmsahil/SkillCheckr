@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { getRemainingTime, formatRemainingTime } from "../utils/dateUtils";
+import { getRemainingTime, formatRemainingTime, parseServerTimestamp } from "../utils/dateUtils";
 
 export function useExamTimer({ expiresAt, onExpire, active = true, showWarning }) {
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(0);
@@ -14,8 +14,9 @@ export function useExamTimer({ expiresAt, onExpire, active = true, showWarning }
   useEffect(() => {
     if (!active || !expiresAt) return;
 
-    const expiresAtMs = new Date(expiresAt).getTime();
-    if (Number.isNaN(expiresAtMs)) {
+    // Guarded here as well as in getRemainingTime, so an unreadable expiry stops the timer rather
+    // than silently counting down against a value the client could not interpret.
+    if (parseServerTimestamp(expiresAt) === null) {
       if (showWarning) {
         showWarning("Could not read the exam expiry time from the server.");
       }

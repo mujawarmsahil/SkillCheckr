@@ -3,6 +3,7 @@ import { getAllExams, getTeacherExams, getExamQuestions, deleteExam } from "../.
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
+import EvaluateSubmission from "./EvaluateSubmission";
 
 export default function ManageExams({ onAddNew }) {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ export default function ManageExams({ onAddNew }) {
   const [selectedExam, setSelectedExam] = useState(null);
   const [examQuestions, setExamQuestions] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [evaluationExamId, setEvaluationExamId] = useState(null);
 
   const fetchExams = useCallback(async () => {
     setLoading(true);
@@ -224,6 +226,14 @@ export default function ManageExams({ onAddNew }) {
                             View
                           </button>
                           <button
+                            onClick={() => setEvaluationExamId(examId)}
+                            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-xs font-medium flex items-center gap-1"
+                            title="Review submissions and grade written answers"
+                          >
+                            <Icon name="check-circle" className="w-4 h-4" />
+                            Grade
+                          </button>
+                          <button
                             onClick={() => handleDelete(examId)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                             title="Delete exam"
@@ -317,6 +327,10 @@ export default function ManageExams({ onAddNew }) {
             </div>
           </div>
         </div>
+      )}
+
+      {evaluationExamId && (
+        <EvaluateSubmission examId={evaluationExamId} onClose={() => setEvaluationExamId(null)} />
       )}
     </div>
   );

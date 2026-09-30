@@ -3,14 +3,12 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
 import { getMinimumExamDate, isExamDateTooSoon } from "../../utils/dateUtils";
 import { EXAM_MIN_LEAD_TIME_DAYS } from "../../constants/examConstants";
-import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 
 const EXAM_NAME_PATTERN = /^[A-Za-z]+(?:[ -][A-Za-z]+)*$/;
 
 export default function AddExam({ onExamCreated }) {
-  const { user } = useAuth();
   const { showSuccess, showError, showWarning } = useToast();
   const navigate = useNavigate();
 
@@ -45,6 +43,7 @@ export default function AddExam({ onExamCreated }) {
   const [questionsList, setQuestionsList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [savedSubjectId, setSavedSubjectId] = useState(null);
+  const [savedExamId, setSavedExamId] = useState(null);
 
   // Auto calculate duration when start or end time changes
   useEffect(() => {
@@ -125,37 +124,42 @@ export default function AddExam({ onExamCreated }) {
 
     setLoading(true);
     try {
-      const teacherId = user?.roleId || localStorage.getItem("teacher_id") || 1;
       const dateTime = `${examData.startDate}T${examData.startTime}`;
 
+      // The teacher identity and the approval status are assigned by the server.
       const payload = {
         exam_name: examData.examName,
         exam_type: examData.examType,
         subject: {
           subject_name: examData.subjectName,
           subject_code: examData.subjectCode,
-          subjectName: examData.subjectName,
-          subjectCode: examData.subjectCode,
         },
-        teacher_id: parseInt(teacherId, 10),
         date: dateTime,
         start_time: examData.startTime,
         end_time: examData.endTime,
         duration_minutes: examData.durationMinutes,
         total_marks: examData.totalMarks,
         passing_marks: examData.passingMarks,
-        status: "Upcoming",
       };
 
-      const response = await apiClient.post("/api/exams/addExams", payload);
-      const subjectId = response.data?.subjectId || response.data?.subject_id || response.data?.id;
+      const response = await apiClient.post("/api/exams", payload);
+      const createdExam = response.data;
+      const examId = createdExam?.exam_id ?? createdExam?.examId ?? null;
+      const subjectId =
+        createdExam?.subject?.subject_id ??
+        createdExam?.subject?.subjectId ??
+        createdExam?.subject_id ??
+        null;
 
-      if (subjectId) {
+      if (examId && subjectId) {
+        setSavedExamId(examId);
         setSavedSubjectId(subjectId);
-        showSuccess(`Exam created. Now add ${examData.examType === "MCQ" ? "MCQ" : "question and answer"} questions.`);
+        showSuccess(
+          "Exam created and sent for approval. Now add the questions."
+        );
         setStep(2);
       } else {
-        showError("Could not read the subject ID for this exam.");
+        showError("The created exam could not be read. Please try again.");
       }
     } catch (err) {
       showError(err.message || "Failed to create exam");
@@ -216,33 +220,31 @@ export default function AddExam({ onExamCreated }) {
 
   const handleFinalSubmit = async () => {
     if (questionsList.length === 0) {
-      showWarning("Add at least one question before publishing.");
+      showWarning("Add at least one question before submitting the exam.");
       return;
     }
 
     setLoading(true);
     try {
       const payload = questionsList.map((q) => ({
+        exam_id: savedExamId,
         subject_id: savedSubjectId,
-        subjectId: savedSubjectId,
         question: q.question,
         question_type: examData.examType,
-        questionType: examData.examType,
         option1: q.option1,
         option2: q.option2,
         option3: q.option3,
         option4: q.option4,
         correct_option: q.correctOption,
-        correctOption: q.correctOption,
         sample_answer: q.sampleAnswer,
-        sampleAnswer: q.sampleAnswer,
         marks: q.marks || 1,
         word_limit: q.wordLimit || 200,
-        wordLimit: q.wordLimit || 200,
       }));
 
-      await apiClient.post("/api/create/addQues", payload);
-      showSuccess(`Exam published with ${questionsList.length} questions.`);
+      await apiClient.post("/api/questions", payload);
+      showSuccess(
+        `Exam submitted for approval with ${questionsList.length} questions.`
+      );
 
       if (onExamCreated) {
         onExamCreated();
@@ -474,6 +476,7 @@ export default function AddExam({ onExamCreated }) {
                 value={examData.totalMarks}
                 onChange={handleExamChange}
                 min="1"
+                step="1"
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none"
                 required
               />
@@ -490,6 +493,7 @@ export default function AddExam({ onExamCreated }) {
                 onChange={handleExamChange}
                 min="1"
                 max={examData.totalMarks}
+                step="1"
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none"
                 required
               />
@@ -510,6 +514,11 @@ export default function AddExam({ onExamCreated }) {
 
       {step === 2 && (
         <div className="space-y-6">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-900">
+            Exam <span className="font-bold">{examData.examName}</span> is created
+            and waiting for admin approval. The exam becomes visible to students
+            only after an admin approves it.
+          </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-orange-100 text-orange-700">
@@ -622,6 +631,7 @@ export default function AddExam({ onExamCreated }) {
                       value={currentQuestion.marks}
                       onChange={handleQuestionChange}
                       min="1"
+                      step="1"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                     />
                   </div>
@@ -736,7 +746,9 @@ export default function AddExam({ onExamCreated }) {
               onClick={handleFinalSubmit}
               className="py-3 px-8 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm disabled:opacity-50"
             >
-              {loading ? "Publishing..." : `Publish Exam (${questionsList.length} Questions) ✓`}
+              {loading
+                ? "Submitting..."
+                : `Submit for Approval (${questionsList.length} Questions) ✓`}
             </button>
           </div>
         </div>
