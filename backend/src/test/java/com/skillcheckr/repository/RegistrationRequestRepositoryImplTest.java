@@ -88,6 +88,22 @@ class RegistrationRequestRepositoryImplTest {
         assertThat(list).containsExactly(req);
     }
 
+    /**
+     * The SQL must name the table exactly as the schema declares it. MySQL resolves an
+     * identifier case-sensitively on Linux hosts, so "Request" fails against the "request"
+     * table created by schema.sql, which surfaced as an HTTP 500 on GET /api/requests.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void getAllRequests_queriesTheSchemaTableNameExactly() throws Exception {
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of());
+
+        repository.getAllRequests();
+
+        verify(jdbcTemplate).query(eq("SELECT * FROM request ORDER BY request_id DESC"),
+                any(RowMapper.class));
+    }
+
     @Test
     void deleteRequestById_returnsTrue_whenRowsUpdated() {
         when(jdbcTemplate.update(anyString(), eq(5))).thenReturn(1);

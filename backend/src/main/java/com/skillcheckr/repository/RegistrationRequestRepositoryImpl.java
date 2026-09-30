@@ -37,7 +37,7 @@ public class RegistrationRequestRepositoryImpl implements RegistrationRequestRep
 
     @Override
     public List<RegistrationRequest> getAllRequests() {
-        return jdbcTemplate.query("SELECT * FROM Request ORDER BY request_id DESC", new RowMapper<RegistrationRequest>() {
+        return jdbcTemplate.query("SELECT * FROM request ORDER BY request_id DESC", new RowMapper<RegistrationRequest>() {
             @Override
             public RegistrationRequest mapRow(ResultSet rs, int rowNum) throws SQLException {
                 RegistrationRequest rqm = new RegistrationRequest();
