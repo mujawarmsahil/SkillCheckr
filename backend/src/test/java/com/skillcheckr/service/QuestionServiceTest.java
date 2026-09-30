@@ -156,6 +156,34 @@ class QuestionServiceTest {
     }
 
     @Test
+    void attachQuestionsToExam_countsOnlyNewlyAttachedQuestions() {
+        when(examRepository.getExamById(3)).thenReturn(Optional.of(openExam(3, 1)));
+        when(examQuestionRepository.getNextQuestionOrder(3)).thenReturn(1);
+        when(questionRepository.findQuestionDetailsById(anyInt())).thenReturn(Optional.of(questionInSubject(1)));
+        // 10 is new and gets a row; 11 is already in the exam, so the repository inserts nothing.
+        when(examQuestionRepository.attachQuestion(3, 10, 1)).thenReturn(true);
+        when(examQuestionRepository.attachQuestion(3, 11, 2)).thenReturn(false);
+
+        int attached = questionService.attachQuestionsToExam(3, List.of(10, 11));
+
+        assertThat(attached).isEqualTo(1);
+    }
+
+    @Test
+    void attachQuestionsToExam_doesNotConsumeAnOrderForAnAlreadyAttachedQuestion() {
+        when(examRepository.getExamById(3)).thenReturn(Optional.of(openExam(3, 1)));
+        when(examQuestionRepository.getNextQuestionOrder(3)).thenReturn(1);
+        when(questionRepository.findQuestionDetailsById(anyInt())).thenReturn(Optional.of(questionInSubject(1)));
+        when(examQuestionRepository.attachQuestion(3, 10, 1)).thenReturn(false);
+        when(examQuestionRepository.attachQuestion(3, 11, 1)).thenReturn(true);
+
+        questionService.attachQuestionsToExam(3, List.of(10, 11));
+
+        // The skipped attachment must not leave a gap in question_order.
+        verify(examQuestionRepository).attachQuestion(3, 11, 1);
+    }
+
+    @Test
     void attachQuestionsToExam_rejectsAnEmptySelection() {
         assertThatThrownBy(() -> questionService.attachQuestionsToExam(3, List.of()))
                 .isInstanceOf(BadRequestException.class)

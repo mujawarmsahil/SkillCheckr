@@ -69,10 +69,19 @@ public class ExamQuestionRepositoryImpl implements ExamQuestionRepository {
         return (maxOrder == null ? 0 : maxOrder) + 1;
     }
 
+    /**
+     * Reports whether this call actually inserted a row, so the caller can count newly
+     * attached questions accurately. A question that is already in the exam returns false:
+     * it is not an error, but no row was added, and reporting true would make the caller
+     * claim a question was attached when the exam did not change.
+     *
+     * <p>The existence check keeps the insert from reaching the unique constraint in the
+     * common case; the constraint remains the authority for a concurrent attach.
+     */
     @Override
     public boolean attachQuestion(int examId, int questionId, int questionOrder) {
         if (isQuestionAssigned(examId, questionId)) {
-            return true;
+            return false;
         }
         return jdbcTemplate.update(
                 "INSERT INTO exam_question (exam_id, question_id, question_order) VALUES (?, ?, ?)",
