@@ -28,7 +28,7 @@ export default function Authentication() {
           />
         </Link>
         <p className="text-xs text-slate-400 font-medium mt-3 tracking-wide">
-          Exam management and proctoring portal
+          Exam management and result portal
         </p>
       </div>
 

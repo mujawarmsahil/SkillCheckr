@@ -56,8 +56,9 @@ Navigate to the `backend/` directory:
 ```bash
 cd backend
 
-# Start Spring Boot Application
-./mvnw spring-boot:run
+# Start Spring Boot Application (the dev profile is required; without it startup
+# fails because a real TOKEN_SECRET is mandatory outside a development profile)
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 # -> API server will be live at http://localhost:8080
 
 # Run Checkstyle linter
@@ -80,13 +81,15 @@ cd backend
 | Task / Purpose | From Root (`/`) | From Frontend (`/frontend`) | From Backend (`/backend`) |
 |---|---|---|---|
 | **Start Frontend** | `npm run dev:frontend` | `npm run dev` | — |
-| **Start Backend** | `npm run dev:backend` | — | `./mvnw spring-boot:run` |
+| **Start Backend** | `npm run dev:backend` | — | `SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run` |
 | **Build Frontend** | `npm run build:frontend` | `npm run build` | — |
 | **Build Backend** | `npm run build:backend` | — | `./mvnw clean package` |
 | **Build Both (Production)** | `npm run build` | — | — |
 | **Run Linting (Frontend)** | `npm run lint:frontend` | `npm run lint` | — |
 | **Run Linting (Backend)** | `npm run lint:backend` | — | `./mvnw checkstyle:check` |
-| **Run All Linters** | `npm run lint` | — | — |
+| **Run All Tests** | `npm test` | — | — |
+| **Run Frontend Tests** | `npm run test:frontend` | `npm test` | — |
+| **Run Backend Tests** | `npm run test:backend` | — | `./mvnw test` |
 | **Test Quality Gate / Pre-commit**| `npm run precommit` | — | — |
 | **Install Git Hooks** | `npm run install:hooks` | — | — |
 
@@ -105,11 +108,13 @@ Before running the application, make sure you have installed:
 ## 🗄️ Database Setup
 
 1. Start your local MySQL server.
-2. Run the provided schema script to set up tables and default admin seed data:
+2. Create the database, then run the provided schema script to set up tables and the default admin seed:
    - File location: [`backend/src/main/resources/schema.sql`](file:///Users/sahilmujawar/Desktop/projects/SkillCheckr/backend/src/main/resources/schema.sql)
 
 ```bash
-mysql -u root -p < backend/src/main/resources/schema.sql
+CREATE DATABASE exam_application_system
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+mysql -u root -p exam_application_system < backend/src/main/resources/schema.sql
 ```
 
 3. Configure your database and secret credentials via environment variables. The backend env template lives at [`backend/.env.example`](backend/.env.example) — copy it to `backend/.env` and fill in your real values (`.env` is git-ignored and must never be committed):
@@ -125,9 +130,11 @@ mysql -u root -p < backend/src/main/resources/schema.sql
    The frontend reads only the public API location, configured separately in [`frontend/.env.example`](frontend/.env.example) (`VITE_API_URL`). Never place a server credential in a `VITE_*` variable — those are compiled into the browser bundle.
 
 ### 🔑 Default Administrator Login
-- **Username:** `Admin1`
-- **Password:** `Admin@1234`
+- **Username:** `admin`
+- **Password:** `admin@123`
 - **Role:** `Admin`
+
+This seed exists only so a freshly created database can be signed into. Change or remove it before any shared or deployed database.
 
 ---
 
@@ -174,8 +181,8 @@ SkillCheckr/
         ├── context/          # AuthContext & ToastContext providers
         ├── components/
         │   ├── auth/         # Login, Signup, Role ProtectedRoute
-        │   ├── teacher/      # AddExam (MCQ vs Q&A), ManageExams
-        │   ├── student/      # AvailableExams, TakeExam (timer & proctoring), StudentResults
+        │   ├── teacher/      # AddExam (MCQ vs Q&A), ManageExams, EvaluateSubmission (grading)
+        │   ├── student/      # AvailableExams, TakeExam (server-timed attempt), StudentResults
         │   ├── admin/        # AdminDashboard + Approvals, Users, Results, Questions, Subjects, Stats
         │   ├── layout/       # Navbar, Footer, Layout
         │   └── public/       # Home, About, Blog, Contact

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getAllResults } from "../../api/resultApi";
+import { RESULT_STATUS } from "../../constants/resultConstants";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 
@@ -28,9 +29,11 @@ export default function ManageResults() {
   }, [fetchResults]);
 
   const totalSubmissions = results.length;
-  const passedCount = results.filter((r) => (r.status || "").toLowerCase().includes("pass")).length;
-  const failedCount = results.filter((r) => (r.status || "").toLowerCase().includes("fail")).length;
-  const disqualifiedCount = results.filter((r) => (r.status || "").toLowerCase().includes("disqualified")).length;
+  const passedCount = results.filter((r) => r.status === RESULT_STATUS.PASS).length;
+  const failedCount = results.filter((r) => r.status === RESULT_STATUS.FAIL).length;
+  const awaitingGradingCount = results.filter(
+    (r) => (r.status || "") === RESULT_STATUS.SUBMITTED_FOR_EVALUATION
+  ).length;
 
   const filteredResults = results.filter((r) => {
     const sName = (r.student_name || r.studentName || "").toLowerCase();
@@ -39,11 +42,10 @@ export default function ManageResults() {
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || sName.includes(query) || eName.includes(query) || subName.includes(query);
 
-    const st = (r.status || "").toLowerCase();
     let matchesStatus = true;
-    if (statusFilter === "PASS") matchesStatus = st.includes("pass");
-    else if (statusFilter === "FAIL") matchesStatus = st.includes("fail");
-    else if (statusFilter === "DISQUALIFIED") matchesStatus = st.includes("disqualified");
+    if (statusFilter === "PASS") matchesStatus = r.status === RESULT_STATUS.PASS;
+    else if (statusFilter === "FAIL") matchesStatus = r.status === RESULT_STATUS.FAIL;
+    else if (statusFilter === "AWAITING_GRADING") matchesStatus = r.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION;
 
     return matchesSearch && matchesStatus;
   });
@@ -56,7 +58,7 @@ export default function ManageResults() {
           Results
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Review student submissions, scores, and proctoring flags
+          Review student submissions, scores, and grading status
         </p>
       </div>
 
@@ -74,8 +76,8 @@ export default function ManageResults() {
           <p className="text-2xl font-black text-rose-600 mt-1">{failedCount}</p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">Disqualified</span>
-          <p className="text-2xl font-black text-amber-600 mt-1">{disqualifiedCount}</p>
+          <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">Awaiting Grading</span>
+          <p className="text-2xl font-black text-blue-600 mt-1">{awaitingGradingCount}</p>
         </div>
       </div>
 
@@ -96,7 +98,7 @@ export default function ManageResults() {
             { id: "ALL", label: "All Results" },
             { id: "PASS", label: "Passed" },
             { id: "FAIL", label: "Failed" },
-            { id: "DISQUALIFIED", label: "Disqualified" },
+            { id: "AWAITING_GRADING", label: "Awaiting Grading" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -149,9 +151,8 @@ export default function ManageResults() {
                   const total = res.total_marks || res.totalMarks || 100;
                   const pct = res.percentage !== undefined ? Math.round(res.percentage) : 0;
                   const st = res.status || "Submitted";
-                  const isPass = st.toLowerCase().includes("pass");
-                  const isFail = st.toLowerCase().includes("fail");
-                  const isDisqualified = st.toLowerCase().includes("disqualified");
+                  const isPass = st === RESULT_STATUS.PASS;
+                  const isFail = st === RESULT_STATUS.FAIL;
 
                   return (
                     <tr key={rId || idx} className="hover:bg-slate-50/70 transition-colors">
@@ -177,14 +178,11 @@ export default function ManageResults() {
                               ? "bg-emerald-100 text-emerald-800"
                               : isFail
                               ? "bg-rose-100 text-rose-800"
-                              : isDisqualified
-                              ? "bg-amber-100 text-amber-800"
                               : "bg-blue-100 text-blue-800"
                           }`}
                         >
                           {isPass && <Icon name="check-circle" className="w-3 h-3 text-emerald-600" />}
                           {isFail && <Icon name="x" className="w-3 h-3 text-rose-600" />}
-                          {isDisqualified && <Icon name="alert" className="w-3 h-3 text-amber-600" />}
                           {st}
                         </span>
                       </td>
@@ -265,22 +263,53 @@ export default function ManageResults() {
                 </div>
               </div>
 
+              {selectedResult.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION && (
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200 text-xs text-blue-900">
+                  Written answers are still awaiting teacher grading. The score above only includes
+                  automatically graded questions.
+                </div>
+              )}
+
               {selectedResult.question_breakdown && selectedResult.question_breakdown.length > 0 && (
                 <div className="space-y-2 pt-2">
                   <span className="text-xs font-bold text-slate-700 block">Performance by question</span>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {selectedResult.question_breakdown.map((q, i) => (
-                      <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-800">Q{i + 1}: {q.question}</span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${q.isCorrect ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                            {q.isCorrect ? "Correct" : "Incorrect"}
-                          </span>
+                    {selectedResult.question_breakdown.map((q, i) => {
+                      const isMcq = (q.questionType || "").toUpperCase() === "MCQ";
+                      return (
+                        <div key={q.questionId ?? i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-slate-800">Q{i + 1}: {q.question}</span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
+                                q.isCorrect === true
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : q.isCorrect === false
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-slate-200 text-slate-700"
+                              }`}
+                            >
+                              {q.isCorrect === true
+                                ? "Correct"
+                                : q.isCorrect === false
+                                ? "Incorrect"
+                                : `${q.awardedMarks ?? 0} / ${q.marks ?? 0}`}
+                            </span>
+                          </div>
+                          <div className="text-slate-600">
+                            Answer:{" "}
+                            <span className="font-semibold">
+                              {(isMcq ? q.selectedAnswer : q.textAnswer) || "No answer"}
+                            </span>
+                          </div>
+                          {q.correctAnswer && (
+                            <div className="text-slate-600">
+                              Correct Option: <span className="font-semibold text-emerald-700">{q.correctAnswer}</span>
+                            </div>
+                          )}
                         </div>
-                        <div className="text-slate-600">Answer: <span className="font-semibold">{q.selectedAnswer || "None"}</span></div>
-                        <div className="text-slate-600">Correct Option: <span className="font-semibold text-emerald-700">{q.correctAnswer}</span></div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
