@@ -82,6 +82,7 @@ class ResultRepositoryImplTest {
             keyHolder.getKeyList().add(Map.of("result_id", 42L));
             return 1;
         }).when(jdbcTemplate).update(any(PreparedStatementCreator.class), any(KeyHolder.class));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(7))).thenReturn(List.of("Alice"));
 
         ExamResultDTO result = ExamResultDTO.builder()
                 .examId(1)
@@ -99,6 +100,56 @@ class ResultRepositoryImplTest {
 
         assertThat(saved).isSameAs(result);
         assertThat(saved.getResultId()).isEqualTo(42);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void insertSubmissionResult_resolvesTheStudentNameForTheImmediateResponse() {
+        doAnswer(invocation -> {
+            KeyHolder keyHolder = invocation.getArgument(1);
+            keyHolder.getKeyList().add(Map.of("result_id", 42L));
+            return 1;
+        }).when(jdbcTemplate).update(any(PreparedStatementCreator.class), any(KeyHolder.class));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(7))).thenReturn(List.of("Alice"));
+
+        ExamResultDTO saved = repository.insertSubmissionResult(ExamResultDTO.builder()
+                .examId(1)
+                .studentId(7)
+                .marksObtained(50)
+                .totalMarks(100)
+                .passingMarks(40)
+                .percentage(50.0)
+                .status("Pass")
+                .submittedAt("2026-09-24 10:00:00")
+                .attemptId(1)
+                .build());
+
+        assertThat(saved.getStudentName()).isEqualTo("Alice");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void insertSubmissionResult_leavesTheNameNullWhenTheStudentRowIsGone() {
+        doAnswer(invocation -> {
+            KeyHolder keyHolder = invocation.getArgument(1);
+            keyHolder.getKeyList().add(Map.of("result_id", 42L));
+            return 1;
+        }).when(jdbcTemplate).update(any(PreparedStatementCreator.class), any(KeyHolder.class));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(7))).thenReturn(List.of());
+
+        ExamResultDTO saved = repository.insertSubmissionResult(ExamResultDTO.builder()
+                .examId(1)
+                .studentId(7)
+                .marksObtained(50)
+                .totalMarks(100)
+                .passingMarks(40)
+                .percentage(50.0)
+                .status("Pass")
+                .submittedAt("2026-09-24 10:00:00")
+                .attemptId(1)
+                .build());
+
+        assertThat(saved.getStudentName()).isNull();
     }
 
     @Test

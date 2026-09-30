@@ -87,7 +87,21 @@ public class ResultRepositoryImpl implements ResultRepository {
 		}, keyHolder);
 		Number key = keyHolder.getKey();
 		if (key != null) result.setResultId(key.intValue());
+		// The insert does not carry the student's name, so the DTO handed back to the caller
+		// would report a null student_name while every later read resolves it. One targeted
+		// lookup keeps the immediate submission response consistent with the read paths.
+		result.setStudentName(findStudentName(result.getStudentId()));
 		return result;
+	}
+
+	/**
+	 * @return the student's name, or null when the student row no longer exists
+	 */
+	private String findStudentName(int studentId) {
+		List<String> names = jdbcTemplate.query(
+				"SELECT name FROM student WHERE student_id = ?",
+				(rs, rowNum) -> rs.getString("name"), studentId);
+		return names.isEmpty() ? null : names.get(0);
 	}
 
 	@Override
