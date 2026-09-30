@@ -13,4 +13,6 @@ public interface AttemptAnswerRepository {
     AttemptAnswer saveAndReturn(AttemptAnswer answer);
 
     boolean updateMarks(int attemptId, int questionId, Integer marksObtained);
+
+    boolean hasAttemptHistory(int questionId);
 }

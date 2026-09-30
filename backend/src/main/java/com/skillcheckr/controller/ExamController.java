@@ -1,8 +1,5 @@
 package com.skillcheckr.controller;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -15,37 +12,41 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.constant.RoleConstants;
 import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ForbiddenException;
 import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.ApiResponse;
-import com.skillcheckr.model.Exam;
-import com.skillcheckr.model.AttemptStartResult;
-import com.skillcheckr.model.ExamAttempt;
-import com.skillcheckr.model.ExamAttemptResponse;
 import com.skillcheckr.model.AttemptAnswerRequest;
 import com.skillcheckr.model.AttemptAnswerResponse;
+import com.skillcheckr.model.AttemptStartResult;
+import com.skillcheckr.model.EvaluationItemDTO;
+import com.skillcheckr.model.Exam;
+import com.skillcheckr.model.ExamAttempt;
+import com.skillcheckr.model.ExamAttemptResponse;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.ExamResultDTO;
+import com.skillcheckr.model.ExamSubmissionSummaryDTO;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.RegistrationCountResponse;
 import com.skillcheckr.model.RegistrationStatusResponse;
 import com.skillcheckr.model.Student;
-import com.skillcheckr.model.Subject;
-import com.skillcheckr.service.ExamService;
-import com.skillcheckr.service.AuthService;
+import com.skillcheckr.security.AuthGuard;
+import com.skillcheckr.security.AuthPrincipal;
 import com.skillcheckr.service.AttemptAnswerService;
+import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.ExamSubmissionService;
 import com.skillcheckr.service.QuestionService;
+import com.skillcheckr.validation.RequestValueParser;
 
-import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.HttpServletRequest;
 
-@Slf4j
 @RestController
-@RequestMapping({"/api/Exams", "/api/exams"})
+@RequestMapping("/api/exams")
 public class ExamController {
 
     @Autowired
@@ -55,25 +56,21 @@ public class ExamController {
     private QuestionService questionService;
 
     @Autowired
-    private AuthService authService;
-
-    @Autowired
     private AttemptAnswerService attemptAnswerService;
 
     @Autowired
     private ExamSubmissionService examSubmissionService;
 
-    @PostMapping({"/addExams", ""})
-    public ResponseEntity<Subject> addExams(@RequestBody Exam exam) {
-        Subject subject = examService.saveExam(exam);
-        if (subject == null) {
-            throw new IllegalStateException("Unable to add exam.");
-        }
-        return ResponseEntity.ok(subject);
+    @PostMapping("")
+    public ResponseEntity<Exam> addExams(@RequestBody Exam exam, HttpServletRequest request) {
+        AuthPrincipal principal = AuthGuard.requireStaff(request);
+        int teacherId = principal.isTeacher() ? principal.getRoleId() : 0;
+        return ResponseEntity.status(HttpStatus.CREATED).body(examService.saveExam(exam, teacherId));
     }
 
-    @GetMapping({"/viewAllExams", ""})
-    public ResponseEntity<List<Exam>> getAllExams() {
+    @GetMapping("")
+    public ResponseEntity<List<Exam>> getAllExams(HttpServletRequest request) {
+        AuthGuard.requireStaff(request);
         List<Exam> exams = examService.getAllExams();
         if (exams == null || exams.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
@@ -82,30 +79,20 @@ public class ExamController {
     }
 
     @GetMapping("/{exam_id}")
-    public ResponseEntity<Exam> getExamById(@PathVariable("exam_id") Integer examId) {
-        Exam exam = examService.getExamById(examId)
-                .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
+    public ResponseEntity<Exam> getExamById(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
+        AuthGuard.requirePrincipal(request);
+        Exam exam = requireExam(examId);
         return ResponseEntity.ok(exam);
     }
 
     @PostMapping("/{exam_id}/attempts")
     public ResponseEntity<ExamAttemptResponse> startAttempt(
             @PathVariable("exam_id") Integer examId,
-            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
-        if (examId == null || examId <= 0) {
-            throw new BadRequestException("Invalid examId");
-        }
-
-        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+            HttpServletRequest request) {
+        int studentId = AuthGuard.requireStudentId(request);
         AttemptStartResult result = examService.startAttempt(examId, studentId);
         ExamAttempt attempt = result.getAttempt();
-        ExamAttemptResponse response = ExamAttemptResponse.builder()
-                .attemptId(attempt.getAttemptId())
-                .examId(examId)
-                .startedAt(attempt.getStartedAt())
-                .expiresAt(attempt.getExpiresAt())
-                .status(attempt.getStatus())
-                .build();
+        ExamAttemptResponse response = ExamAttemptResponse.from(attempt, examId);
         return ResponseEntity.status(result.isExisting() ? HttpStatus.OK : HttpStatus.CREATED).body(response);
     }
 
@@ -114,13 +101,9 @@ public class ExamController {
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
             @PathVariable("question_id") Integer questionId,
-            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
-            @RequestBody(required = false) AttemptAnswerRequest request) {
-        if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0
-                || questionId == null || questionId <= 0) {
-            throw new BadRequestException("Invalid examId, attemptId, or questionId");
-        }
-        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+            @RequestBody(required = false) AttemptAnswerRequest request,
+            HttpServletRequest servletRequest) {
+        int studentId = AuthGuard.requireStudentId(servletRequest);
         AttemptAnswerResponse response = attemptAnswerService.saveAnswer(
                 examId, attemptId, questionId, studentId, request);
         return ResponseEntity.ok(response);
@@ -130,11 +113,8 @@ public class ExamController {
     public ResponseEntity<List<AttemptAnswerResponse>> getAttemptAnswers(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
-            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
-        if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0) {
-            throw new BadRequestException("Invalid examId or attemptId");
-        }
-        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+            HttpServletRequest request) {
+        int studentId = AuthGuard.requireStudentId(request);
         return ResponseEntity.ok(attemptAnswerService.getAnswers(examId, attemptId, studentId));
     }
 
@@ -142,63 +122,97 @@ public class ExamController {
     public ResponseEntity<ExamResultDTO> submitAttempt(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
-            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
-        if (examId == null || examId <= 0 || attemptId == null || attemptId <= 0) {
-            throw new BadRequestException("Invalid examId or attemptId");
-        }
-        int studentId = authService.getStudentIdFromAuthorization(authorizationHeader);
+            HttpServletRequest request) {
+        int studentId = AuthGuard.requireStudentId(request);
         return ResponseEntity.ok(examSubmissionService.submit(examId, attemptId, studentId));
     }
 
     @GetMapping("/teacher/{teacher_id}")
-    public ResponseEntity<List<Exam>> getExamsByTeacherId(@PathVariable("teacher_id") Integer teacherId) {
+    public ResponseEntity<List<Exam>> getExamsByTeacherId(@PathVariable("teacher_id") Integer teacherId,
+            HttpServletRequest request) {
+        AuthPrincipal principal = AuthGuard.requireStaff(request);
+        if (principal.isTeacher() && principal.getRoleId() != teacherId) {
+            throw new ForbiddenException("You are not authorized to view another teacher's exams.");
+        }
         List<Exam> exams = examService.getExamsByTeacherId(teacherId);
         return ResponseEntity.ok(exams != null ? exams : List.of());
     }
 
-    @GetMapping({"/{exam_id}/questions", "/questions/{exam_id}"})
-    public ResponseEntity<List<QuestionDTO>> getQuestionsForExam(@PathVariable("exam_id") Integer examId) {
-        List<QuestionDTO> questions = questionService.getQuestionsByExamId(examId);
+    @GetMapping("/{exam_id}/questions")
+    public ResponseEntity<List<QuestionDTO>> getQuestionsForExam(@PathVariable("exam_id") Integer examId,
+            HttpServletRequest request) {
+        AuthPrincipal principal = AuthGuard.requirePrincipal(request);
+        Exam exam = requireExam(examId);
+        // The answer key stays with staff; a student only ever receives the question text.
+        List<QuestionDTO> questions = principal.isStudent()
+                ? questionService.getStudentQuestionsByExamId(examId)
+                : questionService.getQuestionsByExamId(examId);
         return ResponseEntity.ok(questions != null ? questions : List.of());
     }
 
-    @DeleteMapping({"/deleteExamById/{exam_id}", "/{exam_id}"})
-    public ResponseEntity<String> deleteExam(@PathVariable("exam_id") Integer examId) {
-        boolean deleted = examService.deleteExamById(examId);
-        if (!deleted) {
+    @PostMapping("/{exam_id}/questions")
+    public ResponseEntity<ApiResponse> attachExistingQuestions(@PathVariable("exam_id") Integer examId,
+            @RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
+        AuthPrincipal principal = AuthGuard.requireStaff(request);
+        AuthGuard.requireExamAccess(request, requireExam(examId));
+
+        if (body == null || body.get("questionIds") == null) {
+            throw new BadRequestException("questionIds is required");
+        }
+
+        List<?> rawIds = body.get("questionIds") instanceof List
+                ? (List<?>) body.get("questionIds")
+                : List.of();
+        List<Integer> questionIds = rawIds.stream()
+                .map(value -> RequestValueParser.parseInt(value, "questionIds"))
+                .toList();
+        int attached = questionService.attachQuestionsToExam(examId, questionIds);
+        return ResponseEntity.ok(new ApiResponse(true,
+                attached + " question(s) added to the exam. Attached by " + principal.getUsername() + "."));
+    }
+
+    @DeleteMapping("/{exam_id}")
+    public ResponseEntity<String> deleteExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
+        AuthGuard.requireExamAccess(request, requireExam(examId));
+        if (!examService.deleteExamById(examId)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Exam not found or could not be deleted.");
         }
         return ResponseEntity.ok("Exam deleted successfully.");
     }
 
-    @PostMapping({"/upComingExamStatus/{exam_id}", "/accept/{exam_id}", "/approve/{exam_id}", "/{exam_id}/approve"})
-    public ResponseEntity<String> acceptExam(@PathVariable("exam_id") Integer examId) {
+    @PostMapping("/{exam_id}/approve")
+    public ResponseEntity<String> acceptExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
+        AuthGuard.requireAdmin(request);
         if (!examService.acceptExam(examId)) {
             throw new ResourceNotFoundException("Exam not found");
         }
         return ResponseEntity.ok("Accepted");
     }
 
-    @PostMapping({"/reject/{exam_id}", "/{exam_id}/reject"})
-    public ResponseEntity<ApiResponse> rejectExam(@PathVariable("exam_id") Integer examId) {
+    @PostMapping("/{exam_id}/reject")
+    public ResponseEntity<ApiResponse> rejectExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
+        AuthGuard.requireAdmin(request);
         if (!examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_REJECTED)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Exam not found"));
         }
         return ResponseEntity.ok(new ApiResponse(true, "Exam rejected successfully"));
     }
 
-    @PostMapping({"/cancel/{exam_id}", "/{exam_id}/cancel"})
-    public ResponseEntity<ApiResponse> cancelExam(@PathVariable("exam_id") Integer examId) {
+    @PostMapping("/{exam_id}/cancel")
+    public ResponseEntity<ApiResponse> cancelExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
+        AuthGuard.requireAdmin(request);
         if (!examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_CANCELLED)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Exam not found"));
         }
         return ResponseEntity.ok(new ApiResponse(true, "Exam cancelled successfully"));
     }
 
-    @PutMapping({"/status/{exam_id}", "/{exam_id}/status"})
+    @PutMapping("/{exam_id}/status")
     public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("exam_id") Integer examId,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
+        AuthGuard.requireAdmin(request);
         String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
                 ? body.get("status").trim()
                 : ExamConstants.EXAM_STATUS_UPCOMING;
@@ -209,14 +223,16 @@ public class ExamController {
         return ResponseEntity.ok(new ApiResponse(true, "Exam status updated to " + status));
     }
 
-    @GetMapping({"/viewAllUpComingExam", "/upcoming"})
-    public ResponseEntity<List<Exam>> getAllUpcomingExams() {
+    @GetMapping("/upcoming")
+    public ResponseEntity<List<Exam>> getAllUpcomingExams(HttpServletRequest request) {
+        AuthGuard.requirePrincipal(request);
         List<Exam> exams = examService.getAllUpcomingExams();
         return ResponseEntity.ok(exams != null ? exams : List.of());
     }
 
-    @GetMapping({"/viewAllCompletedExam", "/completed"})
-    public ResponseEntity<List<Exam>> getAllCompletedExams() {
+    @GetMapping("/completed")
+    public ResponseEntity<List<Exam>> getAllCompletedExams(HttpServletRequest request) {
+        AuthGuard.requirePrincipal(request);
         List<Exam> exams = examService.getAllCompletedExams();
         if (exams == null || exams.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
@@ -224,86 +240,55 @@ public class ExamController {
         return ResponseEntity.ok(exams);
     }
 
-
-    @PostMapping({"/register", "/{exam_id}/register", "/{exam_id}/register/{student_id}"})
+    @PostMapping("/{exam_id}/register")
     public ResponseEntity<ApiResponse> registerForExam(
             @PathVariable(value = "exam_id", required = false) Integer pathExamId,
-            @PathVariable(value = "student_id", required = false) Integer pathStudentId,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpServletRequest request) {
 
+        // A student always registers for themselves. The optional path and body values
+        // stay for backwards compatibility but can never select another student.
+        int studentId = AuthGuard.requireStudentId(request);
         Integer examId = pathExamId;
-        Integer studentId = pathStudentId;
 
-        if (body != null) {
-            if (examId == null && body.containsKey("examId")) {
-                examId = Integer.parseInt(body.get("examId").toString());
-            } else if (examId == null && body.containsKey("exam_id")) {
-                examId = Integer.parseInt(body.get("exam_id").toString());
-            }
-            if (studentId == null && body.containsKey("studentId")) {
-                studentId = Integer.parseInt(body.get("studentId").toString());
-            } else if (studentId == null && body.containsKey("student_id")) {
-                studentId = Integer.parseInt(body.get("student_id").toString());
+        if (examId == null && body != null) {
+            Object rawExamId = body.containsKey("examId") ? body.get("examId") : body.get("exam_id");
+            if (rawExamId != null) {
+                examId = RequestValueParser.parseOptionalInt(rawExamId, "examId");
             }
         }
-
-        if (examId == null || studentId == null) {
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponse(false, "Both examId and studentId are required."));
+        if (examId == null || examId <= 0) {
+            throw new BadRequestException("A valid examId is required");
         }
 
-        Exam exam = examService.getExamById(examId)
-                .orElseThrow(() -> new ResourceNotFoundException("Exam not found."));
-
-        try {
-            if (exam.getDate() != null && !exam.getDate().isEmpty()) {
-                String rawDate = exam.getDate().trim();
-                String datePart = rawDate.contains(" ") ? rawDate.split(" ")[0] : (rawDate.contains("T") ? rawDate.split("T")[0] : rawDate);
-                LocalDate date = LocalDate.parse(datePart);
-                LocalTime startTime = exam.getStartTime() != null ? exam.getStartTime() : LocalTime.of(0, 0);
-                LocalDateTime startDateTime = LocalDateTime.of(date, startTime);
-
-                if (LocalDateTime.now().isAfter(startDateTime)) {
-                    return ResponseEntity.badRequest().body(new ApiResponse(
-                            false,
-                            "Registration closed: the deadline for this exam has passed."
-                    ));
-                }
-            }
-        } catch (Exception e) {
-            log.error("Could not parse the exam date for the registration deadline check", e);
-        }
-
-        boolean registered = examService.registerStudentForExam(studentId, examId);
-        if (registered) {
-            return ResponseEntity.ok(new ApiResponse(
-                    true,
-                    "Registered for " + exam.getExamName() + ". You may attend when the exam window starts."
-            ));
-        } else {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(
-                    false,
-                    "Failed to register for exam."
-            ));
-        }
+        Exam exam = requireExam(examId);
+        examService.registerStudentForExam(studentId, examId);
+        return ResponseEntity.ok(new ApiResponse(true,
+                "Registered for " + exam.getExamName() + ". You may attend when the exam window starts."));
     }
 
     @GetMapping("/registrations/student/{student_id}")
-    public ResponseEntity<List<Integer>> getRegistrationsForStudent(@PathVariable("student_id") Integer studentId) {
+    public ResponseEntity<List<Integer>> getRegistrationsForStudent(@PathVariable("student_id") Integer studentId,
+            HttpServletRequest request) {
+        AuthGuard.requireSelfOrStaff(request, studentId);
         List<Integer> registeredExamIds = examService.getRegisteredExamIdsForStudent(studentId);
         return ResponseEntity.ok(registeredExamIds != null ? registeredExamIds : List.of());
     }
 
     @GetMapping("/registrations/student/{student_id}/detailed")
-    public ResponseEntity<List<ExamRegistration>> getDetailedRegistrationsForStudent(@PathVariable("student_id") Integer studentId) {
+    public ResponseEntity<List<ExamRegistration>> getDetailedRegistrationsForStudent(
+            @PathVariable("student_id") Integer studentId, HttpServletRequest request) {
+        AuthGuard.requireSelfOrStaff(request, studentId);
         List<ExamRegistration> registrations = examService.getRegistrationsByStudentId(studentId);
         return ResponseEntity.ok(registrations != null ? registrations : List.of());
     }
 
-    @GetMapping({"/{exam_id}/isRegistered/{student_id}", "/isRegistered/{exam_id}/{student_id}"})
+    @GetMapping("/{exam_id}/isRegistered/{student_id}")
     public ResponseEntity<RegistrationStatusResponse> isRegistered(
             @PathVariable("exam_id") Integer examId,
-            @PathVariable("student_id") Integer studentId) {
+            @PathVariable("student_id") Integer studentId,
+            HttpServletRequest request) {
+        AuthGuard.requireSelfOrStaff(request, studentId);
         boolean registered = examService.isStudentRegisteredForExam(studentId, examId);
         return ResponseEntity.ok(RegistrationStatusResponse.builder()
                 .isRegistered(registered)
@@ -313,13 +298,17 @@ public class ExamController {
     }
 
     @GetMapping("/{exam_id}/registeredStudents")
-    public ResponseEntity<List<Student>> getRegisteredStudents(@PathVariable("exam_id") Integer examId) {
+    public ResponseEntity<List<Student>> getRegisteredStudents(@PathVariable("exam_id") Integer examId,
+            HttpServletRequest request) {
+        AuthGuard.requireExamAccess(request, requireExam(examId));
         List<Student> students = examService.getRegisteredStudentsByExamId(examId);
         return ResponseEntity.ok(students != null ? students : List.of());
     }
 
     @GetMapping("/{exam_id}/registrationCount")
-    public ResponseEntity<RegistrationCountResponse> getRegistrationCount(@PathVariable("exam_id") Integer examId) {
+    public ResponseEntity<RegistrationCountResponse> getRegistrationCount(@PathVariable("exam_id") Integer examId,
+            HttpServletRequest request) {
+        AuthGuard.requireExamAccess(request, requireExam(examId));
         int count = examService.getRegistrationCountByExamId(examId);
         return ResponseEntity.ok(RegistrationCountResponse.builder()
                 .examId(examId)
@@ -327,14 +316,57 @@ public class ExamController {
                 .build());
     }
 
-    @DeleteMapping({"/{exam_id}/unregister/{student_id}", "/unregister/{exam_id}/{student_id}"})
+    @DeleteMapping("/{exam_id}/unregister/{student_id}")
     public ResponseEntity<ApiResponse> unregisterStudent(
             @PathVariable("exam_id") Integer examId,
-            @PathVariable("student_id") Integer studentId) {
-        boolean success = examService.unregisterStudentFromExam(studentId, examId);
-        if (success) {
-            return ResponseEntity.ok(new ApiResponse(true, "Unregistered from exam successfully."));
+            @PathVariable("student_id") Integer studentId,
+            HttpServletRequest request) {
+        AuthGuard.requireSelfOrStaff(request, studentId);
+        examService.unregisterStudentFromExam(studentId, examId);
+        return ResponseEntity.ok(new ApiResponse(true, "Unregistered from exam successfully."));
+    }
+
+    @GetMapping("/{exam_id}/submissions")
+    public ResponseEntity<List<ExamSubmissionSummaryDTO>> listSubmissions(@PathVariable("exam_id") Integer examId,
+            HttpServletRequest request) {
+        AuthGuard.requireExamAccess(request, requireExam(examId));
+        List<ExamSubmissionSummaryDTO> submissions = examSubmissionService.listSubmissions(examId);
+        return ResponseEntity.ok(submissions != null ? submissions : List.of());
+    }
+
+    @GetMapping("/{exam_id}/attempts/{attempt_id}/evaluation")
+    public ResponseEntity<List<EvaluationItemDTO>> getEvaluationItems(
+            @PathVariable("exam_id") Integer examId,
+            @PathVariable("attempt_id") Integer attemptId,
+            HttpServletRequest request) {
+        AuthGuard.requireExamAccess(request, requireExam(examId));
+        return ResponseEntity.ok(examSubmissionService.getEvaluationItems(examId, attemptId));
+    }
+
+    @PutMapping("/{exam_id}/attempts/{attempt_id}/answers/{question_id}/marks")
+    public ResponseEntity<ExamResultDTO> awardAnswerMarks(
+            @PathVariable("exam_id") Integer examId,
+            @PathVariable("attempt_id") Integer attemptId,
+            @PathVariable("question_id") Integer questionId,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpServletRequest request) {
+        AuthGuard.requireRole(request, RoleConstants.ROLE_TEACHER, RoleConstants.ROLE_ADMIN);
+        AuthGuard.requireExamAccess(request, requireExam(examId));
+
+        // Marks are whole numbers everywhere: `question.marks`, `attempt_answer.marks_obtained`
+        // and `result.marks_obtained` are INT columns, and the result is scored with integer
+        // arithmetic. Parsing to a double and rounding would turn a fractional mark into a
+        // different mark without telling anyone, so a fractional value is rejected instead.
+        int marks = RequestValueParser.parseInt(body == null ? null : body.get("marks"), "marks");
+
+        return ResponseEntity.ok(examSubmissionService.awardAnswerMarks(examId, attemptId, questionId, marks));
+    }
+
+    private Exam requireExam(Integer examId) {
+        if (examId == null || examId <= 0) {
+            throw new BadRequestException("Invalid examId");
         }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, "Registration not found."));
+        return examService.getExamById(examId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
     }
 }

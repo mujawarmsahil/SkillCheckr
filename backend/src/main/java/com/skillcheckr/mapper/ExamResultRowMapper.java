@@ -14,46 +14,24 @@ public class ExamResultRowMapper implements RowMapper<ExamResultDTO> {
 
     @Override
     public ExamResultDTO mapRow(ResultSet rs, int rowNum) throws SQLException {
-        String examType = null;
-        try {
-            examType = rs.getString("exam_type");
-        } catch (SQLException ignored) {}
+        String examType = rs.getString("exam_type");
         if (examType == null || examType.isBlank()) {
             examType = ExamConstants.QUESTION_TYPE_MCQ;
         }
 
-        String studentName = null;
-        try {
-            studentName = rs.getString("student_name");
-        } catch (SQLException ignored) {}
-
         int studentId = rs.getInt("student_id");
+        String studentName = rs.getString("student_name");
         if (studentName == null) {
             studentName = "Student #" + studentId;
         }
 
-        String examName = null;
-        try {
-            examName = rs.getString("exam_name");
-        } catch (SQLException ignored) {}
-
-        String subjectName = null;
-        try {
-            subjectName = rs.getString("subject_name");
-        } catch (SQLException ignored) {}
-
-        int attemptId = 0;
-        try {
-            attemptId = rs.getInt("attempt_id");
-        } catch (SQLException ignored) {}
-
         return ExamResultDTO.builder()
                 .resultId(rs.getInt("result_id"))
                 .examId(rs.getInt("exam_id"))
-                .attemptId(attemptId)
-                .examName(examName)
+                .attemptId(rs.getInt("attempt_id"))
+                .examName(rs.getString("exam_name"))
                 .examType(examType)
-                .subjectName(subjectName)
+                .subjectName(rs.getString("subject_name"))
                 .studentId(studentId)
                 .studentName(studentName)
                 .marksObtained(rs.getInt("marks_obtained"))

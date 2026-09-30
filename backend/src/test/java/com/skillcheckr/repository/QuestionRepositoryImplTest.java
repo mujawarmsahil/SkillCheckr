@@ -1,15 +1,22 @@
 package com.skillcheckr.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,8 +25,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.KeyHolder;
 
+import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.model.QuestionDTO;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,10 +47,24 @@ class QuestionRepositoryImplTest {
     }
 
     @Test
-    void saveQuestionWithAnswers_handlesBlankQuestion() {
+    void saveQuestionWithAnswers_rejectsAQuestionWithoutText() {
         QuestionDTO dto = new QuestionDTO();
         dto.setQuestion("  ");
-        repository.saveQuestionWithAnswers(List.of(dto));
+
+        assertThatThrownBy(() -> repository.saveQuestionWithAnswers(List.of(dto)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Every question needs question text");
+        verify(jdbcTemplate, never()).update(any(PreparedStatementCreator.class), any(KeyHolder.class));
+    }
+
+    @Test
+    void saveQuestionWithAnswers_rejectsAQuestionWithoutSubject() {
+        QuestionDTO dto = new QuestionDTO();
+        dto.setQuestion("What is 2+2?");
+
+        assertThatThrownBy(() -> repository.saveQuestionWithAnswers(List.of(dto)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Every question needs a subject");
     }
 
     @Test
@@ -60,21 +83,40 @@ class QuestionRepositoryImplTest {
         subj.setQuestion("Explain polymorphism");
         subj.setSampleAnswer("Polymorphism is many forms");
 
+        // The generated key is returned for every insert, so the answer rows are written
+        // against the id the database would have produced.
         when(jdbcTemplate.update(any(PreparedStatementCreator.class), any(KeyHolder.class)))
                 .thenAnswer(invocation -> {
                     KeyHolder kh = invocation.getArgument(1);
-                    Map<String, Object> keyMap = new HashMap<>();
-                    keyMap.put("GENERATED_KEY", 101);
-                    kh.getKeyList().add(keyMap);
+                    kh.getKeyList().add(Map.of("GENERATED_KEY", 101L));
                     return 1;
                 });
 
         repository.saveQuestionWithAnswers(List.of(mcq, subj));
 
-        verify(jdbcTemplate).update(eq("INSERT INTO answer(question_id, option_text, is_correct) VALUES(?, ?, ?)"),
+        verify(jdbcTemplate).update(eq("INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)"),
+                eq(101), eq("3"), eq(false));
+        verify(jdbcTemplate).update(eq("INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)"),
                 eq(101), eq("4"), eq(true));
-        verify(jdbcTemplate).update(eq("INSERT INTO answer(question_id, option_text, is_correct) VALUES(?, ?, ?)"),
+        verify(jdbcTemplate).update(eq("INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)"),
                 eq(101), eq("Polymorphism is many forms"), eq(true));
+    }
+
+    @Test
+    void saveQuestionWithAnswers_rejectsAQuestionWhoseSubjectDiffersFromTheExam() {
+        QuestionDTO dto = new QuestionDTO();
+        dto.setSubjectId(2);
+        dto.setQuestion("What is 2+2?");
+        dto.setOption1("3");
+        dto.setOption2("4");
+        dto.setCorrectOption("4");
+        dto.setExamId(5);
+        when(jdbcTemplate.query(eq("SELECT subject_id FROM exam WHERE exam_id = ?"), any(RowMapper.class), eq(5)))
+                .thenReturn(List.of(1));
+
+        assertThatThrownBy(() -> repository.saveQuestionWithAnswers(List.of(dto)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("The question subject must match the exam subject");
     }
 
     @Test
@@ -95,6 +137,8 @@ class QuestionRepositoryImplTest {
 
         when(jdbcTemplate.queryForList(eq("SELECT question_id, subject_id, question_text FROM question WHERE subject_id = ?"), eq(10)))
                 .thenReturn(List.of(qRow));
+        when(jdbcTemplate.queryForList(eq("SELECT question_type, marks, word_limit FROM question WHERE question_id = ?"), eq(1)))
+                .thenReturn(List.of());
         when(jdbcTemplate.queryForList(eq("SELECT answer_id, option_text, is_correct FROM answer WHERE question_id = ? ORDER BY answer_id ASC"), eq(1)))
                 .thenReturn(List.of(a1, a2));
 
@@ -133,40 +177,44 @@ class QuestionRepositoryImplTest {
     }
 
     @Test
-    void getQuestionsBySubjectId_returnsEmptyList_onException() {
-        when(jdbcTemplate.queryForList(anyString(), eq(10))).thenThrow(new RuntimeException("SQL Error"));
+    void getQuestionsBySubjectId_propagatesDatabaseFailure() {
+        when(jdbcTemplate.queryForList(anyString(), eq(10)))
+                .thenThrow(new DataAccessResourceFailureException("SQL Error"));
 
-        List<QuestionDTO> result = repository.getQuestionsBySubjectId(10);
-
-        assertThat(result).isEmpty();
+        assertThatThrownBy(() -> repository.getQuestionsBySubjectId(10))
+                .isInstanceOf(DataAccessResourceFailureException.class);
     }
 
     @Test
-    void getQuestionsByExamId_returnsQuestions_whenSubjectFound() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(5))).thenReturn(10);
-
+    void getQuestionsByExamId_returnsQuestionsInAssignmentOrder() {
         Map<String, Object> qRow = new HashMap<>();
         qRow.put("question_id", 1);
+        qRow.put("subject_id", 10);
         qRow.put("question_text", "Sample Q");
+        qRow.put("question_type", "MCQ");
+        qRow.put("marks", 2);
+        qRow.put("subject_name", "Maths");
+        qRow.put("question_order", 1);
 
-        when(jdbcTemplate.queryForList(eq("SELECT question_id, subject_id, question_text FROM question WHERE subject_id = ?"), eq(10)))
-                .thenReturn(List.of(qRow));
-        when(jdbcTemplate.queryForList(eq("SELECT answer_id, option_text, is_correct FROM answer WHERE question_id = ? ORDER BY answer_id ASC"), eq(1)))
-                .thenReturn(List.of());
+        when(jdbcTemplate.queryForList(startsWith("SELECT q.question_id"), eq(5))).thenReturn(List.of(qRow));
+        when(jdbcTemplate.queryForList(startsWith("SELECT answer_id"), eq(1))).thenReturn(List.of());
 
         List<QuestionDTO> questions = repository.getQuestionsByExamId(5);
 
         assertThat(questions).hasSize(1);
         assertThat(questions.get(0).getExamId()).isEqualTo(5);
+        assertThat(questions.get(0).getSubjectId()).isEqualTo(10);
+        assertThat(questions.get(0).getSubjectName()).isEqualTo("Maths");
+        assertThat(questions.get(0).getMarks()).isEqualTo(2);
     }
 
     @Test
-    void getQuestionsByExamId_returnsEmpty_whenException() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(5))).thenThrow(new RuntimeException("Not found"));
+    void getQuestionsByExamId_propagatesDatabaseFailure() {
+        when(jdbcTemplate.queryForList(startsWith("SELECT q.question_id"), eq(5)))
+                .thenThrow(new DataAccessResourceFailureException("connection reset"));
 
-        List<QuestionDTO> questions = repository.getQuestionsByExamId(5);
-
-        assertThat(questions).isEmpty();
+        assertThatThrownBy(() -> repository.getQuestionsByExamId(5))
+                .isInstanceOf(DataAccessResourceFailureException.class);
     }
 
     @Test
@@ -178,9 +226,67 @@ class QuestionRepositoryImplTest {
     }
 
     @Test
-    void deleteQuestionById_returnsFalse_whenExceptionThrown() {
-        when(jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", 1)).thenThrow(new RuntimeException("FK Error"));
+    void deleteQuestionById_propagatesDatabaseFailure() {
+        when(jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", 1))
+                .thenThrow(new DataAccessResourceFailureException("FK Error"));
 
-        assertThat(repository.deleteQuestionById(1)).isFalse();
+        assertThatThrownBy(() -> repository.deleteQuestionById(1))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void getAllQuestions_propagatesDatabaseFailureInsteadOfReturningAnEmptyList() {
+        when(jdbcTemplate.queryForList(startsWith("SELECT q.question_id")))
+                .thenThrow(new DataAccessResourceFailureException("connection reset"));
+
+        assertThatThrownBy(() -> repository.getAllQuestions())
+                .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void getQuestionById_returnsEmpty_whenTheQuestionDoesNotExist() {
+        when(jdbcTemplate.queryForList(startsWith("SELECT q.question_id"), eq(404))).thenReturn(List.of());
+
+        assertThat(repository.getQuestionById(404)).isEmpty();
+    }
+
+    @Test
+    void getQuestionById_propagatesDatabaseFailureInsteadOfHidingItAsAMissingQuestion() {
+        when(jdbcTemplate.queryForList(startsWith("SELECT q.question_id"), eq(1)))
+                .thenThrow(new DataAccessResourceFailureException("connection reset"));
+
+        assertThatThrownBy(() -> repository.getQuestionById(1))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void updateQuestion_propagatesDatabaseFailureInsteadOfReturningFalse() {
+        QuestionDTO dto = new QuestionDTO();
+        dto.setQuestionId(1);
+        dto.setQuestion("What is Java?");
+        dto.setSubjectId(10);
+
+        when(jdbcTemplate.update(eq("UPDATE question SET question_text = ?, subject_id = ?, question_type = ?, marks = ?, word_limit = ? WHERE question_id = ?"),
+                eq("What is Java?"), eq(10), eq("MCQ"), eq(1), any(), eq(1)))
+                .thenThrow(new DataAccessResourceFailureException("read only"));
+
+        assertThatThrownBy(() -> repository.updateQuestion(dto))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void loadQuestionMetadata_propagatesDatabaseFailureForOptionalColumns() {
+        QuestionDTO dto = new QuestionDTO();
+        dto.setQuestionId(1);
+        dto.setQuestion("What is Java?");
+        dto.setSubjectId(10);
+
+        when(jdbcTemplate.queryForList(startsWith("SELECT q.question_id")))
+                .thenReturn(List.of(Map.of("question_id", 1, "question_text", "What is Java?")));
+        when(jdbcTemplate.queryForList(eq("SELECT question_type, marks, word_limit FROM question WHERE question_id = ?"), eq(1)))
+                .thenThrow(new DataAccessResourceFailureException("connection reset"));
+
+        assertThatThrownBy(() -> repository.getAllQuestions())
+                .isInstanceOf(DataAccessResourceFailureException.class);
     }
 }

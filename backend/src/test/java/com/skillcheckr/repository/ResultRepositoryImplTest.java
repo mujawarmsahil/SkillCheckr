@@ -102,15 +102,35 @@ class ResultRepositoryImplTest {
     }
 
     @Test
-    void createSubmittedAttempt_returnsGeneratedKey() {
-        doAnswer(invocation -> {
-            KeyHolder keyHolder = invocation.getArgument(1);
-            keyHolder.getKeyList().add(Map.of("attempt_id", 77L));
-            return 1;
-        }).when(jdbcTemplate).update(any(PreparedStatementCreator.class), any(KeyHolder.class));
+    @SuppressWarnings("unchecked")
+    void findByAttemptId_returnsFromDb() {
+        ExamResultDTO dto = ExamResultDTO.builder().resultId(1).attemptId(3).build();
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(3))).thenReturn(List.of(dto));
 
-        int attemptId = repository.createSubmittedAttempt(1, 7);
+        assertThat(repository.findByAttemptId(3)).containsSame(dto);
+    }
 
-        assertThat(attemptId).isEqualTo(77);
+    @Test
+    @SuppressWarnings("unchecked")
+    void findByAttemptId_returnsEmpty_whenNotPresent() {
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(3))).thenReturn(List.of());
+
+        assertThat(repository.findByAttemptId(3)).isEmpty();
+    }
+
+    @Test
+    void updateResultAfterEvaluation_reportsSuccess_whenARowChanged() {
+        when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);
+
+        boolean updated = repository.updateResultAfterEvaluation(3, 9, 10, 4, 90.0, "Pass");
+
+        assertThat(updated).isTrue();
+    }
+
+    @Test
+    void updateResultAfterEvaluation_reportsFailure_whenNoRowChanged() {
+        when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(0);
+
+        assertThat(repository.updateResultAfterEvaluation(3, 9, 10, 4, 90.0, "Pass")).isFalse();
     }
 }

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.skillcheckr.model.ExamResultDTO;
+import com.skillcheckr.model.ExamSubmissionSummaryDTO;
 
 public interface ResultRepository {
 
@@ -17,5 +18,8 @@ public interface ResultRepository {
 
 	ExamResultDTO insertSubmissionResult(ExamResultDTO result);
 
-	int createSubmittedAttempt(int examId, int studentId);
+	List<ExamSubmissionSummaryDTO> findSubmissionSummariesByExamId(int examId);
+
+	boolean updateResultAfterEvaluation(int attemptId, int marksObtained, int totalMarks, int passingMarks,
+			double percentage, String status);
 }

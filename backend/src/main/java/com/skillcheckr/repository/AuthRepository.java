@@ -7,7 +7,11 @@ import com.skillcheckr.model.UserProfileDTO;
 
 public interface AuthRepository {
 
-    Optional<User> login(String username, String password);
+    Optional<User> findByUsername(String username);
+
+    boolean updatePassword(int userId, String passwordHash);
+
+    Optional<String> findPasswordByUserId(int userId);
 
     int getStudentIdByUserId(int userId);
 
@@ -24,5 +28,4 @@ public interface AuthRepository {
     boolean existsByUsername(String username);
 
     boolean isEmailInUse(String email, int excludeUserId);
-    boolean verifyCurrentPassword(int userId, String oldPassword);
 }

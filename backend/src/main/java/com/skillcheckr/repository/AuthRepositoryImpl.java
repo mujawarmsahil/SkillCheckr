@@ -1,15 +1,11 @@
 package com.skillcheckr.repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.User;
@@ -24,57 +20,47 @@ public class AuthRepositoryImpl implements AuthRepository {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
     @Override
-    public Optional<User> login(String username, String password) {
-        String sql = "SELECT * FROM user WHERE username = ?";
-        List<User> users = jdbcTemplate.query(sql, new RowMapper<User>() {
-            @Override
-            public User mapRow(ResultSet rs, int rowNum) throws SQLException {
-                User u = new User();
-                u.setUserId(rs.getInt("user_id"));
-                u.setUsername(rs.getString("username"));
-                u.setPassword(rs.getString("password"));
-                u.setRole(rs.getString("user_role"));
-                u.setProfileImage(rs.getString("profile_image"));
-                u.setAuthProvider(rs.getString("auth_provider"));
-                u.setProviderId(rs.getString("provider_id"));
-                return u;
-            }
-        }, username);
-
-        if (users.isEmpty()) {
+    public Optional<User> findByUsername(String username) {
+        if (username == null || username.trim().isEmpty()) {
             return Optional.empty();
         }
+        String sql = "SELECT * FROM user WHERE LOWER(username) = LOWER(?)";
+        List<User> users = jdbcTemplate.query(sql, (rs, rowNum) -> {
+            User u = new User();
+            u.setUserId(rs.getInt("user_id"));
+            u.setUsername(rs.getString("username"));
+            u.setPassword(rs.getString("password"));
+            u.setRole(rs.getString("user_role"));
+            u.setProfileImage(rs.getString("profile_image"));
+            u.setAuthProvider(rs.getString("auth_provider"));
+            u.setProviderId(rs.getString("provider_id"));
+            u.setStatus(rs.getString("status"));
+            return u;
+        }, username.trim());
 
-        User user = users.get(0);
-        String storedPassword = user.getPassword();
+        return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+    }
 
-        // Support BCrypt hashed matching with fallback to plain-text (for legacy/seed accounts)
-        boolean matches = false;
-        if (storedPassword != null) {
-            if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")
-                    || storedPassword.startsWith("$2y$")) {
-                matches = passwordEncoder.matches(password, storedPassword);
-            } else {
-                matches = storedPassword.equals(password);
-                // Automatically upgrade plain text password to BCrypt hash in database
-                if (matches) {
-                    try {
-                        String newHash = passwordEncoder.encode(password);
-                        jdbcTemplate.update("UPDATE user SET password = ? WHERE user_id = ?",
-                                newHash, user.getUserId());
-                        user.setPassword(newHash);
-                    } catch (Exception ignored) {
-                        // Non-critical auto-upgrade failure
-                    }
-                }
-            }
+    @Override
+    public boolean updatePassword(int userId, String passwordHash) {
+        int updated = jdbcTemplate.update("UPDATE user SET password = ? WHERE user_id = ?",
+                passwordHash, userId);
+        return updated > 0;
+    }
+
+    @Override
+    public Optional<String> findPasswordByUserId(int userId) {
+        if (userId <= 0) {
+            return Optional.empty();
         }
-
-        return matches ? Optional.of(user) : Optional.empty();
+        String sql = "SELECT password FROM user WHERE user_id = ?";
+        try {
+            String storedPassword = jdbcTemplate.queryForObject(sql, String.class, userId);
+            return Optional.ofNullable(storedPassword);
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
     }
 
     @Override
@@ -188,42 +174,34 @@ public class AuthRepositoryImpl implements AuthRepository {
             return Optional.empty();
         }
 
-        try {
-            if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
-                String encodedPassword = passwordEncoder.encode(profile.getPassword().trim());
-                jdbcTemplate.update(
-                        "UPDATE user SET username = ?, password = ?, profile_image = ? WHERE user_id = ?",
-                        profile.getUsername(), encodedPassword, profile.getProfileImage(), profile.getUserId());
-            } else {
-                jdbcTemplate.update(
-                        "UPDATE user SET username = ?, profile_image = ? WHERE user_id = ?",
-                        profile.getUsername(), profile.getProfileImage(), profile.getUserId());
-            }
-
-            String roleSql = "SELECT user_role FROM user WHERE user_id = ?";
-            String role = jdbcTemplate.queryForObject(roleSql, String.class, profile.getUserId());
-            String roleStr = role != null ? role.trim().toLowerCase() : "";
-
-            if ("student".equals(roleStr)) {
-                updateOrInsertRole(profile, "student");
-            } else if ("teacher".equals(roleStr)) {
-                updateOrInsertRole(profile, "teacher");
-            } else if ("admin".equals(roleStr)) {
-                updateOrInsertRole(profile, "admin");
-            }
-
-            // Sync updated profile to request table as well
-            try {
-                jdbcTemplate.update(
-                        "UPDATE request SET name = ?, email = ?, contact = ? WHERE username = ?",
-                        profile.getName(), profile.getEmail(), profile.getContact(), profile.getUsername());
-            } catch (Exception ignored) {}
-
-            return getUserProfile(profile.getUserId());
-        } catch (Exception e) {
-            log.error("Error updating user profile", e);
-            return Optional.empty();
+        if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
+            jdbcTemplate.update(
+                    "UPDATE user SET username = ?, password = ?, profile_image = ? WHERE user_id = ?",
+                    profile.getUsername(), profile.getPassword().trim(), profile.getProfileImage(), profile.getUserId());
+        } else {
+            jdbcTemplate.update(
+                    "UPDATE user SET username = ?, profile_image = ? WHERE user_id = ?",
+                    profile.getUsername(), profile.getProfileImage(), profile.getUserId());
         }
+
+        String roleSql = "SELECT user_role FROM user WHERE user_id = ?";
+        String role = jdbcTemplate.queryForObject(roleSql, String.class, profile.getUserId());
+        String roleStr = role != null ? role.trim().toLowerCase() : "";
+
+        if ("student".equals(roleStr)) {
+            updateOrInsertRole(profile, "student");
+        } else if ("teacher".equals(roleStr)) {
+            updateOrInsertRole(profile, "teacher");
+        } else if ("admin".equals(roleStr)) {
+            updateOrInsertRole(profile, "admin");
+        }
+
+        // Sync updated profile to request table as well
+        jdbcTemplate.update(
+                "UPDATE request SET name = ?, email = ?, contact = ? WHERE username = ?",
+                profile.getName(), profile.getEmail(), profile.getContact(), profile.getUsername());
+
+        return getUserProfile(profile.getUserId());
     }
 
     private void updateOrInsertRole(UserProfileDTO profile, String role) {
@@ -239,14 +217,14 @@ public class AuthRepositoryImpl implements AuthRepository {
 
     @Override
     public boolean isUsernameInUse(String username, int excludeUserId) {
-        String sql = "SELECT COUNT(*) FROM user WHERE username = ? AND user_id != ?";
+        String sql = "SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?) AND user_id != ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username, excludeUserId);
         return count != null && count > 0;
     }
 
     @Override
     public boolean existsByUsername(String username) {
-        String sql = "SELECT COUNT(*) FROM user WHERE username = ?";
+        String sql = "SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?)";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username);
         return count != null && count > 0;
     }
@@ -265,27 +243,5 @@ public class AuthRepositoryImpl implements AuthRepository {
             }
         }
         return false;
-    }
-
-    @Override
-    public boolean verifyCurrentPassword(int userId, String oldPassword) {
-        if (oldPassword == null || oldPassword.isEmpty() || userId <= 0) {
-            return false;
-        }
-        String sql = "SELECT password FROM user WHERE user_id = ?";
-        try {
-            String storedPassword = jdbcTemplate.queryForObject(sql, String.class, userId);
-            if (storedPassword == null) {
-                return false;
-            }
-            if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")
-                    || storedPassword.startsWith("$2y$")) {
-                return passwordEncoder.matches(oldPassword, storedPassword);
-            } else {
-                return storedPassword.equals(oldPassword);
-            }
-        } catch (EmptyResultDataAccessException e) {
-            return false;
-        }
     }
 }

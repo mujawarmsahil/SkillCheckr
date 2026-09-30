@@ -89,10 +89,50 @@ export const parseExamSchedule = (exam, referenceDate = new Date()) => {
   };
 };
 
+/**
+ * Parses a server timestamp to an absolute instant in epoch milliseconds.
+ *
+ * The exam attempt endpoint sends `expiresAt` as ISO-8601 with an explicit offset, for example
+ * `2026-09-17T19:00:00+05:30`. A string carrying an offset denotes one fixed instant, so the
+ * browser's own timezone cannot shift the result and the countdown agrees with the server's
+ * expiry check.
+ *
+ * A bare value with no offset is rejected rather than guessed. `new Date("2026-09-17T19:00:00")`
+ * would read that wall-clock time as browser-local time, which is exactly the bug this guards
+ * against, so an ambiguous value yields null and the attempt is treated as unusable instead of
+ * silently counting down against the wrong instant.
+ *
+ * @returns epoch milliseconds, or null when the value is missing or ambiguous
+ */
+export const parseServerTimestamp = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+
+  // Epoch milliseconds, should the representation ever change to a number.
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // Require an explicit zone designator. "Z", "+05:30" and "+0530" are all valid; a bare
+  // local date-time is not, because its instant depends on where it is read.
+  const hasExplicitZone = /(?:Z|z|[+-]\d{2}:?\d{2})$/.test(raw);
+  if (!hasExplicitZone) return null;
+
+  const parsed = new Date(raw);
+  const ms = parsed.getTime();
+  return Number.isNaN(ms) ? null : ms;
+};
+
+/**
+ * Seconds left until the server-stated expiry, floored at zero.
+ * Returns 0 for a missing or unparseable timestamp so an attempt is never shown as live
+ * on the strength of a value the client could not interpret.
+ */
 export const getRemainingTime = (expiresAt) => {
-  if (!expiresAt) return 0;
-  const expiresAtMs = new Date(expiresAt).getTime();
-  if (Number.isNaN(expiresAtMs)) return 0;
+  const expiresAtMs = parseServerTimestamp(expiresAt);
+  if (expiresAtMs === null) return 0;
   return Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
 };
 

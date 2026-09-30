@@ -19,14 +19,28 @@ public final class ExamConstants {
     public static final String RESULT_STATUS_SUBMITTED_FOR_EVALUATION = "Submitted for Evaluation";
 
     // Exam Statuses
+    public static final String EXAM_STATUS_PENDING = "Pending";
     public static final String EXAM_STATUS_UPCOMING = "Upcoming";
     public static final String EXAM_STATUS_APPROVED = "Approved";
     public static final String EXAM_STATUS_REJECTED = "Rejected";
     public static final String EXAM_STATUS_CANCELLED = "Cancelled";
+    public static final String EXAM_STATUS_COMPLETED = "Completed";
+
+    /** Statuses an administrator may set on an exam. */
+    public static final java.util.List<String> ADMIN_SETTABLE_EXAM_STATUSES = java.util.List.of(
+            EXAM_STATUS_PENDING, EXAM_STATUS_UPCOMING, EXAM_STATUS_APPROVED,
+            EXAM_STATUS_REJECTED, EXAM_STATUS_CANCELLED);
+
+    public static boolean isOpenForRegistration(String status) {
+        return EXAM_STATUS_UPCOMING.equalsIgnoreCase(status) || EXAM_STATUS_APPROVED.equalsIgnoreCase(status);
+    }
 
     // Exam names accept letters separated by single spaces or hyphens only
     public static final String EXAM_NAME_PATTERN = "^[A-Za-z]+(?:[ -][A-Za-z]+)*$";
 
     // Exams must be scheduled at least this many days in advance of the current day
     public static final int EXAM_MIN_LEAD_TIME_DAYS = 10;
+
+    // Upper bound for a single sitting
+    public static final int EXAM_MAX_DURATION_MINUTES = 600;
 }

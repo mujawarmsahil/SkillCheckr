@@ -1,9 +1,10 @@
 package com.skillcheckr.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,10 +16,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
@@ -29,57 +30,73 @@ class AuthRepositoryImplTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
-    @Mock
-    private PasswordEncoder passwordEncoder;
-
     @InjectMocks
     private AuthRepositoryImpl repository;
 
     @Test
     @SuppressWarnings("unchecked")
-    void login_returnsUser_whenBcryptPasswordMatches() {
+    void findByUsername_returnsUser_whenFound() {
         User user = new User();
         user.setUserId(1);
         user.setUsername("john");
         user.setPassword("$2a$10$hashed");
         user.setRole("Student");
 
-        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE username = ?"), any(RowMapper.class), eq("john")))
+        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE LOWER(username) = LOWER(?)"), any(RowMapper.class), eq("john")))
                 .thenReturn(List.of(user));
-        when(passwordEncoder.matches("secret", "$2a$10$hashed")).thenReturn(true);
 
-        Optional<User> loggedIn = repository.login("john", "secret");
+        Optional<User> found = repository.findByUsername("john");
 
-        assertThat(loggedIn).contains(user);
-        assertThat(loggedIn.get().getUsername()).isEqualTo("john");
+        assertThat(found).contains(user);
+        assertThat(found.get().getUsername()).isEqualTo("john");
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void login_returnsUser_andUpgradesPlaintextPassword_whenMatching() {
-        User user = new User();
-        user.setUserId(2);
-        user.setUsername("plainUser");
-        user.setPassword("plainPass");
-        user.setRole("Teacher");
-
-        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE username = ?"), any(RowMapper.class), eq("plainUser")))
-                .thenReturn(List.of(user));
-        when(passwordEncoder.encode("plainPass")).thenReturn("$2a$10$newHash");
-
-        Optional<User> loggedIn = repository.login("plainUser", "plainPass");
-
-        assertThat(loggedIn).contains(user);
-        verify(jdbcTemplate).update("UPDATE user SET password = ? WHERE user_id = ?", "$2a$10$newHash", 2);
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void login_returnsEmpty_whenUserNotFoundOrPasswordMismatches() {
-        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE username = ?"), any(RowMapper.class), eq("ghost")))
+    void findByUsername_returnsEmpty_whenNotFound() {
+        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE LOWER(username) = LOWER(?)"), any(RowMapper.class), eq("ghost")))
                 .thenReturn(List.of());
 
-        assertThat(repository.login("ghost", "pass")).isEmpty();
+        assertThat(repository.findByUsername("ghost")).isEmpty();
+    }
+
+    @Test
+    void findByUsername_returnsEmpty_whenInputNullOrBlank() {
+        assertThat(repository.findByUsername(null)).isEmpty();
+        assertThat(repository.findByUsername("   ")).isEmpty();
+    }
+
+    @Test
+    void updatePassword_updatesRowAndReturnsTrue() {
+        when(jdbcTemplate.update("UPDATE user SET password = ? WHERE user_id = ?", "$2a$10$newHash", 2))
+                .thenReturn(1);
+
+        assertThat(repository.updatePassword(2, "$2a$10$newHash")).isTrue();
+    }
+
+    @Test
+    void updatePassword_returnsFalseWhenNoRowUpdated() {
+        when(jdbcTemplate.update("UPDATE user SET password = ? WHERE user_id = ?", "$2a$10$newHash", 99))
+                .thenReturn(0);
+
+        assertThat(repository.updatePassword(99, "$2a$10$newHash")).isFalse();
+    }
+
+    @Test
+    void findPasswordByUserId_returnsPassword_whenFound() {
+        when(jdbcTemplate.queryForObject(eq("SELECT password FROM user WHERE user_id = ?"), eq(String.class), eq(1)))
+                .thenReturn("$2a$10$hashedPass");
+
+        assertThat(repository.findPasswordByUserId(1)).contains("$2a$10$hashedPass");
+    }
+
+    @Test
+    void findPasswordByUserId_returnsEmpty_whenEmptyResultOrInvalidId() {
+        when(jdbcTemplate.queryForObject(eq("SELECT password FROM user WHERE user_id = ?"), eq(String.class), eq(99)))
+                .thenThrow(new EmptyResultDataAccessException(1));
+
+        assertThat(repository.findPasswordByUserId(99)).isEmpty();
+        assertThat(repository.findPasswordByUserId(0)).isEmpty();
     }
 
     @Test
@@ -109,61 +126,61 @@ class AuthRepositoryImplTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void getUserProfile_returnsProfile_forStudent() {
+    void getUserProfile_returnsStudentProfile() {
         User user = new User();
-        user.setUserId(5);
-        user.setUsername("student5");
+        user.setUserId(1);
+        user.setUsername("student1");
         user.setRole("Student");
-        user.setProfileImage("avatar.png");
 
-        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE user_id = ?"), any(RowMapper.class), eq(5)))
+        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE user_id = ?"), any(RowMapper.class), eq(1)))
                 .thenReturn(List.of(user));
 
-        Optional<UserProfileDTO> profile = repository.getUserProfile(5);
+        Optional<UserProfileDTO> profile = repository.getUserProfile(1);
 
         assertThat(profile).isPresent();
-        assertThat(profile.get().getUserId()).isEqualTo(5);
-        assertThat(profile.get().getUsername()).isEqualTo("student5");
+        assertThat(profile.get().getUsername()).isEqualTo("student1");
         assertThat(profile.get().getRole()).isEqualTo("Student");
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void getUserProfile_returnsEmpty_whenUserNotFound() {
-        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE user_id = ?"), any(RowMapper.class), eq(999)))
+        when(jdbcTemplate.query(eq("SELECT * FROM user WHERE user_id = ?"), any(RowMapper.class), eq(99)))
                 .thenReturn(List.of());
 
-        assertThat(repository.getUserProfile(999)).isEmpty();
+        assertThat(repository.getUserProfile(99)).isEmpty();
     }
 
     @Test
-    void isUsernameInUse_returnsTrue_whenTaken() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("takenUser"), eq(1))).thenReturn(1);
-
-        assertThat(repository.isUsernameInUse("takenUser", 1)).isTrue();
-    }
-
-    @Test
-    void isUsernameInUse_returnsFalse_whenFree() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("freeUser"), eq(1))).thenReturn(0);
-
-        assertThat(repository.isUsernameInUse("freeUser", 1)).isFalse();
-    }
-
-    @Test
-    void existsByUsername_returnsTrue_whenTaken() {
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM user WHERE username = ?", Integer.class, "takenUser"))
+    void isUsernameInUse_returnsTrue_whenCountGreaterThanZero() {
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?) AND user_id != ?"), eq(Integer.class), eq("admin"), eq(2)))
                 .thenReturn(1);
 
-        assertThat(repository.existsByUsername("takenUser")).isTrue();
+        assertThat(repository.isUsernameInUse("admin", 2)).isTrue();
     }
 
     @Test
-    void existsByUsername_returnsFalse_whenFree() {
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM user WHERE username = ?", Integer.class, "freeUser"))
+    void isUsernameInUse_returnsFalse_whenCountZero() {
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?) AND user_id != ?"), eq(Integer.class), eq("free"), eq(2)))
                 .thenReturn(0);
 
-        assertThat(repository.existsByUsername("freeUser")).isFalse();
+        assertThat(repository.isUsernameInUse("free", 2)).isFalse();
+    }
+
+    @Test
+    void existsByUsername_returnsTrue_whenFound() {
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?)"), eq(Integer.class), eq("admin")))
+                .thenReturn(1);
+
+        assertThat(repository.existsByUsername("admin")).isTrue();
+    }
+
+    @Test
+    void existsByUsername_returnsFalse_whenNotFound() {
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?)"), eq(Integer.class), eq("newuser")))
+                .thenReturn(0);
+
+        assertThat(repository.existsByUsername("newuser")).isFalse();
     }
 
     @Test
@@ -181,26 +198,6 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    void verifyCurrentPassword_returnsTrue_whenMatches() {
-        when(jdbcTemplate.queryForObject(eq("SELECT password FROM user WHERE user_id = ?"), eq(String.class), eq(1)))
-                .thenReturn("$2a$10$hashedPass");
-        when(passwordEncoder.matches("secret", "$2a$10$hashedPass")).thenReturn(true);
-
-        assertThat(repository.verifyCurrentPassword(1, "secret")).isTrue();
-    }
-
-    @Test
-    void verifyCurrentPassword_returnsFalse_whenMismatchesOrNull() {
-        when(jdbcTemplate.queryForObject(eq("SELECT password FROM user WHERE user_id = ?"), eq(String.class), eq(1)))
-                .thenReturn("$2a$10$hashedPass");
-        when(passwordEncoder.matches("wrong", "$2a$10$hashedPass")).thenReturn(false);
-
-        assertThat(repository.verifyCurrentPassword(1, "wrong")).isFalse();
-        assertThat(repository.verifyCurrentPassword(1, null)).isFalse();
-        assertThat(repository.verifyCurrentPassword(0, "secret")).isFalse();
-    }
-
-    @Test
     @SuppressWarnings("unchecked")
     void updateUserProfile_updatesUserAndStudentTable() {
         UserProfileDTO profile = UserProfileDTO.builder()
@@ -209,10 +206,9 @@ class AuthRepositoryImplTest {
                 .name("Updated Name")
                 .email("updated@test.com")
                 .contact("999")
-                .password("newPass")
+                .password("$2a$10$preEncodedPass")
                 .build();
 
-        when(passwordEncoder.encode("newPass")).thenReturn("$2a$10$encodedNewPass");
         when(jdbcTemplate.queryForObject(eq("SELECT user_role FROM user WHERE user_id = ?"), eq(String.class), eq(1)))
                 .thenReturn("Student");
 
@@ -228,6 +224,37 @@ class AuthRepositoryImplTest {
 
         assertThat(result).isPresent();
         verify(jdbcTemplate).update(eq("UPDATE user SET username = ?, password = ?, profile_image = ? WHERE user_id = ?"),
-                eq("updatedUser"), eq("$2a$10$encodedNewPass"), any(), eq(1));
+                eq("updatedUser"), eq("$2a$10$preEncodedPass"), any(), eq(1));
+    }
+
+    @Test
+    void updateUserProfile_propagatesDatabaseFailureInsteadOfReportingAnEmptyProfile() {
+        UserProfileDTO profile = UserProfileDTO.builder().userId(1).username("updatedUser").build();
+
+        when(jdbcTemplate.update(eq("UPDATE user SET username = ?, profile_image = ? WHERE user_id = ?"),
+                any(), any(), eq(1)))
+                .thenThrow(new DataAccessResourceFailureException("connection reset"));
+
+        assertThatThrownBy(() -> repository.updateUserProfile(profile))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void updateUserProfile_propagatesFailureOfTheRequestTableSync() {
+        UserProfileDTO profile = UserProfileDTO.builder().userId(1).username("updatedUser").build();
+
+        when(jdbcTemplate.queryForObject(eq("SELECT user_role FROM user WHERE user_id = ?"), eq(String.class), eq(1)))
+                .thenReturn("Student");
+        when(jdbcTemplate.update(eq("UPDATE user SET username = ?, profile_image = ? WHERE user_id = ?"),
+                any(), any(), eq(1)))
+                .thenReturn(1);
+        when(jdbcTemplate.update(startsWith("UPDATE student SET"), any(), any(), any(), any(), eq(1)))
+                .thenReturn(1);
+        when(jdbcTemplate.update(eq("UPDATE request SET name = ?, email = ?, contact = ? WHERE username = ?"),
+                any(), any(), any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("read only"));
+
+        assertThatThrownBy(() -> repository.updateUserProfile(profile))
+                .isInstanceOf(DataAccessResourceFailureException.class);
     }
 }

@@ -1,6 +1,7 @@
 package com.skillcheckr.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,15 +22,24 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.skillcheckr.exception.GlobalExceptionHandler;
+import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamResultDTO;
-import com.skillcheckr.model.ExamSubmissionDTO;
+import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.ResultService;
+import com.skillcheckr.support.TestAuth;
 
 @ExtendWith(MockitoExtension.class)
 class ResultControllerTest {
 
+    private static final int STUDENT_ID = 2;
+    private static final int OTHER_STUDENT_ID = 3;
+    private static final int TEACHER_ID = 10;
+
     @Mock
     private ResultService resultService;
+
+    @Mock
+    private ExamService examService;
 
     @InjectMocks
     private ResultController resultController;
@@ -40,65 +50,25 @@ class ResultControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(resultController)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .addInterceptors(TestAuth.authInterceptor())
                 .build();
     }
 
     @Test
-    void submitExam_returnsBadRequest_whenExamIdIsMissing() throws Exception {
-        mockMvc.perform(post("/api/results/submit")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"studentId\":1}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Invalid submission data: exam ID is required"));
+    void readEndpoints_rejectRequestsWithoutAToken() throws Exception {
+        mockMvc.perform(get("/api/results/all"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/results/student/" + STUDENT_ID))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void submitExam_returnsExistingResult_whenAlreadySubmitted() throws Exception {
-        ExamResultDTO existing = ExamResultDTO.builder()
-                .resultId(101)
-                .examId(5)
-                .studentId(2)
-                .marksObtained(80)
-                .build();
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.of(existing));
-
+    void legacySubmitEndpointIsNoLongerExposed() throws Exception {
         mockMvc.perform(post("/api/results/submit")
+                        .with(TestAuth.asStudent(STUDENT_ID))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"examId\":5,\"studentId\":2}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result_id").value(101))
-                .andExpect(jsonPath("$.marks_obtained").value(80));
-    }
-
-    @Test
-    void submitExam_returnsNewResult_whenSubmissionSucceeds() throws Exception {
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.empty());
-        ExamResultDTO submitted = ExamResultDTO.builder()
-                .resultId(102)
-                .examId(5)
-                .studentId(2)
-                .marksObtained(90)
-                .status("Pass")
-                .build();
-        when(resultService.submitExam(any(ExamSubmissionDTO.class))).thenReturn(submitted);
-
-        mockMvc.perform(post("/api/results/submit")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"examId\":5,\"studentId\":2,\"examType\":\"MCQ\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result_id").value(102))
-                .andExpect(jsonPath("$.status").value("Pass"));
-    }
-
-    @Test
-    void submitExam_returnsInternalServerError_whenServiceThrows() throws Exception {
-        when(resultService.getResultByExamAndStudent(5, 2)).thenThrow(new RuntimeException("DB error"));
-
-        mockMvc.perform(post("/api/results/submit")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"examId\":5,\"studentId\":2}"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.message").value("DB error"));
+                        .content("{\"examId\":5,\"studentId\":" + STUDENT_ID + ",\"examType\":\"MCQ\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -106,11 +76,11 @@ class ResultControllerTest {
         ExamResultDTO existing = ExamResultDTO.builder()
                 .resultId(101)
                 .examId(5)
-                .studentId(2)
+                .studentId(STUDENT_ID)
                 .build();
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.of(existing));
+        when(resultService.getResultByExamAndStudent(5, STUDENT_ID)).thenReturn(Optional.of(existing));
 
-        mockMvc.perform(get("/api/results/check/5/2"))
+        mockMvc.perform(get("/api/results/check/5/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasSubmitted").value(true))
                 .andExpect(jsonPath("$.result.result_id").value(101));
@@ -118,56 +88,106 @@ class ResultControllerTest {
 
     @Test
     void checkStudentExamStatus_returnsHasSubmittedFalse_whenNoResult() throws Exception {
-        when(resultService.getResultByExamAndStudent(5, 2)).thenReturn(Optional.empty());
+        when(resultService.getResultByExamAndStudent(5, STUDENT_ID)).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/results/check/5/2"))
+        mockMvc.perform(get("/api/results/check/5/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasSubmitted").value(false));
     }
 
     @Test
-    void checkStudentExamStatus_returnsInternalServerError_whenLookupFails() throws Exception {
-        when(resultService.getResultByExamAndStudent(5, 2)).thenThrow(new RuntimeException("Lookup error"));
-
-        mockMvc.perform(get("/api/results/check/5/2"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.message").value("Lookup error"));
+    void checkStudentExamStatus_rejectsAnotherStudent() throws Exception {
+        mockMvc.perform(get("/api/results/check/5/" + OTHER_STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isForbidden());
+        verify(resultService, never()).getResultByExamAndStudent(5, OTHER_STUDENT_ID);
     }
 
     @Test
     void getResultsByStudent_returnsList_whenPresent() throws Exception {
-        ExamResultDTO dto = ExamResultDTO.builder().resultId(1).studentId(2).build();
-        when(resultService.getResultsByStudentId(2)).thenReturn(List.of(dto));
+        ExamResultDTO dto = ExamResultDTO.builder().resultId(1).studentId(STUDENT_ID).build();
+        when(resultService.getResultsByStudentId(STUDENT_ID)).thenReturn(List.of(dto));
 
-        mockMvc.perform(get("/api/results/student/2"))
+        mockMvc.perform(get("/api/results/student/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].result_id").value(1));
     }
 
     @Test
     void getResultsByStudent_returnsEmptyList_whenNull() throws Exception {
-        when(resultService.getResultsByStudentId(2)).thenReturn(null);
+        when(resultService.getResultsByStudentId(STUDENT_ID)).thenReturn(null);
 
-        mockMvc.perform(get("/api/results/student/2"))
+        mockMvc.perform(get("/api/results/student/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test
-    void getAllResults_returnsList_whenPresent() throws Exception {
+    void getResultsByStudent_rejectsAnotherStudent() throws Exception {
+        mockMvc.perform(get("/api/results/student/" + OTHER_STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isForbidden());
+        verify(resultService, never()).getResultsByStudentId(OTHER_STUDENT_ID);
+    }
+
+    @Test
+    void checkStudentExamStatus_allowsTheTeacherWhoOwnsTheExam() throws Exception {
+        Exam exam = new Exam();
+        exam.setExamId(5);
+        exam.setTeacherId(TEACHER_ID);
+        when(examService.getExamById(5)).thenReturn(Optional.of(exam));
+        when(resultService.getResultByExamAndStudent(5, OTHER_STUDENT_ID)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/results/check/5/" + OTHER_STUDENT_ID).with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasSubmitted").value(false));
+    }
+
+    @Test
+    void checkStudentExamStatus_refusesATeacherWhoDoesNotOwnTheExam() throws Exception {
+        Exam exam = new Exam();
+        exam.setExamId(5);
+        exam.setTeacherId(99);
+        when(examService.getExamById(5)).thenReturn(Optional.of(exam));
+
+        mockMvc.perform(get("/api/results/check/5/" + OTHER_STUDENT_ID).with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(resultService, never()).getResultByExamAndStudent(5, OTHER_STUDENT_ID);
+    }
+
+    @Test
+    void getResultsByStudent_refusesATeacher() throws Exception {
+        mockMvc.perform(get("/api/results/student/" + OTHER_STUDENT_ID).with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(resultService, never()).getResultsByStudentId(OTHER_STUDENT_ID);
+    }
+
+    @Test
+    void getResultsByStudent_allowsAnAdmin() throws Exception {
+        when(resultService.getResultsByStudentId(OTHER_STUDENT_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/results/student/" + OTHER_STUDENT_ID).with(TestAuth.asAdmin(1)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getAllResults_isAdminOnly() throws Exception {
         ExamResultDTO dto = ExamResultDTO.builder().resultId(1).build();
         when(resultService.getAllResults()).thenReturn(List.of(dto));
 
-        mockMvc.perform(get("/api/results/all"))
+        mockMvc.perform(get("/api/results/all").with(TestAuth.asAdmin(1)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].result_id").value(1));
+
+        mockMvc.perform(get("/api/results/all").with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/results/all").with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void getAllResults_returnsEmptyList_whenNull() throws Exception {
         when(resultService.getAllResults()).thenReturn(null);
 
-        mockMvc.perform(get("/api/results"))
+        mockMvc.perform(get("/api/results/all").with(TestAuth.asAdmin(1)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }

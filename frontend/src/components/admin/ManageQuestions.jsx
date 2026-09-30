@@ -31,8 +31,8 @@ export default function ManageQuestions() {
     setLoading(true);
     try {
       const [qRes, sRes] = await Promise.all([
-        apiClient.get("/api/questions/all"),
-        apiClient.get("/api/subjects/all"),
+        apiClient.get("/api/questions"),
+        apiClient.get("/api/subjects"),
       ]);
       setQuestions(Array.isArray(qRes.data) ? qRes.data : []);
       setSubjects(Array.isArray(sRes.data) ? sRes.data : []);

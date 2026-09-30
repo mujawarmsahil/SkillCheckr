@@ -15,7 +15,10 @@ export default function StudentResults() {
   const fetchResults = useCallback(async () => {
     setLoading(true);
     try {
-      const studentId = user?.roleId || localStorage.getItem("student_id") || 1;
+      const studentId = user?.roleId ? parseInt(user.roleId, 10) : null;
+      if (!studentId) {
+        throw new Error("Your student account could not be identified. Please sign in again.");
+      }
       const data = await getStudentResults(studentId);
       setResults(data);
     } catch (err) {
@@ -31,7 +34,19 @@ export default function StudentResults() {
 
   const totalExams = results.length;
   const passedExams = results.filter((r) => r.status === RESULT_STATUS.PASS).length;
-  const avgPercentage = totalExams > 0 ? (results.reduce((acc, r) => acc + (r.percentage || 0), 0) / totalExams).toFixed(1) : 0;
+  const awaitingGrading = results.filter(
+    (r) => r.status === RESULT_STATUS.SUBMITTED_FOR_EVALUATION
+  ).length;
+  // Results waiting for teacher grading are excluded so the average is not skewed.
+  const gradedResults = results.filter(
+    (r) => r.status !== RESULT_STATUS.SUBMITTED_FOR_EVALUATION
+  );
+  const avgPercentage =
+    gradedResults.length > 0
+      ? (
+          gradedResults.reduce((acc, r) => acc + (r.percentage || 0), 0) / gradedResults.length
+        ).toFixed(1)
+      : 0;
 
   return (
     <div className="space-y-6">
@@ -71,8 +86,15 @@ export default function StudentResults() {
             <Icon name="chart" className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Average Score</span>
+            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+              Average Score {awaitingGrading > 0 ? `(graded only)` : ""}
+            </span>
             <p className="text-2xl font-black text-blue-600 mt-0.5">{avgPercentage}%</p>
+            {awaitingGrading > 0 && (
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {awaitingGrading} awaiting teacher grading
+              </p>
+            )}
           </div>
         </div>
       </div>

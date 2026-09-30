@@ -10,7 +10,7 @@ import com.skillcheckr.model.Subject;
 
 public interface ExamRepository {
 
-	Subject saveExam(Exam exam);
+	Exam saveExam(Exam exam);
 
 	List<Exam> getAllExams();
 
@@ -41,4 +41,6 @@ public interface ExamRepository {
 	int getRegistrationCountByExamId(int examId);
 
 	boolean unregisterStudentFromExam(int studentId, int examId);
+
+	void syncExamStatuses();
 }

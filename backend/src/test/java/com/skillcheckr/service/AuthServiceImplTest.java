@@ -1,17 +1,23 @@
 package com.skillcheckr.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Optional;
-
+import com.skillcheckr.exception.AccountDisabledException;
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
 import com.skillcheckr.repository.AuthRepository;
@@ -22,25 +28,120 @@ class AuthServiceImplTest {
     @Mock
     private AuthRepository authRepository;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
     @Test
-    void login_delegatesToRepository() {
-        User expectedUser = new User();
-        expectedUser.setUserId(1);
-        expectedUser.setRole("Student");
-        when(authRepository.login("student", "pass")).thenReturn(Optional.of(expectedUser));
+    void login_authenticatesUser_whenBcryptPasswordMatches() {
+        User expectedUser = user(1, "Student", "Active");
+        expectedUser.setPassword("$2a$10$hashed");
+        when(authRepository.findByUsername("student")).thenReturn(Optional.of(expectedUser));
+        when(passwordEncoder.matches("pass", "$2a$10$hashed")).thenReturn(true);
 
         assertThat(authService.login("student", "pass")).containsSame(expectedUser);
-        verify(authRepository).login("student", "pass");
+        verify(authRepository).findByUsername("student");
     }
 
     @Test
-    void login_returnsEmptyWhenRepositoryDoesNotMatch() {
-        when(authRepository.login("nobody", "nope")).thenReturn(Optional.empty());
+    void login_upgradesPlaintextPassword_whenMatching() {
+        User legacyUser = user(2, "Teacher", "Active");
+        legacyUser.setPassword("plainPass");
+        when(authRepository.findByUsername("legacyTeacher")).thenReturn(Optional.of(legacyUser));
+        when(passwordEncoder.encode("plainPass")).thenReturn("$2a$10$newHash");
+
+        Optional<User> loggedIn = authService.login("legacyTeacher", "plainPass");
+
+        assertThat(loggedIn).containsSame(legacyUser);
+        assertThat(legacyUser.getPassword()).isEqualTo("$2a$10$newHash");
+        verify(authRepository).updatePassword(2, "$2a$10$newHash");
+    }
+
+    @Test
+    void login_returnsEmptyWhenUserNotFound() {
+        when(authRepository.findByUsername("nobody")).thenReturn(Optional.empty());
 
         assertThat(authService.login("nobody", "nope")).isEmpty();
+    }
+
+    @Test
+    void login_returnsEmptyWhenPasswordMismatches() {
+        User user = user(1, "Student", "Active");
+        user.setPassword("$2a$10$hashed");
+        when(authRepository.findByUsername("student")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "$2a$10$hashed")).thenReturn(false);
+
+        assertThat(authService.login("student", "wrong")).isEmpty();
+    }
+
+    @Test
+    void login_returnsEmptyWhenUsernameOrPasswordNull() {
+        assertThat(authService.login(null, "pass")).isEmpty();
+        assertThat(authService.login("user", null)).isEmpty();
+    }
+
+    @Test
+    void login_allowsAnActiveUser() {
+        User active = user(1, "Student", "Active");
+        active.setPassword("$2a$10$hashed");
+        when(authRepository.findByUsername("active")).thenReturn(Optional.of(active));
+        when(passwordEncoder.matches("pass", "$2a$10$hashed")).thenReturn(true);
+
+        assertThat(authService.login("active", "pass")).containsSame(active);
+    }
+
+    @Test
+    void login_allowsAUserWhoseStatusIsMissing() {
+        User legacy = user(2, "Student", null);
+        legacy.setPassword("$2a$10$hashed");
+        when(authRepository.findByUsername("legacy")).thenReturn(Optional.of(legacy));
+        when(passwordEncoder.matches("pass", "$2a$10$hashed")).thenReturn(true);
+
+        assertThat(authService.login("legacy", "pass")).containsSame(legacy);
+    }
+
+    @Test
+    void login_rejectsAnInactiveUser() {
+        User blocked = user(3, "Student", "Inactive");
+        blocked.setPassword("$2a$10$hashed");
+        when(authRepository.findByUsername("blocked")).thenReturn(Optional.of(blocked));
+        when(passwordEncoder.matches("pass", "$2a$10$hashed")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login("blocked", "pass"))
+                .isInstanceOf(AccountDisabledException.class)
+                .hasMessage("This account has been deactivated. Please contact your administrator.");
+    }
+
+    @Test
+    void login_rejectsAnInactiveUserRegardlessOfStatusCasing() {
+        User blocked = user(4, "Teacher", "inactive");
+        blocked.setPassword("$2a$10$hashed");
+        when(authRepository.findByUsername("blocked")).thenReturn(Optional.of(blocked));
+        when(passwordEncoder.matches("pass", "$2a$10$hashed")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login("blocked", "pass"))
+                .isInstanceOf(AccountDisabledException.class);
+    }
+
+    @Test
+    void login_doesNotReportADisabledAccountAsAWrongPassword() {
+        User blocked = user(5, "Student", "Inactive");
+        blocked.setPassword("$2a$10$hashed");
+        when(authRepository.findByUsername("blocked")).thenReturn(Optional.of(blocked));
+        when(passwordEncoder.matches("pass", "$2a$10$hashed")).thenReturn(true);
+
+        assertThatExceptionOfType(AccountDisabledException.class)
+                .isThrownBy(() -> authService.login("blocked", "pass"));
+    }
+
+    private User user(int id, String role, String status) {
+        User user = new User();
+        user.setUserId(id);
+        user.setRole(role);
+        user.setStatus(status);
+        return user;
     }
 
     @Test
@@ -82,16 +183,33 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void updateUserProfile_delegatesToRepository() {
+    void updateUserProfile_encodesPasswordAndDelegatesToRepository() {
         UserProfileDTO profile = UserProfileDTO.builder()
                 .userId(1)
                 .username("user1_updated")
                 .name("User One Updated")
                 .email("user1_updated@test.com")
+                .password("plainSecret")
+                .build();
+        when(passwordEncoder.encode("plainSecret")).thenReturn("$2a$10$encoded");
+        when(authRepository.updateUserProfile(profile)).thenReturn(Optional.of(profile));
+
+        assertThat(authService.updateUserProfile(profile)).containsSame(profile);
+        assertThat(profile.getPassword()).isEqualTo("$2a$10$encoded");
+        verify(authRepository).updateUserProfile(profile);
+    }
+
+    @Test
+    void updateUserProfile_leavesNullPasswordUnchanged() {
+        UserProfileDTO profile = UserProfileDTO.builder()
+                .userId(1)
+                .username("user1_updated")
+                .password(null)
                 .build();
         when(authRepository.updateUserProfile(profile)).thenReturn(Optional.of(profile));
 
         assertThat(authService.updateUserProfile(profile)).containsSame(profile);
+        verify(passwordEncoder, never()).encode(any());
         verify(authRepository).updateUserProfile(profile);
     }
 
@@ -112,10 +230,27 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void verifyCurrentPassword_delegatesToRepository() {
-        when(authRepository.verifyCurrentPassword(1, "secret")).thenReturn(true);
+    void verifyCurrentPassword_returnsTrue_whenBcryptMatches() {
+        when(authRepository.findPasswordByUserId(1)).thenReturn(Optional.of("$2a$10$hashedPass"));
+        when(passwordEncoder.matches("secret", "$2a$10$hashedPass")).thenReturn(true);
 
         assertThat(authService.verifyCurrentPassword(1, "secret")).isTrue();
-        verify(authRepository).verifyCurrentPassword(1, "secret");
+    }
+
+    @Test
+    void verifyCurrentPassword_returnsTrue_whenPlaintextMatches() {
+        when(authRepository.findPasswordByUserId(1)).thenReturn(Optional.of("plainSecret"));
+
+        assertThat(authService.verifyCurrentPassword(1, "plainSecret")).isTrue();
+    }
+
+    @Test
+    void verifyCurrentPassword_returnsFalse_whenMismatchesOrNull() {
+        when(authRepository.findPasswordByUserId(1)).thenReturn(Optional.of("$2a$10$hashedPass"));
+        when(passwordEncoder.matches("wrong", "$2a$10$hashedPass")).thenReturn(false);
+
+        assertThat(authService.verifyCurrentPassword(1, "wrong")).isFalse();
+        assertThat(authService.verifyCurrentPassword(1, null)).isFalse();
+        assertThat(authService.verifyCurrentPassword(0, "secret")).isFalse();
     }
 }

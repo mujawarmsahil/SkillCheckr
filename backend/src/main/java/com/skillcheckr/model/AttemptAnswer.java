@@ -17,4 +17,10 @@ public class AttemptAnswer {
     private Answer selectedAnswer;
     private String textAnswer;
     private Integer marksObtained;
+
+    /**
+     * Option text stored as correct for the question, populated by the read queries so a
+     * result review can show the answer key even when the student chose another option.
+     */
+    private String correctOptionText;
 }

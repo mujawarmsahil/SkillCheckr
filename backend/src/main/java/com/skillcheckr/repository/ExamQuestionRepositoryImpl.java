@@ -53,4 +53,38 @@ public class ExamQuestionRepositoryImpl implements ExamQuestionRepository {
                 Integer.class, examId, questionId);
         return count != null && count > 0;
     }
+
+    @Override
+    public boolean isQuestionAssignedToAnyExam(int questionId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM exam_question WHERE question_id = ?", Integer.class, questionId);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public int getNextQuestionOrder(int examId) {
+        Integer maxOrder = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(question_order), 0) FROM exam_question WHERE exam_id = ?",
+                Integer.class, examId);
+        return (maxOrder == null ? 0 : maxOrder) + 1;
+    }
+
+    @Override
+    public boolean attachQuestion(int examId, int questionId, int questionOrder) {
+        if (isQuestionAssigned(examId, questionId)) {
+            return true;
+        }
+        return jdbcTemplate.update(
+                "INSERT INTO exam_question (exam_id, question_id, question_order) VALUES (?, ?, ?)",
+                examId, questionId, questionOrder) > 0;
+    }
+
+    @Override
+    public List<Integer> findSubjectIdsByQuestionId(int questionId) {
+        return jdbcTemplate.queryForList(
+                "SELECT DISTINCT e.subject_id FROM exam e "
+                        + "JOIN exam_question eq ON e.exam_id = eq.exam_id "
+                        + "WHERE eq.question_id = ?",
+                Integer.class, questionId);
+    }
 }

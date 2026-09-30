@@ -4,7 +4,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,9 +17,7 @@ import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.Subject;
 
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Repository
 public class SubjectRepositoryImpl implements SubjectRepository {
 
@@ -40,12 +37,7 @@ public class SubjectRepositoryImpl implements SubjectRepository {
 
     @Override
     public List<Subject> getAllSubjects() {
-        try {
-            return jdbcTemplate.query("SELECT * FROM subject ORDER BY subject_id DESC", subjectRowMapper);
-        } catch (Exception e) {
-            log.error("Error fetching subjects", e);
-            return new ArrayList<>();
-        }
+        return jdbcTemplate.query("SELECT * FROM subject ORDER BY subject_id DESC", subjectRowMapper);
     }
 
     @Override
@@ -54,9 +46,6 @@ public class SubjectRepositoryImpl implements SubjectRepository {
             String sql = "SELECT * FROM subject WHERE subject_id = ?";
             return Optional.ofNullable(jdbcTemplate.queryForObject(sql, subjectRowMapper, subjectId));
         } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        } catch (Exception e) {
-            log.error("Error fetching subject by ID", e);
             return Optional.empty();
         }
     }
@@ -72,32 +61,27 @@ public class SubjectRepositoryImpl implements SubjectRepository {
                 ? subject.getSubjectCode().trim().toUpperCase()
                 : generateSubjectCode(name);
 
-        try {
-            Integer existingCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM subject WHERE subject_code = ?", Integer.class, code);
-            if (existingCount != null && existingCount > 0) {
-                // Generate a unique suffix
-                code = code + "-" + (int) (Math.random() * 900 + 100);
-            }
-
-            String insertSql = "INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)";
-            final String finalCode = code;
-            KeyHolder keyHolder = new GeneratedKeyHolder();
-
-            jdbcTemplate.update(connection -> {
-                PreparedStatement ps = connection.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS);
-                ps.setString(1, name);
-                ps.setString(2, finalCode);
-                return ps;
-            }, keyHolder);
-
-            Number id = keyHolder.getKey();
-            int newId = id != null ? id.intValue() : 0;
-            return new Subject(newId, name, finalCode);
-        } catch (Exception e) {
-            log.error("Error adding subject", e);
-            return null;
+        Integer existingCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM subject WHERE subject_code = ?", Integer.class, code);
+        if (existingCount != null && existingCount > 0) {
+            // Generate a unique suffix
+            code = code + "-" + (int) (Math.random() * 900 + 100);
         }
+
+        String insertSql = "INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)";
+        final String finalCode = code;
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, name);
+            ps.setString(2, finalCode);
+            return ps;
+        }, keyHolder);
+
+        Number id = keyHolder.getKey();
+        int newId = id != null ? id.intValue() : 0;
+        return new Subject(newId, name, finalCode);
     }
 
     @Override
@@ -111,58 +95,53 @@ public class SubjectRepositoryImpl implements SubjectRepository {
                 ? subject.getSubjectCode().trim().toUpperCase()
                 : generateSubjectCode(name);
 
-        try {
-            String updateSql = "UPDATE subject SET subject_name = ?, subject_code = ? WHERE subject_id = ?";
-            int rows = jdbcTemplate.update(updateSql, name, code, subjectId);
-            return rows > 0;
-        } catch (Exception e) {
-            log.error("Error updating subject", e);
-            return false;
-        }
+        String updateSql = "UPDATE subject SET subject_name = ?, subject_code = ? WHERE subject_id = ?";
+        int rows = jdbcTemplate.update(updateSql, name, code, subjectId);
+        return rows > 0;
     }
 
     @Override
     public boolean deleteSubjectById(int subjectId) {
-        try {
-            List<Integer> questionIds = jdbcTemplate.query(
-                    "SELECT question_id FROM question WHERE subject_id = ?",
-                    (rs, rowNum) -> rs.getInt("question_id"), subjectId);
-
-            for (Integer qId : questionIds) {
-                jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", qId);
+        List<Integer> examIds = jdbcTemplate.query("SELECT exam_id FROM exam WHERE subject_id = ?",
+                (rs, rowNum) -> rs.getInt("exam_id"), subjectId);
+        for (Integer examId : examIds) {
+            Integer attemptCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?", Integer.class, examId);
+            if (attemptCount != null && attemptCount > 0) {
+                throw new com.skillcheckr.exception.ExamInUseException(
+                        "This subject has exams with recorded attempts and cannot be deleted.");
             }
-            jdbcTemplate.update("DELETE FROM question WHERE subject_id = ?", subjectId);
-
-            jdbcTemplate.update("DELETE FROM exam WHERE subject_id = ?", subjectId);
-
-            int rows = jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId);
-            return rows > 0;
-        } catch (Exception e) {
-            log.error("Error deleting subject", e);
-            return false;
         }
+
+        for (Integer examId : examIds) {
+            jdbcTemplate.update("DELETE FROM exam_question WHERE exam_id = ?", examId);
+        }
+
+        List<Integer> questionIds = jdbcTemplate.query(
+                "SELECT question_id FROM question WHERE subject_id = ?",
+                (rs, rowNum) -> rs.getInt("question_id"), subjectId);
+
+        for (Integer qId : questionIds) {
+            jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", qId);
+        }
+        jdbcTemplate.update("DELETE FROM question WHERE subject_id = ?", subjectId);
+        jdbcTemplate.update("DELETE FROM exam WHERE subject_id = ?", subjectId);
+
+        return jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId) > 0;
     }
 
     @Override
     public int getQuestionCountBySubjectId(int subjectId) {
-        try {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM question WHERE subject_id = ?", Integer.class, subjectId);
-            return count != null ? count : 0;
-        } catch (Exception e) {
-            return 0;
-        }
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM question WHERE subject_id = ?", Integer.class, subjectId);
+        return count != null ? count : 0;
     }
 
     @Override
     public int getExamCountBySubjectId(int subjectId) {
-        try {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM exam WHERE subject_id = ?", Integer.class, subjectId);
-            return count != null ? count : 0;
-        } catch (Exception e) {
-            return 0;
-        }
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM exam WHERE subject_id = ?", Integer.class, subjectId);
+        return count != null ? count : 0;
     }
 
     private String generateSubjectCode(String name) {

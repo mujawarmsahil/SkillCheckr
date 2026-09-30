@@ -46,6 +46,7 @@ Thumbs.db
 .gemini/
 .antigravity/
 .cursor/
+.opencode/
 
 # Test coverage
 coverage/
