@@ -13,7 +13,7 @@ export default function History() {
         <strong>SkillCheckr</strong> was built to simplify assessment for teachers, students, and institutions. It handles both multiple-choice exams and written-answer questions, which most legacy tools force you to choose between.
       </p>
       <p className="text-base text-slate-600 leading-relaxed">
-        You can set exam schedules, publish proctoring rules, and generate results automatically.
+        You can schedule exams, control approval before they go live, and generate results automatically.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">

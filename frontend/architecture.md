@@ -14,9 +14,9 @@ This document describes the frontend architecture as it exists in `frontend/` af
 | Styling | Tailwind CSS 3 + PostCSS/autoprefixer |
 | Linting | ESLint 9 flat config with `eslint-plugin-react-hooks` and `eslint-plugin-react-refresh` |
 | State | React Context + local component state (no external store) |
-| Tests | None configured |
+| Tests | Vitest 2 + React Testing Library (jsdom environment) |
 
-There is no Redux store, no global CSS framework beyond Tailwind, no form library, and no test runner.
+There is no Redux store, no global CSS framework beyond Tailwind, and no form library.
 
 ## Application structure
 
@@ -29,7 +29,7 @@ frontend/src
 ├── context/              AuthContext, ToastContext
 ├── hooks/                exam-attempt domain hooks
 ├── constants/            shared string constants
-├── utils/                date/schedule, exam, storage helpers
+├── utils/                date/schedule and exam status helpers
 ├── components/
 │   ├── layout/           Navbar, Footer, Layout
 │   ├── public/           Home, About, Blog, Contact (+ presentational children)
@@ -39,7 +39,7 @@ frontend/src
 │   ├── teacher/          TeacherDashboard + AddExam, ManageExams
 │   ├── student/          StudentDashboard + AvailableExams, StudentResults, TakeExam
 │   └── common/Icons      single inline-SVG icon component
-└── assets/images         logos, favicons, background, review photos
+└── assets/images         logos, favicons, background
 ```
 
 ## Provider tree and routing
@@ -56,7 +56,7 @@ Routes:
 | `/login`, `/signup` | redirect to `/authentication` | public alias |
 | `/dashboard` | `DashboardRedirect` | `ProtectedRoute` |
 | `/dashboard/:role`, `/user/:role` | `DashboardPage` | `ProtectedRoute` + role match |
-| `/take-exam/:examId` | `TakeExam` | `ProtectedRoute allowedRoles=[Student, Admin, Teacher]` |
+| `/take-exam/:examId` | `TakeExam` | `ProtectedRoute allowedRoles=[Student]` |
 | `/studentExams`, `/createExam`, `/question` | redirects to the matching dashboard | legacy URL aliases |
 | `*` | redirect to `/` | fallback |
 
@@ -75,19 +75,24 @@ is mounted.
 - `AuthContext` holds `user`, `role`, and `loading`. The token is not duplicated
   in React state: `apiClient` reads it from `localStorage` on every request.
 - On mount the provider rehydrates the session from `localStorage` keys
-  (`role`, `user_id`, `username`, `name`, `email`, `contact`, `profile_image`,
-  `teacher_id` / `student_id`).
-- `login()` posts to `/api/authentication/login`, persists the resolved profile
-  fields to `localStorage`, and returns the raw response so `Login` can route to
+  (`token`, `role`, `user_id`, `username`, `name`, `email`, `contact`,
+  `profile_image`, `teacher_id` / `student_id`). Rehydration requires all three
+  of token, user id, and role; a partial or legacy session is discarded rather
+  than being upgraded into a client-side session.
+- `login()` posts to `/api/auth/login`, rejects a response without a
+  server-issued token or user id, persists the resolved profile fields to
+  `localStorage`, and returns the raw response so `Login` can route to
   `/dashboard/<role>` (or back to the originally requested location).
 - `updateUser()` patches `localStorage` and React state after a profile update.
-- `setAuthSession()` establishes a session from an externally supplied payload.
+- `setAuthSession()` establishes a session from an externally supplied payload
+  and requires a token.
 - `logout()` clears all `localStorage` keys owned by the app and resets state.
   `Navbar` and `DashboardPage` navigate to `/authentication` afterwards.
 
 Storage keys are written and read in `AuthContext`; other modules read
-`localStorage` directly for identifiers only (`user_id`, `role`, `student_id`,
-`teacher_id`) and for the exam draft key.
+`localStorage` only for identifiers (`user_id`, `role`, `student_id`,
+`teacher_id`). No module stores a token, a registration, an attempt, or a result
+there: those come from the server on every load.
 
 ## API layer
 
@@ -134,11 +139,13 @@ hooks:
   persistence to the backend, restore of server-saved answers, and the answered
   count.
 
-Proctoring lives in `TakeExam` itself: webcam capture, browser
-`FaceDetector`/pixel-sampling presence detection, fullscreen tracking, focus and
-clipboard listeners, strike counters, and the screen shield overlay. Answers are
-also mirrored into a `localStorage` draft keyed by exam and user, which is
-cleared on successful submission.
+Proctoring is not implemented. `TakeExam` renders only the timer, question
+navigation, per-question flags, answer inputs, submission confirmation, and the
+server-issued result view. There is no webcam capture, no `FaceDetector`
+presence check, no fullscreen/focus/clipboard enforcement, no strike counter, no
+screen shield, and no client-side disqualification: the server owns attempt state,
+scoring, and the final result status. Answers are not mirrored to a
+`localStorage` draft; they are persisted to the backend by `useAttemptAnswers`.
 
 ## State management
 
@@ -179,7 +186,15 @@ because they are best-effort concerns.
 - `eslint.config.js`: browser globals, `react-hooks` recommended rules,
   `react-refresh/only-export-components` with `useAuth`/`useToast` allowed as
   non-component exports.
-- Scripts: `dev`, `build`, `preview`, `lint`. There is no test script.
+- `vitest.config.js`: jsdom environment, `globals: true`, `include` of
+  `src/**/*.test.{js,jsx}`, and `setupFiles` pointing at `./src/test/setup.js`.
+  The `test` block is inert for `npm run build` and `npm run dev`.
+- `src/test/setup.js`: calls React Testing Library `cleanup()` and
+  `vi.clearAllMocks()` in `afterEach`.
+- Test files: `src/utils/dateUtils.test.jsx` and
+  `src/hooks/useAttemptAnswers.test.jsx`.
+- Scripts: `dev`, `build`, `preview`, `lint`, `test` (`vitest run`),
+  `test:watch` (`vitest`).
 
 ## Notes for future changes
 
