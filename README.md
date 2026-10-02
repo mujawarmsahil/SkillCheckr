@@ -150,6 +150,13 @@ To manually re-install or activate the hook on any machine:
 npm run install:hooks
 ```
 
+GitHub Actions runs the full CI checks on pull requests, pushes to `main`, and
+manual dispatches. The frontend job installs from the lockfile, audits
+dependencies, lints, tests, and builds using Node.js 22.12; the backend job runs
+Maven `verify` with Java 21, including tests and the JaCoCo coverage gate. Set
+these jobs as required status checks in repository branch protection to prevent
+merging when they fail.
+
 ---
 
 ## 📂 Project Architecture Overview
