@@ -1,6 +1,9 @@
 package com.skillcheckr.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.skillcheckr.constant.RoleConstants;
+import com.skillcheckr.service.AuthService;
 import com.skillcheckr.support.TestAuth;
 
 class AuthInterceptorTest {
@@ -66,11 +70,14 @@ class AuthInterceptorTest {
     }
 
     private MockMvc mockMvc;
+    private AuthService authService;
 
     @BeforeEach
     void setUp() {
+        authService = mock(AuthService.class);
+        when(authService.isUserActive(anyInt())).thenReturn(true);
         mockMvc = MockMvcBuilders.standaloneSetup(new ProbeController(), new LoginProbeController())
-                .addInterceptors(TestAuth.authInterceptor())
+                .addInterceptors(TestAuth.authInterceptor(authService))
                 .build();
     }
 
@@ -141,5 +148,61 @@ class AuthInterceptorTest {
     void aValidTokenPublishesThePrincipal() throws Exception {
         mockMvc.perform(get("/api/requests").with(TestAuth.asUser(30, RoleConstants.ROLE_TEACHER, 10)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void aDisabledAccountCannotUseAnExistingToken() throws Exception {
+        when(authService.isUserActive(1)).thenReturn(false);
+
+        mockMvc.perform(get("/api/requests").with(TestAuth.asStudent(1)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loginRequestsAreRateLimitedPerRemoteAddress() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                            .with(request -> {
+                                request.setRemoteAddr("203.0.113.10");
+                                return request;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(post("/api/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.10");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .exists("Retry-After"));
+    }
+
+    @Test
+    void registrationRequestsAreRateLimitedPerRemoteAddress() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/requests")
+                            .with(request -> {
+                                request.setRemoteAddr("203.0.113.11");
+                                return request;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(post("/api/requests")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.11");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isTooManyRequests());
     }
 }

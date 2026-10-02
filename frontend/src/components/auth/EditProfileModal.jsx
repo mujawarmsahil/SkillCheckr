@@ -225,8 +225,8 @@ export default function EditProfileModal({ isOpen, onClose }) {
       }
       if (!formData.newPassword) {
         errs.newPassword = "New password is required";
-      } else if (formData.newPassword.length < 4) {
-        errs.newPassword = "New password must be at least 4 characters";
+      } else if (formData.newPassword.length < 8) {
+        errs.newPassword = "New password must be at least 8 characters";
       }
       if (!formData.confirmPassword) {
         errs.confirmPassword = "Confirm password is required";

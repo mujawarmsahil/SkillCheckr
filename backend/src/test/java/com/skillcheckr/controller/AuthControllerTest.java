@@ -286,6 +286,21 @@ class AuthControllerTest {
     }
 
     @Test
+    void updateProfile_rejectsPasswordsShorterThanEightCharacters() throws Exception {
+        when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
+        when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);
+
+        String json = "{\"username\":\"student1_updated\",\"name\":\"Alice Updated\",\"email\":\"alice_updated@test.com\",\"old_password\":\"oldSecret123\",\"password\":\"short\"}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/profile/10")
+                        .with(STUDENT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("New password must be at least 8 characters long"));
+    }
+
+    @Test
     void updateProfile_returnsBadRequest_whenOldPasswordInvalid() throws Exception {
         when(authService.isUsernameInUse("student1_updated", 10)).thenReturn(false);
         when(authService.isEmailInUse("alice_updated@test.com", 10)).thenReturn(false);

@@ -255,15 +255,15 @@ CREATE TABLE `result` (
 -- --------------------------------------------------------------------------
 -- Development seed.
 --
--- One administrator so a freshly initialised database can be signed into.
+-- One disabled administrator profile so a freshly initialised database can be
+-- provisioned without exposing a working, repository-known password.
 -- The password is BCrypt, produced with the application's own
 -- BCryptPasswordEncoder (strength 10); the plaintext never appears here.
 --
 --   username: admin
---   password: admin@123
 --
--- This is a local/development starting point only. Replace or remove it
--- before any shared or deployed database.
+-- Before enabling this account, replace its password with a newly generated
+-- BCrypt hash through a trusted provisioning process, then set status to Active.
 -- --------------------------------------------------------------------------
 
 INSERT INTO `user` (`username`, `password`, `user_role`, `auth_provider`, `status`)
@@ -271,7 +271,7 @@ VALUES ('admin',
         '$2a$10$j2C435J408CE8xngWpT0eeKGLATzFE56FZVwgaYuW3B1cRQtTo2Vq',
         'Admin',
         'LOCAL',
-        'Active');
+        'Inactive');
 
 INSERT INTO `admin` (`user_id`, `name`, `contact`, `email`)
 VALUES ((SELECT `user_id` FROM `user` WHERE `username` = 'admin'),

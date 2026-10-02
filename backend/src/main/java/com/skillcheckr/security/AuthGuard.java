@@ -88,7 +88,8 @@ public final class AuthGuard {
      */
     public static AuthPrincipal requireSelfOrAdminForRoleData(HttpServletRequest request, int ownerRoleId) {
         AuthPrincipal principal = requirePrincipal(request);
-        if (principal.isAdmin() || principal.getRoleId() == ownerRoleId) {
+        if (principal.isAdmin()
+                || (principal.isStudent() && principal.getRoleId() == ownerRoleId)) {
             return principal;
         }
         throw new ForbiddenException("You are not authorized to access another user's data.");

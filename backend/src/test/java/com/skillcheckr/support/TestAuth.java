@@ -1,10 +1,17 @@
 package com.skillcheckr.support;
 
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.skillcheckr.constant.RoleConstants;
+import com.skillcheckr.security.PublicEndpointRateLimiter;
 import com.skillcheckr.security.AuthInterceptor;
 import com.skillcheckr.security.TokenService;
+import com.skillcheckr.service.AuthService;
 
 /**
  * Builds the bearer tokens used by the controller tests. The real {@link TokenService} and
@@ -23,7 +30,14 @@ public final class TestAuth {
     }
 
     public static AuthInterceptor authInterceptor() {
-        return new AuthInterceptor(tokenService());
+        AuthService authService = mock(AuthService.class);
+        lenient().when(authService.isUserActive(anyInt())).thenReturn(true);
+        return authInterceptor(authService);
+    }
+
+    public static AuthInterceptor authInterceptor(AuthService authService) {
+        return new AuthInterceptor(tokenService(), authService,
+                new PublicEndpointRateLimiter(10, 60, 5, 3600));
     }
 
     public static String tokenFor(int userId, int roleId, String role) {
