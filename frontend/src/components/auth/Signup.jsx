@@ -46,8 +46,8 @@ export default function Signup({ onSignupSuccess }) {
     }
     if (!formData.password) {
       errs.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      errs.password = "Password must be at least 6 characters";
+    } else if (formData.password.length < 8) {
+      errs.password = "Password must be at least 8 characters";
     }
     if (!formData.requested_role || formData.requested_role === "select") {
       errs.requested_role = "Select a role";
@@ -191,7 +191,7 @@ export default function Signup({ onSignupSuccess }) {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="At least 6 chars"
+              placeholder="At least 8 chars"
               className={`w-full pl-3.5 pr-10 py-2 bg-slate-50 border ${
                 errors.password ? "border-rose-400 ring-1 ring-rose-300" : "border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
               } rounded-xl text-slate-800 placeholder-slate-400 text-sm outline-none transition-all`}

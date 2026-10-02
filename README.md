@@ -108,8 +108,8 @@ Before running the application, make sure you have installed:
 ## 🗄️ Database Setup
 
 1. Start your local MySQL server.
-2. Create the database, then run the provided schema script to set up tables and the default admin seed:
-   - File location: [`backend/src/main/resources/schema.sql`](file:///Users/sahilmujawar/Desktop/projects/SkillCheckr/backend/src/main/resources/schema.sql)
+2. Create the database, then run the provided schema script to set up tables and a disabled administrator profile:
+   - File location: [`backend/src/main/resources/schema.sql`](backend/src/main/resources/schema.sql)
 
 ```bash
 CREATE DATABASE exam_application_system
@@ -129,12 +129,28 @@ mysql -u root -p exam_application_system < backend/src/main/resources/schema.sql
 
    The frontend reads only the public API location, configured separately in [`frontend/.env.example`](frontend/.env.example) (`VITE_API_URL`). Never place a server credential in a `VITE_*` variable — those are compiled into the browser bundle.
 
-### 🔑 Default Administrator Login
-- **Username:** `admin`
-- **Password:** `admin@123`
-- **Role:** `Admin`
+### Administrator provisioning
 
-This seed exists only so a freshly created database can be signed into. Change or remove it before any shared or deployed database.
+The schema includes an **inactive** `admin` account so the known repository
+password cannot authenticate on a fresh database. Before first use, provision a
+new, unique password with your approved password-management process, store only
+its BCrypt hash, and activate the account:
+
+```sql
+UPDATE `user`
+SET `password` = '<BCrypt hash for a new, unique administrator password>',
+    `status` = 'Active'
+WHERE `username` = 'admin' AND `user_role` = 'Admin';
+```
+
+Do not enable this account with any password published in source control. Use a
+separate credential and controlled database access in each environment.
+
+For an **existing** database, apply
+[`backend/src/main/resources/migrations/disable-known-admin.sql`](backend/src/main/resources/migrations/disable-known-admin.sql)
+before deploying the application update. It disables only the unchanged
+repository-seeded password; it does not affect an administrator whose password
+was already replaced.
 
 ---
 

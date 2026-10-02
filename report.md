@@ -7,30 +7,31 @@ tree, on the date in the last section. No result is copied from an earlier run.
 
 | # | Command | Result |
 | --- | --- | --- |
-| 1 | `cd backend && ./mvnw test` | **537 tests, 0 failures, 0 errors, 0 skipped** — BUILD SUCCESS |
+| 1 | `cd backend && ./mvnw verify` | **554 tests, 0 failures, 0 errors, 0 skipped** — coverage gate passed |
 | 2 | `cd backend && ./mvnw -q -DskipTests compile` | Exit code 0, no output |
 | 3 | `cd backend && ./mvnw checkstyle:check` | 0 Checkstyle violations — BUILD SUCCESS |
-| 4 | `cd frontend && npm test` | **2 test files, 41 tests passed** |
+| 4 | `cd frontend && npm test` | **2 test files, 41 tests passed** (Vitest 5.0.3) |
 | 5 | `cd frontend && npm run lint` | Clean, no errors or warnings |
-| 6 | `cd frontend && npm run build` | Built in ~1.25s, 762 modules transformed |
+| 6 | `cd frontend && npm run build` | Built in ~3.9s, 767 modules transformed |
+| 7 | `cd frontend && npm audit` | **0 vulnerabilities** |
 
 ## Backend test breakdown
 
-`./mvnw test` (537 total across 36 test classes):
+`./mvnw verify` (554 total across 37 test classes):
 
 | Area | Classes | Tests |
 | --- | --- | --- |
 | Context / integration | `DevCorsIntegrationTest` (4), `CorsIntegrationTest` (4), `SkillCheckrApplicationTests` (1), `ActuatorHealthTest` (1) | 10 |
 | Config | `DeploymentConfigurationValidatorTest` (10) | 10 |
-| Security | `TokenServiceTest` (11), `AuthInterceptorTest` (9) | 20 |
-| Controllers | `ExamControllerTest` (75), `AdminControllerTest` (24), `RegistrationRequestControllerTest` (20), `AuthControllerTest` (18), `QuestionControllerTest` (15), `ResultControllerTest` (14), `SubjectControllerTest` (12) | 178 |
-| Services | `ExamServiceTest` (34), `AuthServiceImplTest` (21), `RegistrationRequestServiceTest` (16), `QuestionServiceTest` (16), `ExamSubmissionServiceTest` (16), `AdminServiceTest` (15), `ResultServiceTest` (6), `AttemptAnswerServiceTest` (5), `SubjectServiceTest` (3) | 132 |
-| Repositories | `AdminRepositoryImplTest` (31), `ExamRepositoryImplTest` (25), `AuthRepositoryImplTest` (20), `QuestionRepositoryImplTest` (17), `SubjectRepositoryImplTest` (11), `ResultRepositoryImplTest` (9), `RegistrationRequestRepositoryImplTest` (8) | 121 |
+| Security | `TokenServiceTest` (11), `AuthInterceptorTest` (12) | 23 |
+| Controllers | `ExamControllerTest` (75), `AdminControllerTest` (24), `RegistrationRequestControllerTest` (20), `AuthControllerTest` (19), `QuestionControllerTest` (15), `ResultControllerTest` (16), `SubjectControllerTest` (12) | 181 |
+| Services | `ExamServiceTest` (34), `AuthServiceImplTest` (22), `RegistrationRequestServiceTest` (16), `QuestionServiceTest` (18), `ExamSubmissionServiceTest` (16), `AdminServiceTest` (15), `ResultServiceTest` (6), `AttemptAnswerServiceTest` (5), `SubjectServiceTest` (3) | 135 |
+| Repositories | `AdminRepositoryImplTest` (31), `ExamRepositoryImplTest` (25), `ExamQuestionRepositoryImplTest` (4), `AuthRepositoryImplTest` (21), `QuestionRepositoryImplTest` (17), `SubjectRepositoryImplTest` (11), `ResultRepositoryImplTest` (11), `RegistrationRequestRepositoryImplTest` (9) | 129 |
 | Validation | `ExamCreationValidatorTest` (21), `RequestValueParserTest` (15) | 36 |
 | Exception handling | `GlobalExceptionHandlerTest` | 16 |
 | Mappers | `ExamResultRowMapperTest` (4), `ExamAttemptRowMapperTest` (4) | 8 |
 | JSON serialization | `JacksonNumberBindingTest` | 6 |
-| **Total** | | **537** |
+| **Total** | | **554** |
 
 ## Frontend test breakdown
 
@@ -45,17 +46,16 @@ tree, on the date in the last section. No result is copied from an earlier run.
 ## Frontend build output
 
 ```text
-✓ 762 modules transformed.
+✓ 767 modules transformed.
 dist/index.html                             0.93 kB │ gzip:   0.52 kB
 dist/assets/index-De724Jwj.css             49.04 kB │ gzip:   8.32 kB
-dist/assets/index-Bhyi3TCN.js             908.23 kB │ gzip: 249.20 kB
-✓ built in 1.25s
+dist/assets/index-COErKPw3.js             942.31 kB │ gzip: 260.13 kB
+✓ built in 3.85s
 ```
 
-Two non-blocking notices remain, both pre-existing and unrelated to correctness:
+One non-blocking notice remains:
 
 - the main chunk exceeds the 500 kB advisory limit (no code splitting configured);
-- `caniuse-lite` is stale relative to Browserslist.
 
 ## Issues found and resolved
 
@@ -77,8 +77,9 @@ These are deliberate boundaries, not defects:
 - **No proctoring or anti-cheat.** There is no webcam, focus, fullscreen, or
   clipboard enforcement, and no `Disqualified` result status. Nothing in the
   backend or frontend can produce one.
-- **No rate limiting.** No request throttling is applied to any endpoint,
-  including authentication.
+- **Rate limiting is per process.** Login and registration are limited to 10
+  requests/minute and 5 requests/hour per remote address. Multi-replica
+  deployments still need a shared ingress limiter.
 - **Legacy plaintext passwords are still accepted.** They are migrated to
   BCrypt on the next successful sign in.
 - **Chunk size.** The single 908 kB bundle could be code-split, but this is a
@@ -102,8 +103,8 @@ since removed):
 | Foreign keys created | 16 |
 | Repository SQL statements validated with `PREPARE` | 154 (139 direct + 15 expanded dynamic-table) |
 | Unique / `NOT NULL` / restrictive-FK constraints | Enforced as declared |
-| Seeded admin row | Present, active, BCrypt hash only (no plaintext) |
-| End-to-end flow against a database created only from `schema.sql` | **30/30 checks pass** |
+| Seeded admin row | Present, inactive by default; activate only after setting a new BCrypt password |
+| End-to-end flow against a database created only from `schema.sql` | **30/30 checks passed before the seed was made inactive; rerun after secure administrator provisioning** |
 
 The end-to-end flow covered admin login, subject creation, teacher/student
 registration and approval, question creation, exam creation, exam approval,
@@ -138,6 +139,13 @@ second-attempt guards.
 | — | `QuestionServiceImpl.deleteQuestionById` | Message now names the actual remedy (delete the exam first) |
 | — | Controllers | Legacy route aliases removed; canonical paths only |
 | — | `AuthInterceptor` | Public-route allowlist reduced to `/api/auth/login` and `/api/requests` |
+| — | `AuthGuard`, `ResultController` | Require student role for self-result access, preventing cross-role ID collisions |
+| — | `AuthInterceptor`, `AuthService`, `AuthRepository` | Re-check account status on protected requests so deactivation invalidates existing tokens |
+| — | `PublicEndpointRateLimiter` | Apply bounded per-process limits to login and public registration |
+| — | `schema.sql`, `README.md` | Disable the seeded admin until a unique BCrypt password is provisioned |
+| — | `disable-known-admin.sql` | Disable the unchanged default account in existing databases before deployment |
+| — | `AuthController`, `Signup`, `EditProfileModal` | Require at least eight characters for new and changed passwords |
+| — | `frontend/package.json`, `frontend/package-lock.json` | Update vulnerable frontend dependencies; `npm audit` reports zero advisories |
 | — | Frontend | API clients and components updated to canonical paths; dead assets deleted |
 
 No database referential integrity was weakened. The
@@ -145,4 +153,4 @@ No database referential integrity was weakened. The
 
 ## Date
 
-Report generated 2026-09-29. Schema rebuild, finding fixes, and cleanup verified 2026-09-29.
+Original schema rebuild and end-to-end verification: 2026-09-29. Security remediations and test verification: 2026-10-01.

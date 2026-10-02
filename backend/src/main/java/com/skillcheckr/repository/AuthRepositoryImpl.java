@@ -244,4 +244,20 @@ public class AuthRepositoryImpl implements AuthRepository {
         }
         return false;
     }
+
+    @Override
+    public boolean isUserActive(int userId) {
+        if (userId <= 0) {
+            return false;
+        }
+        List<String> statuses = jdbcTemplate.query(
+                "SELECT status FROM user WHERE user_id = ?",
+                (rs, rowNum) -> rs.getString("status"),
+                userId);
+        if (statuses.isEmpty()) {
+            return false;
+        }
+        String status = statuses.get(0);
+        return status == null || status.trim().isEmpty() || !"Inactive".equalsIgnoreCase(status.trim());
+    }
 }

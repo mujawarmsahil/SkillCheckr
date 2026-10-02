@@ -22,5 +22,8 @@ public interface AuthService {
     boolean isUsernameInUse(String username, int excludeUserId);
 
     boolean isEmailInUse(String email, int excludeUserId);
+
+    boolean isUserActive(int userId);
+
     boolean verifyCurrentPassword(int userId, String oldPassword);
 }

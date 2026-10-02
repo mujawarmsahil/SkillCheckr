@@ -14,7 +14,7 @@ This document describes the frontend architecture as it exists in `frontend/` af
 | Styling | Tailwind CSS 3 + PostCSS/autoprefixer |
 | Linting | ESLint 9 flat config with `eslint-plugin-react-hooks` and `eslint-plugin-react-refresh` |
 | State | React Context + local component state (no external store) |
-| Tests | Vitest 2 + React Testing Library (jsdom environment) |
+| Tests | Vitest 5 + React Testing Library (jsdom environment) |
 
 There is no Redux store, no global CSS framework beyond Tailwind, and no form library.
 
@@ -162,9 +162,9 @@ scoring, and the final result status. Answers are not mirrored to a
 ## Validation responsibilities
 
 Frontend validation exists only for immediate feedback and input constraints:
-required fields, email format, 10-digit contact, minimum username/password
-length, password confirmation, non-empty question text, MCQ option completeness,
-and marks relationships. The backend remains authoritative for credentials,
+required fields, email format, 10-digit contact, minimum username length, an
+eight-character password minimum, password confirmation, non-empty question
+text, MCQ option completeness, and marks relationships. The backend remains authoritative for credentials,
 schedules, registration, and grading; the frontend does not reimplement those
 rules.
 

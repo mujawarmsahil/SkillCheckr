@@ -230,6 +230,14 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void isUserActive_delegatesToRepository() {
+        when(authRepository.isUserActive(5)).thenReturn(false);
+
+        assertThat(authService.isUserActive(5)).isFalse();
+        verify(authRepository).isUserActive(5);
+    }
+
+    @Test
     void verifyCurrentPassword_returnsTrue_whenBcryptMatches() {
         when(authRepository.findPasswordByUserId(1)).thenReturn(Optional.of("$2a$10$hashedPass"));
         when(passwordEncoder.matches("secret", "$2a$10$hashedPass")).thenReturn(true);

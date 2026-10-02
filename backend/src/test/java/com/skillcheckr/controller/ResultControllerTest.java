@@ -161,6 +161,27 @@ class ResultControllerTest {
     }
 
     @Test
+    void getResultsByStudent_refusesTeacherWhenRoleIdsCollide() throws Exception {
+        mockMvc.perform(get("/api/results/student/" + STUDENT_ID)
+                        .with(TestAuth.asTeacherAccount(99, STUDENT_ID)))
+                .andExpect(status().isForbidden());
+        verify(resultService, never()).getResultsByStudentId(STUDENT_ID);
+    }
+
+    @Test
+    void checkStudentExamStatus_requiresTeacherToOwnExamWhenRoleIdsCollide() throws Exception {
+        Exam exam = new Exam();
+        exam.setExamId(5);
+        exam.setTeacherId(99);
+        when(examService.getExamById(5)).thenReturn(Optional.of(exam));
+
+        mockMvc.perform(get("/api/results/check/5/" + TEACHER_ID)
+                        .with(TestAuth.asTeacherAccount(99, TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(resultService, never()).getResultByExamAndStudent(5, TEACHER_ID);
+    }
+
+    @Test
     void getResultsByStudent_allowsAnAdmin() throws Exception {
         when(resultService.getResultsByStudentId(OTHER_STUDENT_ID)).thenReturn(List.of());
 
