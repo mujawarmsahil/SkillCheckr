@@ -60,7 +60,7 @@ public class ResultController {
 	 */
 	private void requireResultReadAccess(HttpServletRequest request, Integer examId, Integer studentId) {
 		AuthPrincipal principal = AuthGuard.requirePrincipal(request);
-		if (principal.isAdmin() || principal.getRoleId() == studentId) {
+		if (principal.isAdmin() || (principal.isStudent() && principal.getRoleId() == studentId)) {
 			return;
 		}
 		if (principal.isTeacher()) {

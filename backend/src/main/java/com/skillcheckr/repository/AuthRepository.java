@@ -28,4 +28,6 @@ public interface AuthRepository {
     boolean existsByUsername(String username);
 
     boolean isEmailInUse(String email, int excludeUserId);
+
+    boolean isUserActive(int userId);
 }

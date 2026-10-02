@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import com.skillcheckr.service.AuthService;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -30,11 +32,8 @@ public class AuthInterceptor implements HandlerInterceptor {
      * the methods listed here, so a public sign up route can never expose the administrative
      * endpoint that happens to share the same path.
      *
-     * <p>None of these routes are rate limited: the project ships no rate limiting dependency
-     * and none was introduced. The login route is therefore a credential stuffing target and
-     * the registration route can create pending rows without limit. Protect these paths at the
-     * gateway or add a limiter before relying on this list in a public deployment. See the
-     * "Anonymous endpoints and rate limiting" section of architecture.md.
+     * <p>Login and registration are throttled per remote address. The limiter is per process,
+     * so a multi-replica deployment must also apply a shared limit at the ingress.
      */
     private static final List<PublicRoute> PUBLIC_ROUTES = List.of(
             new PublicRoute("/api/auth/login", POST),
@@ -47,15 +46,35 @@ public class AuthInterceptor implements HandlerInterceptor {
     }
 
     private final TokenService tokenService;
+    private final AuthService authService;
+    private final PublicEndpointRateLimiter rateLimiter;
 
-    public AuthInterceptor(TokenService tokenService) {
+    public AuthInterceptor(TokenService tokenService, AuthService authService,
+            PublicEndpointRateLimiter rateLimiter) {
         this.tokenService = tokenService;
+        this.authService = authService;
+        this.rateLimiter = rateLimiter;
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws IOException {
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod()) || isPublic(request)) {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+        PublicRoute publicRoute = findPublicRoute(request);
+        if (publicRoute != null) {
+            if (publicRoute.path().startsWith("/api/")) {
+                long retryAfter = rateLimiter.tryConsume(publicRoute.path(), request.getRemoteAddr());
+                if (retryAfter > 0) {
+                    response.setHeader("Retry-After", Long.toString(retryAfter));
+                    response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                    response.getWriter().write("{\"message\":\"Too many requests. Please try again later.\"}");
+                    return false;
+                }
+            }
             return true;
         }
 
@@ -66,7 +85,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         Optional<AuthPrincipal> principal = tokenService.verifyToken(token);
-        if (principal.isEmpty()) {
+        if (principal.isEmpty() || !authService.isUserActive(principal.get().getUserId())) {
             writeUnauthorized(response, "Your session is invalid or has expired. Please sign in again.");
             return false;
         }
@@ -75,10 +94,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    private boolean isPublic(HttpServletRequest request) {
+    private PublicRoute findPublicRoute(HttpServletRequest request) {
         String path = request.getRequestURI();
         if (path == null || path.isEmpty()) {
-            return false;
+            return null;
         }
         int contextPathLength = request.getContextPath() == null ? 0 : request.getContextPath().length();
         String normalized = contextPathLength > 0 && path.startsWith(request.getContextPath())
@@ -89,10 +108,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
         for (PublicRoute route : PUBLIC_ROUTES) {
             if (matches(route, normalized, request.getMethod())) {
-                return true;
+                return route;
             }
         }
-        return false;
+        return null;
     }
 
     private boolean matches(PublicRoute route, String normalizedPath, String method) {

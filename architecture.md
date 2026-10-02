@@ -38,7 +38,7 @@ covers the boundaries between the two applications.
 | Database | MySQL (`schema.sql`); H2 in MySQL mode for tests |
 | Auth | HMAC-SHA256 signed stateless tokens + `HandlerInterceptor` |
 | Client | React 19, Vite 6, react-router-dom 7, axios, Tailwind CSS |
-| Tests | JUnit 5 + Mockito (537 backend tests), Vitest 2 + React Testing Library (41 frontend tests), ESLint 9, Checkstyle, Vite build |
+| Tests | JUnit 5 + Mockito (554 backend tests), Vitest 5 + React Testing Library (41 frontend tests), ESLint 9, Checkstyle, Vite build |
 
 ## 3. Trust boundary
 
@@ -76,7 +76,8 @@ sc1.<base64url(userId:roleId:role:issuedAt:expiresAt:username)>.<base64url(HMAC-
   role is unknown so a role can never be escalated by tampering with the payload.
 - Secret comes from `app.security.token-secret`; TTL from
   `app.security.token-ttl-minutes`. There is no sliding refresh: a token is
-  re-issued by logging in again.
+  re-issued by logging in again. Authenticated requests also check that the
+  account remains active, so administrator deactivation invalidates existing tokens.
 - The client sends `Authorization: Bearer <token>`; there is no server-side
   session and no client-generated fallback token.
 - `AuthPrincipal` distinguishes `userId` (the `user` row) from `roleId` (the
@@ -96,7 +97,9 @@ HTTP request
 ```
 
 - `AuthInterceptor` matches public routes by HTTP method, so `POST` on an
-  otherwise public path is still authenticated.
+  otherwise public path is still authenticated. Anonymous login and registration
+  requests have per-process rate limits (10/minute and 5/hour per remote address);
+  production ingress should enforce shared limits when running multiple replicas.
 - `AuthGuard` expresses each authorization decision explicitly:
 
   | Guard | Rule |
@@ -248,11 +251,13 @@ Canonical REST paths are authoritative across the API surface.
 - `schema.sql` is the single source of truth for new databases. It declares the
   `uq_exam_attempt` uniqueness constraint directly, so a fresh install needs no
   upgrade step and there is no startup migration or schema-repair machinery.
+  The seeded administrator is inactive and must be provisioned with a new
+  password before activation.
 
 ## 11. Verification
 
 ```bash
-cd backend  && ./mvnw test          # 537 tests, 0 failures, 0 errors
+cd backend  && ./mvnw test          # 554 tests, 0 failures, 0 errors
 cd backend  && ./mvnw -q -DskipTests compile
 cd backend  && ./mvnw checkstyle:check
 cd frontend && npm test             # 41 tests, 2 test files
@@ -260,6 +265,6 @@ cd frontend && npm run lint
 cd frontend && npm run build
 ```
 
-Current status: backend **537/537 passing** with 0 Checkstyle violations,
+Current status: backend **554/554 passing** with 0 Checkstyle violations,
 frontend **41/41 passing** with lint clean, production build succeeds (only the
 pre-existing >500 kB chunk-size and Browserslist notices).

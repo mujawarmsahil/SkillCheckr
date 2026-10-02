@@ -199,6 +199,22 @@ class AuthRepositoryImplTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void isUserActive_requiresAnExistingNonInactiveAccount() {
+        when(jdbcTemplate.query(eq("SELECT status FROM user WHERE user_id = ?"), any(RowMapper.class), eq(1)))
+                .thenReturn(List.of("Active"));
+        when(jdbcTemplate.query(eq("SELECT status FROM user WHERE user_id = ?"), any(RowMapper.class), eq(2)))
+                .thenReturn(List.of("Inactive"));
+        when(jdbcTemplate.query(eq("SELECT status FROM user WHERE user_id = ?"), any(RowMapper.class), eq(3)))
+                .thenReturn(List.of());
+
+        assertThat(repository.isUserActive(1)).isTrue();
+        assertThat(repository.isUserActive(2)).isFalse();
+        assertThat(repository.isUserActive(3)).isFalse();
+        assertThat(repository.isUserActive(0)).isFalse();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void updateUserProfile_updatesUserAndStudentTable() {
         UserProfileDTO profile = UserProfileDTO.builder()
                 .userId(1)

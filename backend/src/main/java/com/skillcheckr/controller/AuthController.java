@@ -138,8 +138,8 @@ public class AuthController {
 
         if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
             String newPassword = profile.getPassword().trim();
-            if (newPassword.length() < 4) {
-                throw new BadRequestException("New password must be at least 4 characters long");
+            if (newPassword.length() < 8) {
+                throw new BadRequestException("New password must be at least 8 characters long");
             }
 
             if (profile.getOldPassword() == null || profile.getOldPassword().trim().isEmpty()) {

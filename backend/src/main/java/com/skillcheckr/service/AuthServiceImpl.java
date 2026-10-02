@@ -132,6 +132,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public boolean isUserActive(int userId) {
+        return authRepository.isUserActive(userId);
+    }
+
+    @Override
     public boolean verifyCurrentPassword(int userId, String oldPassword) {
         if (oldPassword == null || oldPassword.isEmpty() || userId <= 0) {
             return false;

@@ -164,6 +164,9 @@ The schema currently contains these tables:
 - `result`
 
 `src/main/resources/schema.sql` is the authoritative single source of truth for the database structure, tables, keys, and constraints. The application relies on this schema definition directly, and the project has no Flyway or Liquibase migration history.
+The manually applied `src/main/resources/migrations/disable-known-admin.sql`
+is a one-time compatibility migration for existing databases; review and run it
+before deploying the change that disables the seeded administrator.
 
 RowMappers use explicit query projections rather than runtime metadata fallback. Repositories explicitly project the required columns (such as `student.name AS student_name` via `LEFT JOIN`), eliminating `ResultSetMetaData` and `hasColumn` probing.
 
@@ -263,6 +266,8 @@ The base properties file deliberately carries **no** default token secret. An un
 | CORS credentials toggle | `CORS_ALLOW_CREDENTIALS` |
 | Token signing secret | `TOKEN_SECRET` |
 | Token lifetime | `TOKEN_TTL_MINUTES` |
+| Anonymous login limit | `AUTH_LOGIN_RATE_LIMIT_REQUESTS`, `AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS` |
+| Anonymous registration limit | `REGISTRATION_RATE_LIMIT_REQUESTS`, `REGISTRATION_RATE_LIMIT_WINDOW_SECONDS` |
 | Active profile | `SPRING_PROFILES_ACTIVE` |
 
 No secret is stored in the repository. `backend/.env.example` is a git-ignored, credential-free template; copy it to `backend/.env` and fill in real values, or set the same variables in the deployment platform.
@@ -279,15 +284,21 @@ Actuator exposes `health` over HTTP. The health response publishes component det
 | `/api/requests` | `POST` | public registration request |
 | `/actuator/health`, `/actuator/info` | any | health probe |
 
-**Known security gap: these anonymous endpoints are not rate limited.** The project has no rate-limiting dependency and none was added, so login and the public registration endpoint can be called without limit. This allows credential stuffing against `/login` and unbounded creation of pending registration requests. The registration rows are only pending until an admin approves them, so the impact is stored-row growth and admin review load rather than direct account creation, but the login endpoint is a genuine brute-force target.
-
-Recommended mitigation, out of scope here: an in-process rate limiter (Bucket4j) or a gateway/WAF rule keyed on IP, plus a CAPTCHA on the registration endpoint. Until then, these routes should be protected at the edge in front of the service.
+Login is limited to 10 requests per minute per remote address; registration is
+limited to 5 requests per hour per remote address. A rejected request returns
+HTTP 429 and a `Retry-After` header. These limits are in-memory and per process,
+so production deployments with multiple replicas must enforce shared limits at
+the ingress as well.
 
 ## Password storage and legacy migration
 
 Passwords are stored as BCrypt hashes and verified with `BCryptPasswordEncoder`. `AuthServiceImpl.login` treats a stored value that lacks a BCrypt prefix (`$2a$`, `$2b$`, `$2y$`) as legacy plaintext, compares it in constant time, and rewrites the row as a BCrypt hash on the next successful sign in.
 
-`schema.sql` seeds one administrator `user` row (see the README for its credentials) and the repository contains no seed data script, so this migration path applies only to rows imported from an older deployment, not to fresh installations. A failed auto-upgrade is swallowed so that a correct password still signs the user in; the plaintext row is retried on the next login. Accounts created through the application are always written through `PasswordEncoder` and are therefore never plaintext.
+New registration and profile password changes require at least eight characters.
+
+`schema.sql` seeds one inactive administrator row. It must be provisioned with
+a unique BCrypt password before activation; the repository contains no usable
+default administrator credential.
 
 ## Tests
 
