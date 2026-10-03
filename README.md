@@ -166,6 +166,21 @@ changes belong in a new, ordered migration under
 `backend/src/main/resources/db/migration/` and must not modify a migration
 already applied in an environment.
 
+### Student question-bank PDFs
+
+Teachers add the structured questions required by the online exam in the
+**Add Exam** workflow. They may optionally upload a separate question-only PDF
+(maximum 10 MB); if they do not, the backend generates a student PDF from the
+structured questions. The generated PDF omits correct options and descriptive
+sample answers. The application cannot reliably detect answer keys inside
+arbitrary uploaded PDFs, so the teacher must confirm the uploaded PDF contains
+questions only.
+
+The question-bank download is available to students only after an exam is
+approved. Flyway applies
+`backend/src/main/resources/db/migration/V3__add_exam_question_bank.sql`
+automatically on startup; no manual SQL migration is required.
+
 ---
 
 ## 🛡️ Automated Pre-Commit Quality Gate

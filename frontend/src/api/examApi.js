@@ -31,6 +31,19 @@ export const getExamQuestions = async (examId) => {
   return Array.isArray(res.data) ? res.data : [];
 };
 
+export const uploadExamQuestionBankPdf = async (examId, file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("questionOnlyConfirmed", "true");
+  const res = await apiClient.post(`/api/exams/${examId}/question-bank`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};
+
+export const downloadExamQuestionBank = async (examId) =>
+  apiClient.get(`/api/exams/${examId}/question-bank`, { responseType: "blob" });
+
 export const getUpcomingExams = async () => {
   const res = await apiClient.get("/api/exams/upcoming");
   return Array.isArray(res.data) ? res.data : [];
