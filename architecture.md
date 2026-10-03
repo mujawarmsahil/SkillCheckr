@@ -20,7 +20,7 @@ SkillCheckr/
 │   │   ├── security/         TokenService, AuthInterceptor, AuthGuard, AuthPrincipal
 │   │   ├── service/          Business logic interfaces + *Impl
 │   │   └── validation/       ExamCreationValidator, ExamAttemptValidator, QuestionValidator
-│   └── src/main/resources/   application.properties, schema.sql
+│   └── src/main/resources/   application.properties, db/migration/
 ├── frontend/                 React 19 + Vite 6 client
 │   └── src/{api,components,constants,context,hooks,pages,utils}
 └── architecture.md           This file
@@ -35,7 +35,7 @@ covers the boundaries between the two applications.
 | --- | --- |
 | API | Spring Boot 3.4, Spring MVC, Java 21 |
 | Persistence | `JdbcTemplate` + explicit SQL (no JPA/Hibernate) |
-| Database | MySQL (`schema.sql`); H2 in MySQL mode for tests |
+| Database | MySQL (Flyway migrations); H2 in MySQL mode for tests |
 | Auth | HMAC-SHA256 signed stateless tokens + `HandlerInterceptor` |
 | Client | React 19, Vite 6, react-router-dom 7, axios, Tailwind CSS |
 | Tests | JUnit 5 + Mockito (554 backend tests), Vitest 5 + React Testing Library (41 frontend tests), ESLint 9, Checkstyle, Vite build |
@@ -248,9 +248,9 @@ Canonical REST paths are authoritative across the API surface.
 
 ## 10. Database
 
-- `schema.sql` is the single source of truth for new databases. It declares the
-  `uq_exam_attempt` uniqueness constraint directly, so a fresh install needs no
-  upgrade step and there is no startup migration or schema-repair machinery.
+- Flyway migrations under `backend/src/main/resources/db/migration/` are the
+  source of truth for the database schema. Fresh databases apply the initial
+  migration on startup; existing complete schemas are baselined at version 1.
   The seeded administrator is inactive and must be provisioned with a new
   password before activation.
 

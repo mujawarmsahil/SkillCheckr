@@ -14,11 +14,12 @@ SkillCheckr backend is a modular monolithic Spring Boot REST API.
 | Production database | MySQL 8.x |
 | Build | Maven Wrapper |
 | Password hashing | BCrypt through Spring Security Crypto |
+| Schema migrations | Flyway versioned SQL migrations |
 | Operational endpoint | Spring Boot Actuator health endpoint |
 | Model generation | Lombok |
 | Deployment | Executable JAR, with an optional multi-stage Docker image |
 
-There is no JPA, Hibernate, database migration library, message broker, or separate frontend build in this module.
+There is no JPA, Hibernate, message broker, or separate frontend build in this module.
 
 ## Runtime flow
 
@@ -163,10 +164,14 @@ The schema currently contains these tables:
 - `attempt_answer`
 - `result`
 
-`src/main/resources/schema.sql` is the authoritative single source of truth for the database structure, tables, keys, and constraints. The application relies on this schema definition directly, and the project has no Flyway or Liquibase migration history.
-The manually applied `src/main/resources/migrations/disable-known-admin.sql`
-is a one-time compatibility migration for existing databases; review and run it
-before deploying the change that disables the seeded administrator.
+`src/main/resources/db/migration/V1__initial_schema.sql` defines the initial
+database structure, tables, keys, constraints, and inactive administrator seed.
+Flyway applies it automatically to a new, empty database. A non-empty existing
+database is baselined at version 1 and skips V1; this assumes its schema already
+matches V1. `V2__disable_known_admin.sql` is safe on both paths: it disables only
+the unchanged repository-seeded password and leaves a replaced password alone.
+New schema changes must use new versioned SQL migrations; applied migrations
+must not be edited.
 
 RowMappers use explicit query projections rather than runtime metadata fallback. Repositories explicitly project the required columns (such as `student.name AS student_name` via `LEFT JOIN`), eliminating `ResultSetMetaData` and `hasColumn` probing.
 
@@ -296,9 +301,9 @@ Passwords are stored as BCrypt hashes and verified with `BCryptPasswordEncoder`.
 
 New registration and profile password changes require at least eight characters.
 
-`schema.sql` seeds one inactive administrator row. It must be provisioned with
-a unique BCrypt password before activation; the repository contains no usable
-default administrator credential.
+`V1__initial_schema.sql` seeds one inactive administrator row. It must be
+provisioned with a unique BCrypt password before activation; the repository
+contains no usable default administrator credential.
 
 ## Tests
 
@@ -335,7 +340,7 @@ The following are current constraints that callers and maintainers must account 
 - Role-based authorization is enforced at the controller boundary, but not by a Spring Security filter chain or an interceptor.
 - Exam status transitions depend on request-time database checks rather than a scheduler.
 - Transaction coverage spans answer saving, attempt submission, administrative approval/deletion/status changes, question authoring, and subject deletion.
-- `schema.sql` is the authoritative single source of truth for the runtime database structure.
+- Versioned Flyway SQL migrations are the source of truth for runtime database structure.
 - Result submission is exposed only through the attempt workflow in `ExamController`; `ResultController` is read-only.
 - Canonical REST routes are authoritative across all controllers; legacy route aliases have been removed.
 

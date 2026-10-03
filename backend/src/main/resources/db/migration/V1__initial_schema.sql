@@ -1,17 +1,17 @@
 -- ==========================================================================
--- SkillCheckr - fresh installation schema
+-- SkillCheckr - initial database schema
 -- ==========================================================================
 --
 -- Target database: exam_application_system (MySQL 8.x)
 --
--- This file describes the CURRENT structure only. It is meant to be applied
--- once, to a completely empty database, and it contains no migration,
--- upgrade, or existence-checking logic. Create the database first, then run
--- this file against it:
+-- This migration creates the initial schema for a fresh installation.
+-- Flyway applies it automatically after the target database has been created.
+-- Existing installations are baselined at version 1 and skip this migration.
 --
 --   CREATE DATABASE exam_application_system
 --       CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
---   mysql -u root -p exam_application_system < src/main/resources/schema.sql
+-- Existing installations must contain the complete version-1 schema before
+-- Flyway baseline-on-migrate is enabled for the first deployment.
 --
 -- Conventions taken from the application code, not chosen freely here:
 --   user.user_role          'Admin' | 'Teacher' | 'Student'   (RoleConstants)

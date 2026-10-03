@@ -108,13 +108,12 @@ Before running the application, make sure you have installed:
 ## 🗄️ Database Setup
 
 1. Start your local MySQL server.
-2. Create the database, then run the provided schema script to set up tables and a disabled administrator profile:
-   - File location: [`backend/src/main/resources/schema.sql`](backend/src/main/resources/schema.sql)
+2. Create an empty MySQL database. Flyway creates the tables and the disabled
+   administrator profile automatically when the backend starts:
 
 ```bash
 CREATE DATABASE exam_application_system
     CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-mysql -u root -p exam_application_system < backend/src/main/resources/schema.sql
 ```
 
 3. Configure your database and secret credentials via environment variables. The backend env template lives at [`backend/.env.example`](backend/.env.example) — copy it to `backend/.env` and fill in your real values (`.env` is git-ignored and must never be committed):
@@ -146,11 +145,26 @@ WHERE `username` = 'admin' AND `user_role` = 'Admin';
 Do not enable this account with any password published in source control. Use a
 separate credential and controlled database access in each environment.
 
-For an **existing** database, apply
-[`backend/src/main/resources/migrations/disable-known-admin.sql`](backend/src/main/resources/migrations/disable-known-admin.sql)
-before deploying the application update. It disables only the unchanged
-repository-seeded password; it does not affect an administrator whose password
-was already replaced.
+### Existing database adoption
+
+Back up the database before deploying. Flyway is configured to baseline a
+non-empty schema at version 1, which records the existing schema as the initial
+version without re-running the table-creation migration. On startup Flyway then
+applies later versioned migrations, including the compatibility migration that
+disables only the unchanged repository-seeded administrator password.
+
+This automatic baseline is safe only when the existing database already
+contains the complete schema corresponding to version 1. Verify the tables
+against [`backend/src/main/resources/db/migration/V1__initial_schema.sql`](backend/src/main/resources/db/migration/V1__initial_schema.sql)
+and take a restorable backup first. Do not deploy this version to an empty or
+partially initialized production database expecting it to infer missing tables:
+empty databases receive V1, while non-empty databases are baselined and skip
+V1.
+
+Flyway creates and maintains its `flyway_schema_history` table. Future schema
+changes belong in a new, ordered migration under
+`backend/src/main/resources/db/migration/` and must not modify a migration
+already applied in an environment.
 
 ---
 
@@ -193,7 +207,7 @@ SkillCheckr/
 │       │   ├── repository/   # Data access layer (JDBC Templates)
 │       │   └── model/        # DTOs & Domain entities
 │       └── main/resources/
-│           ├── schema.sql    # Complete MySQL relational database schema
+│           ├── db/migration/ # Ordered Flyway schema migrations
 │           └── application.properties
 └── frontend/                 # React 19 + Vite Frontend (Tailwind CSS)
     ├── package.json          # Frontend dependencies & scripts
