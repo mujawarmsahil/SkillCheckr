@@ -4,16 +4,21 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.constant.RoleConstants;
@@ -31,6 +36,7 @@ import com.skillcheckr.model.ExamAttemptResponse;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.model.ExamSubmissionSummaryDTO;
+import com.skillcheckr.model.QuestionBankDocument;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.RegistrationCountResponse;
 import com.skillcheckr.model.RegistrationStatusResponse;
@@ -40,6 +46,7 @@ import com.skillcheckr.security.AuthPrincipal;
 import com.skillcheckr.service.AttemptAnswerService;
 import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.ExamSubmissionService;
+import com.skillcheckr.service.QuestionBankService;
 import com.skillcheckr.service.QuestionService;
 import com.skillcheckr.validation.RequestValueParser;
 
@@ -61,6 +68,9 @@ public class ExamController {
     @Autowired
     private ExamSubmissionService examSubmissionService;
 
+    @Autowired
+    private QuestionBankService questionBankService;
+
     @PostMapping("")
     public ResponseEntity<Exam> addExams(@RequestBody Exam exam, HttpServletRequest request) {
         AuthPrincipal principal = AuthGuard.requireStaff(request);
@@ -80,9 +90,48 @@ public class ExamController {
 
     @GetMapping("/{exam_id}")
     public ResponseEntity<Exam> getExamById(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
-        AuthGuard.requirePrincipal(request);
+        AuthPrincipal principal = AuthGuard.requirePrincipal(request);
         Exam exam = requireExam(examId);
+        if (principal.isStudent()) {
+            requireStudentVisibleExam(exam);
+        }
         return ResponseEntity.ok(exam);
+    }
+
+    @PostMapping(path = "/{exam_id}/question-bank", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse> uploadQuestionBank(
+            @PathVariable("exam_id") Integer examId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("questionOnlyConfirmed") boolean questionOnlyConfirmed,
+            HttpServletRequest request) throws java.io.IOException {
+        Exam exam = requireExam(examId);
+        AuthGuard.requireExamAccess(request, exam);
+        if (!ExamConstants.EXAM_STATUS_PENDING.equalsIgnoreCase(exam.getStatus())) {
+            throw new BadRequestException("A question-bank PDF can only be changed while the exam is pending approval");
+        }
+        questionBankService.saveUploadedPdf(examId, file.getOriginalFilename(), file.getBytes(),
+                questionOnlyConfirmed);
+        return ResponseEntity.ok(new ApiResponse(true, "Student question-bank PDF uploaded successfully"));
+    }
+
+    @GetMapping("/{exam_id}/question-bank")
+    public ResponseEntity<byte[]> downloadQuestionBank(
+            @PathVariable("exam_id") Integer examId, HttpServletRequest request) {
+        AuthPrincipal principal = AuthGuard.requirePrincipal(request);
+        Exam exam = requireExam(examId);
+        if (principal.isStudent()) {
+            requireStudentVisibleExam(exam);
+        } else {
+            AuthGuard.requireExamAccess(request, exam);
+        }
+
+        QuestionBankDocument document = questionBankService.getStudentDocument(exam);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(document.fileName()).build());
+        headers.setCacheControl("private, no-store");
+        headers.set("X-Content-Type-Options", "nosniff");
+        return ResponseEntity.ok().headers(headers).body(document.content());
     }
 
     @PostMapping("/{exam_id}/attempts")
@@ -143,6 +192,9 @@ public class ExamController {
             HttpServletRequest request) {
         AuthPrincipal principal = AuthGuard.requirePrincipal(request);
         Exam exam = requireExam(examId);
+        if (principal.isStudent()) {
+            requireStudentVisibleExam(exam);
+        }
         // The answer key stays with staff; a student only ever receives the question text.
         List<QuestionDTO> questions = principal.isStudent()
                 ? questionService.getStudentQuestionsByExamId(examId)
@@ -368,5 +420,13 @@ public class ExamController {
         }
         return examService.getExamById(examId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
+    }
+
+    private void requireStudentVisibleExam(Exam exam) {
+        boolean visible = ExamConstants.isOpenForRegistration(exam.getStatus())
+                || ExamConstants.EXAM_STATUS_COMPLETED.equalsIgnoreCase(exam.getStatus());
+        if (!visible) {
+            throw new ResourceNotFoundException("Exam not found");
+        }
     }
 }

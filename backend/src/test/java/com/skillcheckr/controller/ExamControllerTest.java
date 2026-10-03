@@ -1,6 +1,7 @@
 package com.skillcheckr.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,9 +29,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -54,11 +59,13 @@ import com.skillcheckr.model.ExamAttempt;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.model.ExamSubmissionSummaryDTO;
+import com.skillcheckr.model.QuestionBankDocument;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.service.AttemptAnswerService;
 import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.ExamSubmissionService;
+import com.skillcheckr.service.QuestionBankService;
 import com.skillcheckr.service.QuestionService;
 import com.skillcheckr.support.TestAuth;
 
@@ -82,6 +89,9 @@ class ExamControllerTest {
     @Mock
     private ExamSubmissionService examSubmissionService;
 
+    @Mock
+    private QuestionBankService questionBankService;
+
     @InjectMocks
     private ExamController examController;
 
@@ -104,7 +114,7 @@ class ExamControllerTest {
                 .addInterceptors(TestAuth.authInterceptor())
                 // The string converter stays ahead of Jackson so endpoints that return a bare
                 // String body keep returning plain text rather than a JSON string.
-                .setMessageConverters(new StringHttpMessageConverter(),
+                .setMessageConverters(new ByteArrayHttpMessageConverter(), new StringHttpMessageConverter(),
                         new MappingJackson2HttpMessageConverter(strictMapper))
                 .build();
     }
@@ -129,6 +139,8 @@ class ExamControllerTest {
         mockMvc.perform(get("/api/exams"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/exams/1/attempts"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/exams/1/question-bank"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -537,6 +549,81 @@ class ExamControllerTest {
                 .andExpect(jsonPath("$[0].correct_option").doesNotExist())
                 .andExpect(jsonPath("$[0].sample_answer").doesNotExist());
         verify(questionService, never()).getQuestionsByExamId(1);
+    }
+
+    @Test
+    void getQuestionsForExam_hidesPendingExamQuestionsFromStudents() throws Exception {
+        Exam pendingExam = examWith(1, "Pending exam", ExamConstants.EXAM_STATUS_PENDING, "2030-01-15T09:00:00");
+        when(examService.getExamById(1)).thenReturn(Optional.of(pendingExam));
+
+        mockMvc.perform(get("/api/exams/1/questions").with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isNotFound());
+        verify(questionService, never()).getStudentQuestionsByExamId(1);
+    }
+
+    @Test
+    void getExamById_hidesPendingExamFromStudents() throws Exception {
+        Exam pendingExam = examWith(1, "Pending exam", ExamConstants.EXAM_STATUS_PENDING, "2030-01-15T09:00:00");
+        when(examService.getExamById(1)).thenReturn(Optional.of(pendingExam));
+
+        mockMvc.perform(get("/api/exams/1").with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void downloadQuestionBank_returnsQuestionPdfForAnApprovedExam() throws Exception {
+        Exam approvedExam = examWith(1, "Approved exam", ExamConstants.EXAM_STATUS_UPCOMING, "2030-01-15T09:00:00");
+        when(examService.getExamById(1)).thenReturn(Optional.of(approvedExam));
+        when(questionBankService.getStudentDocument(approvedExam))
+                .thenReturn(new QuestionBankDocument("questions.pdf", new byte[] { 1, 2, 3 }));
+
+        mockMvc.perform(get("/api/exams/1/question-bank").with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(content().bytes(new byte[] { 1, 2, 3 }));
+    }
+
+    @Test
+    void downloadQuestionBank_hidesPendingExamFromStudents() throws Exception {
+        Exam pendingExam = examWith(1, "Pending exam", ExamConstants.EXAM_STATUS_PENDING, "2030-01-15T09:00:00");
+        when(examService.getExamById(1)).thenReturn(Optional.of(pendingExam));
+
+        mockMvc.perform(get("/api/exams/1/question-bank").with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isNotFound());
+        verify(questionBankService, never()).getStudentDocument(any());
+    }
+
+    @Test
+    void uploadQuestionBank_acceptsTheOwningTeachersPdfForPendingExam() throws Exception {
+        Exam pendingExam = examWith(1, "Pending exam", ExamConstants.EXAM_STATUS_PENDING, "2030-01-15T09:00:00");
+        pendingExam.setTeacherId(TEACHER_ID);
+        when(examService.getExamById(1)).thenReturn(Optional.of(pendingExam));
+        MockMultipartFile file = new MockMultipartFile("file", "questions.pdf", "application/pdf",
+                "%PDF-1.4\n".getBytes());
+        MockMultipartHttpServletRequestBuilder request = MockMvcRequestBuilders.multipart("/api/exams/1/question-bank");
+
+        mockMvc.perform(request.file(file)
+                        .param("questionOnlyConfirmed", "true")
+                        .with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+        verify(questionBankService).saveUploadedPdf(1, "questions.pdf", file.getBytes(), true);
+    }
+
+    @Test
+    void uploadQuestionBank_rejectsAnotherTeachersExam() throws Exception {
+        Exam pendingExam = examWith(1, "Pending exam", ExamConstants.EXAM_STATUS_PENDING, "2030-01-15T09:00:00");
+        pendingExam.setTeacherId(TEACHER_ID);
+        when(examService.getExamById(1)).thenReturn(Optional.of(pendingExam));
+        MockMultipartFile file = new MockMultipartFile("file", "questions.pdf", "application/pdf",
+                "%PDF-1.4\n".getBytes());
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/exams/1/question-bank")
+                        .file(file)
+                        .param("questionOnlyConfirmed", "true")
+                        .with(TestAuth.asTeacher(OTHER_TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(questionBankService, never()).saveUploadedPdf(anyInt(), any(), any(), anyBoolean());
     }
 
     @Test

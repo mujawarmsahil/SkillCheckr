@@ -5,8 +5,10 @@ import { getMinimumExamDate, isExamDateTooSoon } from "../../utils/dateUtils";
 import { EXAM_MIN_LEAD_TIME_DAYS } from "../../constants/examConstants";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
+import { uploadExamQuestionBankPdf } from "../../api/examApi";
 
 const EXAM_NAME_PATTERN = /^[A-Za-z]+(?:[ -][A-Za-z]+)*$/;
+const MAX_QUESTION_BANK_PDF_SIZE = 10 * 1024 * 1024;
 
 export default function AddExam({ onExamCreated }) {
   const { showSuccess, showError, showWarning } = useToast();
@@ -41,6 +43,8 @@ export default function AddExam({ onExamCreated }) {
   });
 
   const [questionsList, setQuestionsList] = useState([]);
+  const [questionBankPdf, setQuestionBankPdf] = useState(null);
+  const [questionOnlyConfirmed, setQuestionOnlyConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savedSubjectId, setSavedSubjectId] = useState(null);
   const [savedExamId, setSavedExamId] = useState(null);
@@ -218,14 +222,42 @@ export default function AddExam({ onExamCreated }) {
     setQuestionsList((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleQuestionBankPdfChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setQuestionBankPdf(null);
+      setQuestionOnlyConfirmed(false);
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith(".pdf") || (file.type && file.type !== "application/pdf")) {
+      showWarning("Choose a PDF file.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > MAX_QUESTION_BANK_PDF_SIZE) {
+      showWarning("The question-bank PDF must be 10 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+    setQuestionBankPdf(file);
+    setQuestionOnlyConfirmed(false);
+  };
+
   const handleFinalSubmit = async () => {
     if (questionsList.length === 0) {
       showWarning("Add at least one question before submitting the exam.");
       return;
     }
+    if (questionBankPdf && !questionOnlyConfirmed) {
+      showWarning("Confirm that the uploaded PDF contains student-facing questions only.");
+      return;
+    }
 
     setLoading(true);
     try {
+      if (questionBankPdf) {
+        await uploadExamQuestionBankPdf(savedExamId, questionBankPdf);
+      }
       const payload = questionsList.map((q) => ({
         exam_id: savedExamId,
         subject_id: savedSubjectId,
@@ -518,6 +550,39 @@ export default function AddExam({ onExamCreated }) {
             Exam <span className="font-bold">{examData.examName}</span> is created
             and waiting for admin approval. The exam becomes visible to students
             only after an admin approves it.
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Student question-bank download</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                By default, students can download a PDF generated from the questions below.
+                Optionally upload a different question-only PDF (maximum 10 MB). Exam questions
+                must still be entered below for the online exam.
+              </p>
+            </div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Optional PDF to use instead of the generated question PDF
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={handleQuestionBankPdfChange}
+                className="mt-2 block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+              />
+            </label>
+            {questionBankPdf && (
+              <label className="flex items-start gap-2 text-xs text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={questionOnlyConfirmed}
+                  onChange={(event) => setQuestionOnlyConfirmed(event.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I confirm <strong>{questionBankPdf.name}</strong> contains only student-facing
+                  questions and does not include answer keys or sample answers.
+                </span>
+              </label>
+            )}
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">

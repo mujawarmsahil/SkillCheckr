@@ -163,6 +163,7 @@ The schema currently contains these tables:
 - `exam_attempt`
 - `attempt_answer`
 - `result`
+- `exam_question_bank`
 
 `src/main/resources/db/migration/V1__initial_schema.sql` defines the initial
 database structure, tables, keys, constraints, and inactive administrator seed.
@@ -172,6 +173,13 @@ matches V1. `V2__disable_known_admin.sql` is safe on both paths: it disables onl
 the unchanged repository-seeded password and leaves a replaced password alone.
 New schema changes must use new versioned SQL migrations; applied migrations
 must not be edited.
+
+`V3__add_exam_question_bank.sql` adds optional per-exam student PDF storage.
+Teachers may upload a question-only PDF while their exam is pending approval.
+Students can download it only once the exam is approved; when no PDF is
+uploaded, PDFBox generates one from student-safe question data and excludes
+correct options and descriptive sample answers. Uploaded PDFs are stored in
+MySQL to survive container restarts.
 
 RowMappers use explicit query projections rather than runtime metadata fallback. Repositories explicitly project the required columns (such as `student.name AS student_name` via `LEFT JOIN`), eliminating `ResultSetMetaData` and `hasColumn` probing.
 
