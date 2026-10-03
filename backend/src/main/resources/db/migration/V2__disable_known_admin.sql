@@ -1,6 +1,7 @@
 -- Disable only the unchanged administrator seeded with the repository-known
 -- password. Administrators who have already replaced that password are left
--- untouched.
+-- untouched. On an established database this runs after Flyway baselines the
+-- existing schema at version 1; on a fresh database it safely does nothing.
 UPDATE `user`
 SET `status` = 'Inactive'
 WHERE `username` = 'admin'
