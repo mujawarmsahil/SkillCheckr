@@ -155,6 +155,19 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 	}
 
 	@Override
+	public void lockQuestionForUpdate(int questionId) {
+		jdbcTemplate.queryForList("SELECT question_id FROM question WHERE question_id = ? FOR UPDATE",
+				Integer.class, questionId);
+	}
+
+	@Override
+	public List<Integer> findQuestionIdsBySubjectId(int subjectId) {
+		return jdbcTemplate.queryForList(
+				"SELECT question_id FROM question WHERE subject_id = ? ORDER BY question_id",
+				Integer.class, subjectId);
+	}
+
+	@Override
 	public boolean updateQuestion(QuestionDTO dto) {
 		if (dto == null || dto.getQuestionId() <= 0) return false;
 		int questionId = dto.getQuestionId();

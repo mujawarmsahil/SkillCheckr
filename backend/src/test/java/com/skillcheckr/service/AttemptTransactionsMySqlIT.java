@@ -36,9 +36,12 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.AttemptAnswerException;
+import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.model.AttemptAnswerRequest;
+import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.repository.ExamAttemptRepositoryImpl;
+import com.skillcheckr.repository.ExamRepositoryImpl;
 
 /**
  * Runs only through the mysql-integration Maven profile against a dedicated InnoDB schema.
@@ -63,12 +66,22 @@ class AttemptTransactionsMySqlIT {
     private ExamSubmissionService examSubmissionService;
 
     @Autowired
+    private ExamService examService;
+
+    @Autowired
+    private QuestionService questionService;
+
+    @Autowired
     private AttemptExpiryPolicy attemptExpiryPolicy;
 
     @SpyBean
     private ExamAttemptRepositoryImpl examAttemptRepository;
 
+    @SpyBean
+    private ExamRepositoryImpl examRepository;
+
     private final AtomicReference<LockGate> activeGate = new AtomicReference<>();
+    private final AtomicReference<ExamLockGate> activeExamGate = new AtomicReference<>();
     private int subjectId;
     private int studentId;
     private int examId;
@@ -76,7 +89,11 @@ class AttemptTransactionsMySqlIT {
     private int correctAnswerId;
     private int incorrectAnswerId;
     private int attemptId;
-                
+    private int paperExamId;
+    private int paperQuestionId;
+    private int extraPaperQuestionId;
+    private int paperAttemptId;
+
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
         String url = requiredEnvironmentVariable("SKILLCHECKR_MYSQL_IT_URL");
@@ -146,6 +163,7 @@ class AttemptTransactionsMySqlIT {
                 attemptId, questionId, incorrectAnswerId);
 
         installLockGate();
+        installExamLockGate();
     }
 
     @AfterEach
@@ -154,7 +172,12 @@ class AttemptTransactionsMySqlIT {
         if (gate != null) {
             gate.release();
         }
+        ExamLockGate examGate = activeExamGate.getAndSet(null);
+        if (examGate != null) {
+            examGate.release();
+        }
         reset(examAttemptRepository);
+        reset(examRepository);
         if (attemptId > 0) {
             jdbcTemplate.update("DELETE FROM result WHERE attempt_id = ?", attemptId);
             jdbcTemplate.update("DELETE FROM attempt_answer WHERE attempt_id = ?", attemptId);
@@ -163,6 +186,20 @@ class AttemptTransactionsMySqlIT {
         if (examId > 0) {
             jdbcTemplate.update("DELETE FROM exam_question WHERE exam_id = ?", examId);
             jdbcTemplate.update("DELETE FROM exam WHERE exam_id = ?", examId);
+        }
+        if (paperExamId > 0) {
+            jdbcTemplate.update("DELETE FROM exam_attempt WHERE exam_id = ?", paperExamId);
+            jdbcTemplate.update("DELETE FROM exam_registration WHERE exam_id = ?", paperExamId);
+            jdbcTemplate.update("DELETE FROM exam_question WHERE exam_id = ?", paperExamId);
+            jdbcTemplate.update("DELETE FROM exam WHERE exam_id = ?", paperExamId);
+        }
+        if (paperQuestionId > 0) {
+            jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", paperQuestionId);
+            jdbcTemplate.update("DELETE FROM question WHERE question_id = ?", paperQuestionId);
+        }
+        if (extraPaperQuestionId > 0) {
+            jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", extraPaperQuestionId);
+            jdbcTemplate.update("DELETE FROM question WHERE question_id = ?", extraPaperQuestionId);
         }
         if (questionId > 0) {
             jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", questionId);
@@ -358,6 +395,188 @@ class AttemptTransactionsMySqlIT {
         }
     }
 
+    @Test
+    void approvalRacingWithQuestionAssignmentNeverAllowsPostApprovalMutation() throws Exception {
+        createPendingPaperFixture();
+        ExamLockGate gate = armExamLockGate();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> approval = executor.submit(() -> examService.acceptExam(paperExamId));
+            gate.awaitFirstLock();
+            CountDownLatch attachCompleted = new CountDownLatch(1);
+            Future<String> attach = executor.submit(() -> {
+                try {
+                    questionService.attachQuestionsToExam(paperExamId, java.util.List.of(extraPaperQuestionId));
+                    return "attached";
+                } catch (ExamInUseException ex) {
+                    return "rejected";
+                } finally {
+                    attachCompleted.countDown();
+                }
+            });
+            gate.awaitSecondAttempt();
+            assertThat(attachCompleted.await(200, TimeUnit.MILLISECONDS))
+                    .as("assignment must wait for the approval transaction's exam lock").isFalse();
+
+            gate.release();
+            assertThat(approval.get(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(attach.get(10, TimeUnit.SECONDS)).isEqualTo("rejected");
+
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT status FROM exam WHERE exam_id = ?", String.class, paperExamId))
+                    .isEqualTo(ExamConstants.EXAM_STATUS_UPCOMING);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT paper_frozen FROM exam WHERE exam_id = ?", Boolean.class, paperExamId)).isTrue();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM exam_question WHERE exam_id = ? AND question_id = ?",
+                    Integer.class, paperExamId, paperQuestionId)).isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM exam_question WHERE exam_id = ? AND question_id = ?",
+                    Integer.class, paperExamId, extraPaperQuestionId)).isZero();
+        } finally {
+            gate.release();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    void approvalRacingWithQuestionEditNeverAllowsPostApprovalMutation() throws Exception {
+        createPendingPaperFixture();
+        ExamLockGate gate = armExamLockGate();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> approval = executor.submit(() -> examService.acceptExam(paperExamId));
+            gate.awaitFirstLock();
+            QuestionDTO edit = QuestionDTO.builder()
+                    .questionId(paperQuestionId)
+                    .question("Question changed during approval")
+                    .subjectId(subjectId)
+                    .questionType(ExamConstants.QUESTION_TYPE_MCQ)
+                    .marks(5)
+                    .option1("Changed correct " + paperQuestionId)
+                    .option2("Changed wrong " + paperQuestionId)
+                    .correctOption("Changed correct " + paperQuestionId)
+                    .build();
+            Future<String> update = executor.submit(() -> {
+                try {
+                    questionService.updateQuestion(edit);
+                    return "updated";
+                } catch (ExamInUseException ex) {
+                    return "rejected";
+                }
+            });
+            gate.awaitSecondAttempt();
+
+            gate.release();
+            assertThat(approval.get(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(update.get(10, TimeUnit.SECONDS)).isEqualTo("rejected");
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT question_text FROM question WHERE question_id = ?",
+                    String.class, paperQuestionId)).isEqualTo("Existing question");
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT option_text FROM answer WHERE question_id = ? AND is_correct = 1",
+                    String.class, paperQuestionId)).isEqualTo("Correct " + paperQuestionId);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT paper_frozen FROM exam WHERE exam_id = ?", Boolean.class, paperExamId)).isTrue();
+        } finally {
+            gate.release();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    void attemptCreationRacingWithQuestionAssignmentPreservesTheFrozenPaper() throws Exception {
+        createPendingPaperFixture();
+        LocalDate today = LocalDate.now();
+        jdbcTemplate.update("UPDATE exam SET status = ?, paper_frozen = TRUE, exam_date = ?, "
+                        + "start_time = ?, end_time = ? WHERE exam_id = ?",
+                ExamConstants.EXAM_STATUS_UPCOMING,
+                today.atStartOfDay(),
+                LocalTime.now().minusHours(1), LocalTime.now().plusHours(4), paperExamId);
+        jdbcTemplate.update("INSERT INTO exam_registration (student_id, exam_id, status) "
+                + "VALUES (?, ?, 'Registered')", studentId, paperExamId);
+        ExamLockGate gate = armExamLockGate();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> start = executor.submit(() -> {
+                var result = examService.startAttempt(paperExamId, studentId);
+                paperAttemptId = result.getAttempt().getAttemptId();
+            });
+            gate.awaitFirstLock();
+            Future<String> attach = executor.submit(() -> {
+                try {
+                    questionService.attachQuestionsToExam(paperExamId,
+                            java.util.List.of(extraPaperQuestionId));
+                    return "attached";
+                } catch (ExamInUseException ex) {
+                    return "rejected";
+                }
+            });
+            gate.awaitSecondAttempt();
+
+            gate.release();
+            start.get(10, TimeUnit.SECONDS);
+            assertThat(attach.get(10, TimeUnit.SECONDS)).isEqualTo("rejected");
+            assertThat(paperAttemptId).isPositive();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM exam_question WHERE exam_id = ? AND question_id = ?",
+                    Integer.class, paperExamId, extraPaperQuestionId)).isZero();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT status FROM exam WHERE exam_id = ?", String.class, paperExamId))
+                    .isEqualTo(ExamConstants.EXAM_STATUS_UPCOMING);
+        } finally {
+            gate.release();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    private void createPendingPaperFixture() {
+        LocalDate examDate = LocalDate.now().plusDays(30);
+        paperExamId = insertAndGetId("INSERT INTO exam "
+                        + "(subject_id, exam_name, exam_type, exam_date, start_time, end_time, duration_minutes, "
+                        + "total_marks, pass_marks, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                subjectId, "Paper Freeze Race", ExamConstants.QUESTION_TYPE_MCQ,
+                examDate.atTime(10, 0),
+                LocalTime.of(10, 0), LocalTime.of(12, 0), 60, 10, 5,
+                ExamConstants.EXAM_STATUS_PENDING);
+        paperQuestionId = insertValidMcq("Existing question");
+        extraPaperQuestionId = insertValidMcq("Question to attach");
+        jdbcTemplate.update("INSERT INTO exam_question (exam_id, question_id, question_order) VALUES (?, ?, 1)",
+                paperExamId, paperQuestionId);
+    }
+
+    private int insertValidMcq(String text) {
+        int id = insertAndGetId("INSERT INTO question (subject_id, question_text, question_type, marks) "
+                        + "VALUES (?, ?, ?, ?)",
+                subjectId, text, ExamConstants.QUESTION_TYPE_MCQ, 5);
+        insertAndGetId("INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)",
+                id, "Correct " + id, true);
+        insertAndGetId("INSERT INTO answer (question_id, option_text, is_correct) VALUES (?, ?, ?)",
+                id, "Wrong " + id, false);
+        return id;
+    }
+
+    private void installExamLockGate() {
+        doAnswer(invocation -> {
+            ExamLockGate gate = activeExamGate.get();
+            int invocationNumber = gate == null ? 0 : gate.beforeLock();
+            Object exam = invocation.callRealMethod();
+            if (gate != null) {
+                gate.afterLock(invocationNumber);
+            }
+            return exam;
+        }).when(examRepository).getExamByIdForUpdate(anyInt());
+    }
+
+    private ExamLockGate armExamLockGate() {
+        ExamLockGate gate = new ExamLockGate();
+        activeExamGate.set(gate);
+        return gate;
+    }
+
     private static String requiredEnvironmentVariable(String name) {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) {
@@ -485,5 +704,56 @@ class AttemptTransactionsMySqlIT {
             }
         }
 
+    }
+
+    private final class ExamLockGate {
+        private final AtomicInteger calls = new AtomicInteger();
+        private final CountDownLatch firstLockAcquired = new CountDownLatch(1);
+        private final CountDownLatch secondLockAttempted = new CountDownLatch(1);
+        private final CountDownLatch releaseFirstTransaction = new CountDownLatch(1);
+        private final AtomicBoolean firstReleased = new AtomicBoolean();
+
+        private int beforeLock() {
+            int invocation = calls.incrementAndGet();
+            if (invocation == 2) {
+                secondLockAttempted.countDown();
+            }
+            return invocation;
+        }
+
+        private void afterLock(int invocation) {
+            if (invocation != 1) {
+                return;
+            }
+            firstLockAcquired.countDown();
+            await(releaseFirstTransaction, "Timed out waiting to release the approval or assignment transaction");
+        }
+
+        private void awaitFirstLock() throws InterruptedException {
+            assertThat(firstLockAcquired.await(10, TimeUnit.SECONDS))
+                    .as("first transaction must acquire the exam row lock").isTrue();
+        }
+
+        private void awaitSecondAttempt() throws InterruptedException {
+            assertThat(secondLockAttempted.await(10, TimeUnit.SECONDS))
+                    .as("second transaction must reach the exam-row lock").isTrue();
+        }
+
+        private void release() {
+            if (firstReleased.compareAndSet(false, true)) {
+                releaseFirstTransaction.countDown();
+            }
+        }
+
+        private void await(CountDownLatch latch, String message) {
+            try {
+                if (!latch.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException(message);
+                }
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while coordinating MySQL exam locks", ex);
+            }
+        }
     }
 }

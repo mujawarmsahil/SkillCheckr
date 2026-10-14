@@ -2,6 +2,7 @@ package com.skillcheckr.model;
 
 import java.time.LocalTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -60,4 +61,7 @@ public class Exam {
 	private int passingMarks;
 
 	private String status;
+
+	@JsonIgnore
+	private boolean paperFrozen;
 }

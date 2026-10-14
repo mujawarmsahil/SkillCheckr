@@ -106,9 +106,6 @@ public class ExamController {
             HttpServletRequest request) throws java.io.IOException {
         Exam exam = requireExam(examId);
         AuthGuard.requireExamAccess(request, exam);
-        if (!ExamConstants.EXAM_STATUS_PENDING.equalsIgnoreCase(exam.getStatus())) {
-            throw new BadRequestException("A question-bank PDF can only be changed while the exam is pending approval");
-        }
         questionBankService.saveUploadedPdf(examId, file.getOriginalFilename(), file.getBytes(),
                 questionOnlyConfirmed);
         return ResponseEntity.ok(new ApiResponse(true, "Student question-bank PDF uploaded successfully"));

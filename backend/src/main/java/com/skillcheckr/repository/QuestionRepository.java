@@ -16,6 +16,10 @@ public interface QuestionRepository {
 
 	Optional<Question> findQuestionDetailsById(int questionId);
 
+	void lockQuestionForUpdate(int questionId);
+
+	List<Integer> findQuestionIdsBySubjectId(int subjectId);
+
 	List<QuestionDTO> getQuestionsBySubjectId(int subjectId);
 
 	List<QuestionDTO> getQuestionsByExamId(int examId);
@@ -24,4 +28,3 @@ public interface QuestionRepository {
 
 	boolean deleteQuestionById(int questionId);
 }
-

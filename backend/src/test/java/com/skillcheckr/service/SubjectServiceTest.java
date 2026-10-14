@@ -13,6 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.skillcheckr.model.Subject;
+import com.skillcheckr.repository.ExamRepository;
+import com.skillcheckr.repository.QuestionRepository;
 import com.skillcheckr.repository.SubjectRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -20,6 +22,15 @@ class SubjectServiceTest {
 
     @Mock
     private SubjectRepository subjectRepository;
+
+    @Mock
+    private QuestionRepository questionRepository;
+
+    @Mock
+    private ExamRepository examRepository;
+
+    @Mock
+    private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @InjectMocks
     private SubjectServiceImpl subjectService;
@@ -50,11 +61,26 @@ class SubjectServiceTest {
 
     @Test
     void deleteSubjectById_delegatesToRepository() {
+        when(examRepository.findExamIdsBySubjectId(5)).thenReturn(List.of());
+        when(questionRepository.findQuestionIdsBySubjectId(5)).thenReturn(List.of());
         when(subjectRepository.deleteSubjectById(5)).thenReturn(true);
 
         boolean result = subjectService.deleteSubjectById(5);
 
         assertThat(result).isTrue();
+        verify(subjectRepository).deleteSubjectById(5);
+    }
+
+    @Test
+    void deleteSubjectById_checksForFrozenExamsBeforeDeletingTheSubject() {
+        when(questionRepository.findQuestionIdsBySubjectId(5)).thenReturn(List.of(8));
+        when(examRepository.findExamIdsBySubjectId(5)).thenReturn(List.of(7));
+        when(questionPaperMutationPolicy.lockAndValidate(7)).thenReturn(new com.skillcheckr.model.Exam());
+
+        subjectService.deleteSubjectById(5);
+
+        verify(questionRepository).lockQuestionForUpdate(8);
+        verify(questionPaperMutationPolicy).lockAndValidate(7);
         verify(subjectRepository).deleteSubjectById(5);
     }
 }

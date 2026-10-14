@@ -17,4 +17,6 @@ public interface ExamAttemptRepository {
     boolean finalizeAttempt(int attemptId, java.time.LocalDateTime submittedAt);
 
     int createAttempt(ExamAttempt attempt);
+
+    boolean hasAttemptsForExam(int examId);
 }
