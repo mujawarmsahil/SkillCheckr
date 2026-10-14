@@ -2,6 +2,9 @@ package com.skillcheckr.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,12 +12,14 @@ import com.skillcheckr.model.Answer;
 import com.skillcheckr.model.AttemptAnswer;
 import com.skillcheckr.model.AttemptAnswerRequest;
 import com.skillcheckr.model.AttemptAnswerResponse;
+import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamAttempt;
 import com.skillcheckr.exception.AttemptAnswerException;
 import com.skillcheckr.model.Question;
 import com.skillcheckr.repository.AttemptAnswerRepository;
 import com.skillcheckr.repository.ExamAttemptRepository;
 import com.skillcheckr.repository.ExamQuestionRepository;
+import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.repository.QuestionRepository;
 
 import com.skillcheckr.constant.ExamConstants;
@@ -25,24 +30,45 @@ public class AttemptAnswerServiceImpl implements AttemptAnswerService {
 
     private final ExamAttemptRepository examAttemptRepository;
     private final ExamQuestionRepository examQuestionRepository;
+    private final ExamRepository examRepository;
     private final QuestionRepository questionRepository;
     private final AttemptAnswerRepository attemptAnswerRepository;
+    private final AttemptExpiryPolicy attemptExpiryPolicy;
+    private final Clock clock;
 
+    @Autowired
     public AttemptAnswerServiceImpl(ExamAttemptRepository examAttemptRepository,
-            ExamQuestionRepository examQuestionRepository, QuestionRepository questionRepository,
-            AttemptAnswerRepository attemptAnswerRepository) {
+            ExamQuestionRepository examQuestionRepository, ExamRepository examRepository,
+            QuestionRepository questionRepository, AttemptAnswerRepository attemptAnswerRepository,
+            AttemptExpiryPolicy attemptExpiryPolicy) {
+        this(examAttemptRepository, examQuestionRepository, examRepository, questionRepository,
+                attemptAnswerRepository, attemptExpiryPolicy, Clock.systemDefaultZone());
+    }
+
+    AttemptAnswerServiceImpl(ExamAttemptRepository examAttemptRepository,
+            ExamQuestionRepository examQuestionRepository, ExamRepository examRepository,
+            QuestionRepository questionRepository, AttemptAnswerRepository attemptAnswerRepository,
+            AttemptExpiryPolicy attemptExpiryPolicy, Clock clock) {
         this.examAttemptRepository = examAttemptRepository;
         this.examQuestionRepository = examQuestionRepository;
+        this.examRepository = examRepository;
         this.questionRepository = questionRepository;
         this.attemptAnswerRepository = attemptAnswerRepository;
+        this.attemptExpiryPolicy = attemptExpiryPolicy;
+        this.clock = clock;
     }
 
     @Override
     @Transactional
     public AttemptAnswerResponse saveAnswer(int examId, int attemptId, int questionId, int studentId,
             AttemptAnswerRequest request) {
-        ExamAttempt attempt = examAttemptRepository.findById(attemptId);
+        ExamAttempt attempt = examAttemptRepository.findByIdForUpdate(attemptId);
         ExamAttemptValidator.validateAnswerAttempt(attempt, examId, studentId);
+        Exam exam = examRepository.getExamById(examId)
+                .orElseThrow(() -> new AttemptAnswerException(404, "Exam not found"));
+        if (attemptExpiryPolicy.isExpired(attempt, exam, LocalDateTime.now(clock))) {
+            throw new AttemptAnswerException(409, "Exam attempt has expired");
+        }
 
         Question question = questionRepository.findQuestionDetailsById(questionId)
                 .orElseThrow(() -> new AttemptAnswerException(404, "Question not found"));
@@ -83,6 +109,10 @@ public class AttemptAnswerServiceImpl implements AttemptAnswerService {
             }
         } else {
             throw new AttemptAnswerException(400, "Unsupported question type");
+        }
+
+        if (attemptExpiryPolicy.isExpired(attempt, exam, LocalDateTime.now(clock))) {
+            throw new AttemptAnswerException(409, "Exam attempt has expired");
         }
 
         AttemptAnswer saved = attemptAnswerRepository.saveAndReturn(AttemptAnswer.builder()

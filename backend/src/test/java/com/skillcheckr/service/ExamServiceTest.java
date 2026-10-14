@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.skillcheckr.constant.ExamConstants;
@@ -49,6 +50,9 @@ class ExamServiceTest {
 
     @Mock
     private ExamSubmissionService examSubmissionService;
+
+    @Spy
+    private AttemptExpiryPolicy attemptExpiryPolicy = new AttemptExpiryPolicy();
 
     @InjectMocks
     private ExamServiceImpl examService;
@@ -251,6 +255,21 @@ class ExamServiceTest {
     }
 
     @Test
+    void startAttempt_capsDurationAtTheScheduledWindowEnd() {
+        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        LocalDateTime scheduledEnd = now.plusMinutes(10);
+        Exam exam = examAt(1, ExamConstants.EXAM_STATUS_UPCOMING, now.minusMinutes(5), scheduledEnd.toLocalTime());
+        when(examRepository.getExamById(1)).thenReturn(Optional.of(exam));
+        when(examRepository.isStudentRegisteredForExam(STUDENT_ID, 1)).thenReturn(true);
+        when(examAttemptRepository.findByExamIdAndStudentId(1, STUDENT_ID)).thenReturn(List.of());
+        when(examAttemptRepository.createAttempt(any(ExamAttempt.class))).thenReturn(43);
+
+        AttemptStartResult result = examService.startAttempt(1, STUDENT_ID);
+
+        assertThat(result.getAttempt().getExpiresAt()).isEqualTo(scheduledEnd);
+    }
+
+    @Test
     void startAttempt_resumesALiveAttempt() {
         LocalDateTime now = LocalDateTime.now();
         Exam exam = examAt(1, ExamConstants.EXAM_STATUS_UPCOMING, now.minusMinutes(5), now.plusHours(1).toLocalTime());
@@ -282,6 +301,23 @@ class ExamServiceTest {
                 .hasMessageContaining("submitted automatically");
         verify(examSubmissionService).submit(1, 7, STUDENT_ID);
         verify(examAttemptRepository, never()).createAttempt(any());
+    }
+
+    @Test
+    void startAttempt_finalizesAnAttemptWhoseScheduledWindowEndedBeforeStoredExpiry() {
+        LocalDateTime now = LocalDateTime.now();
+        Exam exam = examAt(1, ExamConstants.EXAM_STATUS_UPCOMING, now.minusHours(2), now.minusHours(1).toLocalTime());
+        ExamAttempt expired = ExamAttempt.builder()
+                .attemptId(8).expiresAt(now.plusMinutes(30)).status(ExamConstants.ATTEMPT_STATUS_IN_PROGRESS).build();
+        when(examRepository.getExamById(1)).thenReturn(Optional.of(exam));
+        when(examRepository.isStudentRegisteredForExam(STUDENT_ID, 1)).thenReturn(true);
+        when(examAttemptRepository.findByExamIdAndStudentId(1, STUDENT_ID)).thenReturn(List.of(expired));
+
+        assertThatThrownBy(() -> examService.startAttempt(1, STUDENT_ID))
+                .isInstanceOf(AttemptStartException.class)
+                .hasMessageContaining("submitted automatically");
+
+        verify(examSubmissionService).submit(1, 8, STUDENT_ID);
     }
 
     @Test

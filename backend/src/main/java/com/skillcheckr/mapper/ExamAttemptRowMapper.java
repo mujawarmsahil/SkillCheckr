@@ -2,7 +2,6 @@ package com.skillcheckr.mapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
 import org.springframework.jdbc.core.RowMapper;
@@ -17,9 +16,12 @@ public class ExamAttemptRowMapper implements RowMapper<ExamAttempt> {
 
     @Override
     public ExamAttempt mapRow(ResultSet rs, int rowNum) throws SQLException {
-        Timestamp started = rs.getTimestamp("started_at");
-        Timestamp expires = rs.getTimestamp("expires_at");
-        Timestamp submitted = rs.getTimestamp("submitted_at");
+        // started_at, expires_at and submitted_at are MySQL DATETIME wall-clock values, so
+        // they are read as LocalDateTime. Reading them as java.sql.Timestamp would apply
+        // the connection timezone and shift the stored value.
+        LocalDateTime started = rs.getObject("started_at", LocalDateTime.class);
+        LocalDateTime expires = rs.getObject("expires_at", LocalDateTime.class);
+        LocalDateTime submitted = rs.getObject("submitted_at", LocalDateTime.class);
 
         int examId = rs.getInt("exam_id");
         Exam exam = examId > 0 ? Exam.builder().examId(examId).build() : null;
@@ -31,14 +33,10 @@ public class ExamAttemptRowMapper implements RowMapper<ExamAttempt> {
                 .attemptId(rs.getInt("attempt_id"))
                 .exam(exam)
                 .student(student)
-                .startedAt(toLocalDateTime(started))
-                .expiresAt(toLocalDateTime(expires))
-                .submittedAt(toLocalDateTime(submitted))
+                .startedAt(started)
+                .expiresAt(expires)
+                .submittedAt(submitted)
                 .status(rs.getString("status"))
                 .build();
-    }
-
-    private LocalDateTime toLocalDateTime(Timestamp timestamp) {
-        return timestamp == null ? null : timestamp.toLocalDateTime();
     }
 }

@@ -2,7 +2,9 @@ package com.skillcheckr.repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +20,8 @@ import com.skillcheckr.mapper.ExamResultRowMapper;
 
 @Repository
 public class ResultRepositoryImpl implements ResultRepository {
+
+	private static final DateTimeFormatter SUBMITTED_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
@@ -69,6 +73,11 @@ public class ResultRepositoryImpl implements ResultRepository {
 
 	@Override
 	public ExamResultDTO insertSubmissionResult(ExamResultDTO result) {
+		// submitted_at is a MySQL DATETIME wall-clock value. The DTO carries it as a
+		// formatted string because it is part of the JSON contract, so it is parsed back to
+		// a LocalDateTime and bound without any JDBC timezone conversion. Parsing happens
+		// before the insert so an unusable value is reported before a statement is opened.
+		LocalDateTime submittedAt = parseSubmittedAt(result.getSubmittedAt());
 		String sql = "INSERT INTO result (exam_id, student_id, marks_obtained, total_marks, passing_marks, "
 				+ "percentage, status, submitted_at, attempt_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -81,7 +90,7 @@ public class ResultRepositoryImpl implements ResultRepository {
 			statement.setInt(5, result.getPassingMarks());
 			statement.setDouble(6, result.getPercentage());
 			statement.setString(7, result.getStatus());
-			statement.setTimestamp(8, java.sql.Timestamp.valueOf(result.getSubmittedAt()));
+			statement.setObject(8, submittedAt);
 			statement.setInt(9, result.getAttemptId());
 			return statement;
 		}, keyHolder);
@@ -124,13 +133,29 @@ public class ResultRepositoryImpl implements ResultRepository {
 				.totalMarks(rs.getInt("total_marks"))
 				.passingMarks(rs.getInt("passing_marks"))
 				.percentage(rs.getDouble("percentage"))
-				.startedAt(formatDateTime(rs.getTimestamp("started_at")))
-				.submittedAt(formatDateTime(rs.getTimestamp("submitted_at")))
+				.startedAt(formatDateTime(rs.getObject("started_at", LocalDateTime.class)))
+				.submittedAt(formatDateTime(rs.getObject("submitted_at", LocalDateTime.class)))
 				.build(), examId);
 	}
 
-	private String formatDateTime(java.sql.Timestamp timestamp) {
-		return timestamp == null ? null : timestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+	/**
+	 * Turns the DTO's JSON-facing submitted_at string back into the wall-clock value the
+	 * DATETIME column stores. The column is NOT NULL, so a missing or unreadable value is
+	 * rejected here rather than surfacing later as a constraint violation.
+	 */
+	private static LocalDateTime parseSubmittedAt(String submittedAt) {
+		if (submittedAt == null || submittedAt.isBlank()) {
+			throw new IllegalArgumentException("submitted_at is required");
+		}
+		try {
+			return LocalDateTime.parse(submittedAt, SUBMITTED_AT_FORMAT);
+		} catch (DateTimeParseException ex) {
+			throw new IllegalArgumentException("submitted_at must use the yyyy-MM-dd HH:mm:ss format");
+		}
+	}
+
+	private String formatDateTime(LocalDateTime dateTime) {
+		return dateTime == null ? null : dateTime.format(SUBMITTED_AT_FORMAT);
 	}
 
 	@Override

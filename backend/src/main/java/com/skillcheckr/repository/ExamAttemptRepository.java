@@ -8,6 +8,8 @@ public interface ExamAttemptRepository {
 
     List<ExamAttempt> findByExamIdAndStudentId(int examId, int studentId);
 
+    List<ExamAttempt> findInProgressAttemptsAfterId(int afterAttemptId, int limit);
+
     ExamAttempt findById(int attemptId);
 
     ExamAttempt findByIdForUpdate(int attemptId);
