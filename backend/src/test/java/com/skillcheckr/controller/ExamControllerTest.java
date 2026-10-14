@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -502,6 +503,8 @@ class ExamControllerTest {
     void submitAttempt_returnsResult() throws Exception {
         when(examSubmissionService.submit(1, 2, STUDENT_ID)).thenReturn(ExamResultDTO.builder()
                 .resultId(4).attemptId(2).examId(1).studentId(STUDENT_ID)
+                .questionBreakdown(List.of())
+                .answerKeyReleased(false)
                 .marksObtained(7).totalMarks(10).passingMarks(4)
                 .percentage(70).status(ExamConstants.RESULT_STATUS_PASS).build());
 
@@ -509,7 +512,23 @@ class ExamControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.attempt_id").value(2))
                 .andExpect(jsonPath("$.marks_obtained").value(7))
-                .andExpect(jsonPath("$.status").value("Pass"));
+                .andExpect(jsonPath("$.status").value("Pass"))
+                .andExpect(jsonPath("$.answer_key_released").value(false))
+                .andExpect(jsonPath("$.question_breakdown").isEmpty());
+    }
+
+    @Test
+    void submitAttempt_returnsReleasedBreakdownFromSubmissionService() throws Exception {
+        when(examSubmissionService.submit(1, 2, STUDENT_ID)).thenReturn(ExamResultDTO.builder()
+                .resultId(4).attemptId(2).examId(1).studentId(STUDENT_ID)
+                .questionBreakdown(List.of(java.util.Map.of("correctAnswer", "B", "isCorrect", true)))
+                .answerKeyReleased(true)
+                .build());
+
+        mockMvc.perform(post("/api/exams/1/attempts/2/submit").with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer_key_released").value(true))
+                .andExpect(jsonPath("$.question_breakdown[0].correctAnswer").value("B"));
     }
 
     @Test
@@ -635,6 +654,25 @@ class ExamControllerTest {
         mockMvc.perform(get("/api/exams/1/questions").with(TestAuth.asTeacher(TEACHER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].correct_option").value("B"));
+    }
+
+    @Test
+    void getQuestionsForExam_rejectsAnotherTeacher() throws Exception {
+        when(examService.getExamById(1)).thenReturn(Optional.of(ownedExam(1)));
+
+        mockMvc.perform(get("/api/exams/1/questions").with(TestAuth.asTeacher(OTHER_TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(questionService, never()).getQuestionsByExamId(1);
+        verify(questionService, never()).getStudentQuestionsByExamId(1);
+    }
+
+    @Test
+    void getQuestionsForExam_allowsAnAdmin() throws Exception {
+        when(examService.getExamById(1)).thenReturn(Optional.of(ownedExam(1)));
+        when(questionService.getQuestionsByExamId(1)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/exams/1/questions").with(TestAuth.asAdmin(1)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -840,6 +878,24 @@ class ExamControllerTest {
     }
 
     @Test
+    void getRegistrationsForStudent_deniesTeachersBecauseTheListIsStudentWide() throws Exception {
+        mockMvc.perform(get("/api/exams/registrations/student/" + STUDENT_ID)
+                        .with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(examService, never()).getRegisteredExamIdsForStudent(anyInt());
+    }
+
+    @Test
+    void getRegistrationsForStudent_allowsAnAdmin() throws Exception {
+        when(examService.getRegisteredExamIdsForStudent(OTHER_STUDENT_ID)).thenReturn(List.of(1));
+
+        mockMvc.perform(get("/api/exams/registrations/student/" + OTHER_STUDENT_ID)
+                        .with(TestAuth.asAdmin(1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(1));
+    }
+
+    @Test
     void getDetailedRegistrationsForStudent_returnsList() throws Exception {
         ExamRegistration reg = new ExamRegistration();
         reg.setRegistrationId(1);
@@ -850,6 +906,23 @@ class ExamControllerTest {
                         .with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].registration_id").value(1));
+    }
+
+    @Test
+    void getDetailedRegistrationsForStudent_deniesTeachersBecauseTheListIsStudentWide() throws Exception {
+        mockMvc.perform(get("/api/exams/registrations/student/" + STUDENT_ID + "/detailed")
+                        .with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(examService, never()).getRegistrationsByStudentId(anyInt());
+    }
+
+    @Test
+    void getDetailedRegistrationsForStudent_allowsAnAdmin() throws Exception {
+        when(examService.getRegistrationsByStudentId(OTHER_STUDENT_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/exams/registrations/student/" + OTHER_STUDENT_ID + "/detailed")
+                        .with(TestAuth.asAdmin(1)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -867,6 +940,31 @@ class ExamControllerTest {
         mockMvc.perform(get("/api/exams/1/isRegistered/" + OTHER_STUDENT_ID)
                         .with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void isRegistered_allowsTheOwningTeacherAndAdmin() throws Exception {
+        when(examService.getExamById(1)).thenReturn(Optional.of(ownedExam(1)));
+        when(examService.isStudentRegisteredForExam(OTHER_STUDENT_ID, 1)).thenReturn(true);
+
+        mockMvc.perform(get("/api/exams/1/isRegistered/" + OTHER_STUDENT_ID)
+                        .with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isRegistered").value(true));
+
+        mockMvc.perform(get("/api/exams/1/isRegistered/" + OTHER_STUDENT_ID)
+                        .with(TestAuth.asAdmin(1)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void isRegistered_rejectsAnotherTeachersExam() throws Exception {
+        when(examService.getExamById(1)).thenReturn(Optional.of(ownedExam(1)));
+
+        mockMvc.perform(get("/api/exams/1/isRegistered/" + OTHER_STUDENT_ID)
+                        .with(TestAuth.asTeacher(OTHER_TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(examService, never()).isStudentRegisteredForExam(anyInt(), anyInt());
     }
 
     @Test
@@ -912,6 +1010,30 @@ class ExamControllerTest {
     void unregisterStudent_rejectsAnotherStudent() throws Exception {
         mockMvc.perform(delete("/api/exams/1/unregister/" + OTHER_STUDENT_ID)
                         .with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isForbidden());
+        verify(examService, never()).unregisterStudentFromExam(anyInt(), anyInt());
+    }
+
+    @Test
+    void unregisterStudent_allowsTheOwningTeacherAndAdmin() throws Exception {
+        when(examService.getExamById(1)).thenReturn(Optional.of(ownedExam(1)));
+
+        mockMvc.perform(delete("/api/exams/1/unregister/" + STUDENT_ID)
+                        .with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/exams/1/unregister/" + STUDENT_ID)
+                        .with(TestAuth.asAdmin(1)))
+                .andExpect(status().isOk());
+        verify(examService, times(2)).unregisterStudentFromExam(STUDENT_ID, 1);
+    }
+
+    @Test
+    void unregisterStudent_rejectsAnotherTeachersExam() throws Exception {
+        when(examService.getExamById(1)).thenReturn(Optional.of(ownedExam(1)));
+
+        mockMvc.perform(delete("/api/exams/1/unregister/" + STUDENT_ID)
+                        .with(TestAuth.asTeacher(OTHER_TEACHER_ID)))
                 .andExpect(status().isForbidden());
         verify(examService, never()).unregisterStudentFromExam(anyInt(), anyInt());
     }

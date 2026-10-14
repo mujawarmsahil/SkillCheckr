@@ -173,7 +173,8 @@ public class ExamController {
             @PathVariable("attempt_id") Integer attemptId,
             HttpServletRequest request) {
         int studentId = AuthGuard.requireStudentId(request);
-        return ResponseEntity.ok(examSubmissionService.submit(examId, attemptId, studentId));
+        ExamResultDTO result = examSubmissionService.submit(examId, attemptId, studentId);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/teacher/{teacher_id}")
@@ -194,6 +195,8 @@ public class ExamController {
         Exam exam = requireExam(examId);
         if (principal.isStudent()) {
             requireStudentVisibleExam(exam);
+        } else {
+            AuthGuard.requireExamAccess(request, exam);
         }
         // The answer key stays with staff; a student only ever receives the question text.
         List<QuestionDTO> questions = principal.isStudent()
@@ -322,7 +325,7 @@ public class ExamController {
     @GetMapping("/registrations/student/{student_id}")
     public ResponseEntity<List<Integer>> getRegistrationsForStudent(@PathVariable("student_id") Integer studentId,
             HttpServletRequest request) {
-        AuthGuard.requireSelfOrStaff(request, studentId);
+        AuthGuard.requireSelfOrAdminForRoleData(request, studentId);
         List<Integer> registeredExamIds = examService.getRegisteredExamIdsForStudent(studentId);
         return ResponseEntity.ok(registeredExamIds != null ? registeredExamIds : List.of());
     }
@@ -330,7 +333,7 @@ public class ExamController {
     @GetMapping("/registrations/student/{student_id}/detailed")
     public ResponseEntity<List<ExamRegistration>> getDetailedRegistrationsForStudent(
             @PathVariable("student_id") Integer studentId, HttpServletRequest request) {
-        AuthGuard.requireSelfOrStaff(request, studentId);
+        AuthGuard.requireSelfOrAdminForRoleData(request, studentId);
         List<ExamRegistration> registrations = examService.getRegistrationsByStudentId(studentId);
         return ResponseEntity.ok(registrations != null ? registrations : List.of());
     }
@@ -340,7 +343,7 @@ public class ExamController {
             @PathVariable("exam_id") Integer examId,
             @PathVariable("student_id") Integer studentId,
             HttpServletRequest request) {
-        AuthGuard.requireSelfOrStaff(request, studentId);
+        requireRegistrationAccess(request, examId, studentId);
         boolean registered = examService.isStudentRegisteredForExam(studentId, examId);
         return ResponseEntity.ok(RegistrationStatusResponse.builder()
                 .isRegistered(registered)
@@ -373,7 +376,7 @@ public class ExamController {
             @PathVariable("exam_id") Integer examId,
             @PathVariable("student_id") Integer studentId,
             HttpServletRequest request) {
-        AuthGuard.requireSelfOrStaff(request, studentId);
+        requireRegistrationAccess(request, examId, studentId);
         examService.unregisterStudentFromExam(studentId, examId);
         return ResponseEntity.ok(new ApiResponse(true, "Unregistered from exam successfully."));
     }
@@ -420,6 +423,17 @@ public class ExamController {
         }
         return examService.getExamById(examId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
+    }
+
+    private void requireRegistrationAccess(HttpServletRequest request, Integer examId, Integer studentId) {
+        AuthPrincipal principal = AuthGuard.requirePrincipal(request);
+        if (principal.isStudent()) {
+            if (principal.getRoleId() != studentId) {
+                throw new ForbiddenException("You are not authorized to access another user's registration.");
+            }
+            return;
+        }
+        AuthGuard.requireExamAccess(request, requireExam(examId));
     }
 
     private void requireStudentVisibleExam(Exam exam) {

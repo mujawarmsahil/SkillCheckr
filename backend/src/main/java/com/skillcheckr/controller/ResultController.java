@@ -17,6 +17,7 @@ import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.model.SubmissionStatusResponse;
 import com.skillcheckr.security.AuthGuard;
 import com.skillcheckr.security.AuthPrincipal;
+import com.skillcheckr.service.AnswerKeyReleasePolicy;
 import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.ResultService;
 
@@ -32,13 +33,19 @@ public class ResultController {
 	@Autowired
 	private ExamService examService;
 
+	@Autowired
+	private AnswerKeyReleasePolicy answerKeyReleasePolicy;
+
 	@GetMapping("/check/{examId}/{studentId}")
 	public ResponseEntity<SubmissionStatusResponse> checkStudentExamStatus(
 			@PathVariable("examId") Integer examId,
 			@PathVariable("studentId") Integer studentId,
 			HttpServletRequest request) {
-		requireResultReadAccess(request, examId, studentId);
+		AuthPrincipal principal = requireResultReadAccess(request, examId, studentId);
 		Optional<ExamResultDTO> existing = resultService.getResultByExamAndStudent(examId, studentId);
+		if (principal.isStudent()) {
+			existing.ifPresent(result -> answerKeyReleasePolicy.protectStudentResult(result, requireExam(examId)));
+		}
 		SubmissionStatusResponse response = existing
 				.map(result -> SubmissionStatusResponse.builder().hasSubmitted(true).result(result).build())
 				.orElseGet(() -> SubmissionStatusResponse.builder().hasSubmitted(false).build());
@@ -49,8 +56,11 @@ public class ResultController {
 	public ResponseEntity<List<ExamResultDTO>> getResultsByStudent(@PathVariable("studentId") Integer studentId,
 			HttpServletRequest request) {
 		// The list spans every exam the student took, so only the student and an admin may read it.
-		AuthGuard.requireSelfOrAdminForRoleData(request, studentId);
+		AuthPrincipal principal = AuthGuard.requireSelfOrAdminForRoleData(request, studentId);
 		List<ExamResultDTO> results = resultService.getResultsByStudentId(studentId);
+		if (principal.isStudent() && results != null) {
+			results.forEach(result -> answerKeyReleasePolicy.protectStudentResult(result, requireExam(result.getExamId())));
+		}
 		return ResponseEntity.ok(results != null ? results : List.of());
 	}
 
@@ -58,18 +68,23 @@ public class ResultController {
 	 * A single exam result is readable by the student, by an admin, and by the teacher who
 	 * owns the exam. Any other teacher is refused because exams are not shared between staff.
 	 */
-	private void requireResultReadAccess(HttpServletRequest request, Integer examId, Integer studentId) {
+	private AuthPrincipal requireResultReadAccess(HttpServletRequest request, Integer examId, Integer studentId) {
 		AuthPrincipal principal = AuthGuard.requirePrincipal(request);
 		if (principal.isAdmin() || (principal.isStudent() && principal.getRoleId() == studentId)) {
-			return;
+			return principal;
 		}
 		if (principal.isTeacher()) {
 			Exam exam = examService.getExamById(examId)
 					.orElseThrow(() -> new ResourceNotFoundException("Exam not found"));
 			AuthGuard.requireExamAccess(request, exam);
-			return;
+			return principal;
 		}
 		throw new ForbiddenException("You are not authorized to access another user's result.");
+	}
+
+	private Exam requireExam(Integer examId) {
+		return examService.getExamById(examId)
+				.orElseThrow(() -> new ResourceNotFoundException("Exam not found"));
 	}
 
 	@GetMapping("/all")

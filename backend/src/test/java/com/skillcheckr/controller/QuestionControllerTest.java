@@ -159,11 +159,38 @@ class QuestionControllerTest {
         QuestionDTO q = new QuestionDTO();
         q.setQuestionId(2);
         q.setExamId(5);
+        when(examService.getExamById(5)).thenReturn(Optional.of(ownedExam(5)));
         when(questionService.getQuestionsByExamId(5)).thenReturn(List.of(q));
 
         mockMvc.perform(get("/api/questions/exam/5").with(TestAuth.asTeacher(TEACHER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].question_id").value(2));
+    }
+
+    @Test
+    void getQuestionsByExam_rejectsAnotherTeacher() throws Exception {
+        when(examService.getExamById(5)).thenReturn(Optional.of(ownedExam(5)));
+
+        mockMvc.perform(get("/api/questions/exam/5").with(TestAuth.asTeacher(OTHER_TEACHER_ID)))
+                .andExpect(status().isForbidden());
+        verify(questionService, never()).getQuestionsByExamId(5);
+    }
+
+    @Test
+    void getQuestionsByExam_allowsAnAdmin() throws Exception {
+        when(examService.getExamById(5)).thenReturn(Optional.of(ownedExam(5)));
+        when(questionService.getQuestionsByExamId(5)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/questions/exam/5").with(TestAuth.asAdmin(1)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getQuestionsByExam_isNotAvailableToStudents() throws Exception {
+        mockMvc.perform(get("/api/questions/exam/5").with(TestAuth.asStudent(7)))
+                .andExpect(status().isForbidden());
+        verify(examService, never()).getExamById(5);
+        verify(questionService, never()).getQuestionsByExamId(5);
     }
 
     @Test
