@@ -39,19 +39,22 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
     private final AttemptAnswerRepository attemptAnswerRepository;
     private final ResultRepository resultRepository;
     private final QuestionBreakdownService questionBreakdownService;
+    private final AnswerKeyReleasePolicy answerKeyReleasePolicy;
 
     public ExamSubmissionServiceImpl(ExamRepository examRepository,
             ExamAttemptRepository examAttemptRepository,
             ExamQuestionRepository examQuestionRepository,
             AttemptAnswerRepository attemptAnswerRepository,
             ResultRepository resultRepository,
-            QuestionBreakdownService questionBreakdownService) {
+            QuestionBreakdownService questionBreakdownService,
+            AnswerKeyReleasePolicy answerKeyReleasePolicy) {
         this.examRepository = examRepository;
         this.examAttemptRepository = examAttemptRepository;
         this.examQuestionRepository = examQuestionRepository;
         this.attemptAnswerRepository = attemptAnswerRepository;
         this.resultRepository = resultRepository;
         this.questionBreakdownService = questionBreakdownService;
+        this.answerKeyReleasePolicy = answerKeyReleasePolicy;
     }
 
     @Override
@@ -59,16 +62,16 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
     public ExamResultDTO submit(int examId, int attemptId, int studentId) {
         ExamAttempt attempt = examAttemptRepository.findByIdForUpdate(attemptId);
         ExamAttemptValidator.validateSubmitAttempt(attempt, examId, studentId);
+        Exam exam = requireExam(examId);
 
         if (ExamConstants.ATTEMPT_STATUS_SUBMITTED.equalsIgnoreCase(attempt.getStatus())) {
             // Submission is idempotent: a repeated submit returns the stored result.
             return resultRepository.findByAttemptId(attemptId)
-                    .map(result -> withBreakdown(result, examId, attemptId))
+                    .map(result -> withBreakdown(result, exam))
                     .orElseThrow(() -> new ExamSubmissionException(409, "Exam attempt has already been submitted"));
         }
         ExamAttemptValidator.validateAttemptCanSubmit(attempt);
 
-        Exam exam = requireExam(examId);
         LocalDateTime submittedAt = LocalDateTime.now();
 
         // Multiple choice answers are graded here, descriptive answers stay pending until
@@ -102,16 +105,17 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
         if (!examAttemptRepository.finalizeAttempt(attemptId, submittedAt)) {
             throw new ExamSubmissionException(500, "Unable to finalize exam attempt");
         }
-        return withBreakdown(savedResult, examId, attemptId);
+        return withBreakdown(savedResult, exam);
     }
 
     /**
      * The stored row only carries the score, so the per question review the client renders is
      * always re-derived from the saved attempt answers.
      */
-    private ExamResultDTO withBreakdown(ExamResultDTO result, int examId, int attemptId) {
+    private ExamResultDTO withBreakdown(ExamResultDTO result, Exam exam) {
         if (result != null) {
-            result.setQuestionBreakdown(questionBreakdownService.build(examId, attemptId));
+            result.setQuestionBreakdown(questionBreakdownService.build(exam.getExamId(), result.getAttemptId()));
+            answerKeyReleasePolicy.protectStudentResult(result, exam);
         }
         return result;
     }

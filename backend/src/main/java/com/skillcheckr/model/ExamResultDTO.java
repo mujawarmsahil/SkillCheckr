@@ -76,4 +76,8 @@ public class ExamResultDTO {
 	@JsonProperty("question_breakdown")
 	@JsonAlias({"questionBreakdown", "breakdown"})
 	private List<Map<String, Object>> questionBreakdown;
+
+	@JsonProperty("answer_key_released")
+	@JsonAlias({"answerKeyReleased"})
+	private Boolean answerKeyReleased;
 }
