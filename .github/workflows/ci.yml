@@ -66,3 +66,80 @@ jobs:
       - name: Verify
         working-directory: backend
         run: ./mvnw --batch-mode --no-transfer-progress verify
+
+  # The opt-in MySQL suites cover the row-locking, transaction and DATETIME
+  # behaviour that only a real InnoDB server exercises, so they run against an
+  # isolated service container that lives and dies with the job. It is never a
+  # production database: the hostname is the runner's own loopback address, the
+  # root password is randomised on start, and the schema is created fresh by the
+  # image and dropped with the container.
+  backend-mysql-integration:
+    name: Backend checks (MySQL integration, TZ=${{ matrix.timezone }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The scheduling columns are timezone-free DATETIMEs, so the suites must
+        # pass whatever zone the runner happens to be in. Running them under
+        # several zones keeps a driver-side conversion from coming back.
+        timezone:
+          - Asia/Kolkata
+          - UTC
+          - America/Los_Angeles
+          - Pacific/Kiritimati
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+          # The integration suites refuse to start unless the schema name matches
+          # skillcheckr_it_<suffix>, so an unrelated database can never be reached.
+          MYSQL_DATABASE: skillcheckr_it_ci
+          MYSQL_USER: skillcheckr_it
+          # Override with a repository secret if one is configured. The default is a
+          # throwaway literal for a container that only ever listens on the runner's
+          # loopback interface and is destroyed with the job, so it grants access to
+          # nothing that outlives the run.
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_IT_PASSWORD || 'skillcheckr_it_ci_local_only' }}
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TZ: ${{ matrix.timezone }}
+      SKILLCHECKR_MYSQL_IT_URL: >-
+        jdbc:mysql://127.0.0.1:3306/skillcheckr_it_ci?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SKILLCHECKR_MYSQL_IT_USERNAME: skillcheckr_it
+      SKILLCHECKR_MYSQL_IT_PASSWORD: ${{ secrets.MYSQL_IT_PASSWORD || 'skillcheckr_it_ci_local_only' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      # The service health check above is the readiness gate. This repeats it
+      # with a tool the runner already has, so a slow first boot is reported as
+      # a MySQL problem rather than as a connection error inside the suites.
+      - name: Wait for MySQL
+        run: |
+          for attempt in $(seq 1 30); do
+            if (exec 3<>/dev/tcp/127.0.0.1/3306) 2>/dev/null; then
+              echo "MySQL is accepting connections on 127.0.0.1:3306"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MySQL did not become ready within 60s" >&2
+          exit 1
+
+      - name: Verify (MySQL integration)
+        working-directory: backend
+        run: ./mvnw --batch-mode --no-transfer-progress -Pmysql-integration verify
