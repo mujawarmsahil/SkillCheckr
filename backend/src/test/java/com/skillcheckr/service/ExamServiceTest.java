@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,6 +36,7 @@ import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.repository.ExamAttemptRepository;
+import com.skillcheckr.repository.ExamQuestionRepository;
 import com.skillcheckr.repository.ExamRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,16 +49,28 @@ class ExamServiceTest {
     private ExamRepository examRepository;
 
     @Mock
+    private ExamQuestionRepository examQuestionRepository;
+
+    @Mock
     private ExamAttemptRepository examAttemptRepository;
 
     @Mock
     private ExamSubmissionService examSubmissionService;
+
+    @Mock
+    private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @Spy
     private AttemptExpiryPolicy attemptExpiryPolicy = new AttemptExpiryPolicy();
 
     @InjectMocks
     private ExamServiceImpl examService;
+
+    @BeforeEach
+    void stubLockingExamReadsFromExamFixtures() {
+        lenient().when(examRepository.getExamByIdForUpdate(anyInt()))
+                .thenAnswer(invocation -> examRepository.getExamById(invocation.getArgument(0)));
+    }
 
     private Exam validExam(String name) {
         Exam exam = new Exam();
@@ -161,22 +176,43 @@ class ExamServiceTest {
 
     @Test
     void deleteExamById_delegatesToRepository() {
+        Exam exam = new Exam();
+        exam.setExamId(9);
+        exam.setStatus(ExamConstants.EXAM_STATUS_PENDING);
+        when(questionPaperMutationPolicy.lockAndValidate(9)).thenReturn(exam);
         when(examRepository.deleteExamById(9)).thenReturn(true);
 
         assertThat(examService.deleteExamById(9)).isTrue();
+        verify(questionPaperMutationPolicy).lockAndValidate(9);
         verify(examRepository).deleteExamById(9);
     }
 
     @Test
     void acceptExam_opensAPendingExam() {
-        Exam pending = new Exam();
+        Exam pending = validExam("Maths Final");
         pending.setExamId(3);
         pending.setStatus(ExamConstants.EXAM_STATUS_PENDING);
         when(examRepository.getExamById(3)).thenReturn(Optional.of(pending));
+        when(examQuestionRepository.isExamReadyForApproval(3)).thenReturn(true);
         when(examRepository.acceptExam(3)).thenReturn(true);
 
         assertThat(examService.acceptExam(3)).isTrue();
+        verify(examRepository).getExamByIdForUpdate(3);
         verify(examRepository).acceptExam(3);
+    }
+
+    @Test
+    void acceptExam_rejectsAnExamWithoutAValidAssignedQuestion() {
+        Exam pending = validExam("Maths Final");
+        pending.setExamId(3);
+        pending.setStatus(ExamConstants.EXAM_STATUS_PENDING);
+        when(examRepository.getExamById(3)).thenReturn(Optional.of(pending));
+        when(examQuestionRepository.isExamReadyForApproval(3)).thenReturn(false);
+
+        assertThatThrownBy(() -> examService.acceptExam(3))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("at least one valid assigned question");
+        verify(examRepository, never()).acceptExam(anyInt());
     }
 
     @Test
@@ -202,6 +238,19 @@ class ExamServiceTest {
         assertThatThrownBy(() -> examService.updateExamStatus(3, "Published"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("is not a valid exam status");
+    }
+
+    @Test
+    void updateExamStatus_rejectsRollbackFromAnApprovedStatus() {
+        Exam approved = validExam("Maths Final");
+        approved.setExamId(3);
+        approved.setStatus(ExamConstants.EXAM_STATUS_UPCOMING);
+        when(examRepository.getExamById(3)).thenReturn(Optional.of(approved));
+
+        assertThatThrownBy(() -> examService.updateExamStatus(3, ExamConstants.EXAM_STATUS_PENDING))
+                .isInstanceOf(com.skillcheckr.exception.ExamInUseException.class)
+                .hasMessageContaining("cannot return to an unapproved status");
+        verify(examRepository, never()).updateExamStatus(anyInt(), any());
     }
 
     @Test

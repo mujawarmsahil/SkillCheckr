@@ -17,6 +17,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -186,7 +187,7 @@ class ExamRepositoryImplTest {
 
     @Test
     void acceptExam_returnsTrue_whenStatusUpdated() {
-        when(jdbcTemplate.update(eq("UPDATE exam SET status = 'Upcoming' WHERE exam_id = ?"), eq(3)))
+        when(jdbcTemplate.update(eq("UPDATE exam SET status = 'Upcoming', paper_frozen = TRUE WHERE exam_id = ?"), eq(3)))
                 .thenReturn(1);
 
         assertThat(repository.acceptExam(3)).isTrue();
@@ -331,5 +332,23 @@ class ExamRepositoryImplTest {
         when(jdbcTemplate.update(anyString(), eq(1), eq(2))).thenReturn(0);
 
         assertThat(repository.unregisterStudentFromExam(1, 2)).isFalse();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getExamByIdForUpdate_readsTheLockedRowInsteadOfAPlainSnapshotRead() {
+        Exam locked = new Exam();
+        locked.setExamId(7);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(7))).thenReturn(List.of(locked));
+
+        assertThat(repository.getExamByIdForUpdate(7)).containsSame(locked);
+
+        ArgumentCaptor<String> query = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).query(query.capture(), any(RowMapper.class), eq(7));
+        assertThat(query.getValue())
+                .endsWith("FOR UPDATE")
+                .contains("subject_name");
+        verify(jdbcTemplate, never()).queryForList(anyString(), eq(Integer.class), eq(7));
+        verify(jdbcTemplate, never()).query(anyString(), any(RowMapper.class));
     }
 }

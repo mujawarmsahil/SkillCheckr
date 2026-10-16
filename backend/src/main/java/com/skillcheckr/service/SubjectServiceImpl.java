@@ -3,6 +3,7 @@ package com.skillcheckr.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.TreeSet;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.model.SubjectStatsResponse;
+import com.skillcheckr.repository.ExamRepository;
+import com.skillcheckr.repository.QuestionRepository;
 import com.skillcheckr.repository.SubjectRepository;
 
 @Service
@@ -17,6 +20,15 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Autowired
     private SubjectRepository subjectRepository;
+
+    @Autowired
+    private QuestionRepository questionRepository;
+
+    @Autowired
+    private ExamRepository examRepository;
+
+    @Autowired
+    private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @Override
     public List<Subject> getAllSubjects() {
@@ -41,6 +53,12 @@ public class SubjectServiceImpl implements SubjectService {
     @Override
     @Transactional
     public boolean deleteSubjectById(int subjectId) {
+        for (int questionId : questionRepository.findQuestionIdsBySubjectId(subjectId)) {
+            questionRepository.lockQuestionForUpdate(questionId);
+        }
+        for (int examId : new TreeSet<>(examRepository.findExamIdsBySubjectId(subjectId))) {
+            questionPaperMutationPolicy.lockAndValidate(examId);
+        }
         return subjectRepository.deleteSubjectById(subjectId);
     }
 

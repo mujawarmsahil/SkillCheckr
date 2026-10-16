@@ -23,4 +23,8 @@ public interface ExamQuestionRepository {
     boolean attachQuestion(int examId, int questionId, int questionOrder);
 
     List<Integer> findSubjectIdsByQuestionId(int questionId);
+
+    List<Integer> findExamIdsByQuestionId(int questionId);
+
+    boolean isExamReadyForApproval(int examId);
 }

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,16 +17,24 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.QuestionBankDocument;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.repository.QuestionBankRepository;
+import com.skillcheckr.repository.ExamRepository;
 
 @ExtendWith(MockitoExtension.class)
 class QuestionBankServiceTest {
 
     @Mock
     private QuestionBankRepository questionBankRepository;
+
+    @Mock
+    private ExamRepository examRepository;
+
+    @Mock
+    private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @Mock
     private QuestionService questionService;
@@ -63,12 +72,26 @@ class QuestionBankServiceTest {
 
     @Test
     void saveUploadedPdf_validatesAndStoresQuestionOnlyPdf() {
-        byte[] pdf = new QuestionBankPdfGenerator().generate(exam(9),
+        byte[] pdf = new QuestionBankPdfGenerator().generate(pendingExam(9),
                 List.of(QuestionDTO.builder().question("Student question").build()));
+        when(questionPaperMutationPolicy.lockAndValidate(9)).thenReturn(pendingExam(9));
 
         questionBankService.saveUploadedPdf(9, "../questions.pdf", pdf, true);
 
         verify(questionBankRepository).save(9, "questions.pdf", pdf);
+    }
+
+    @Test
+    void saveUploadedPdf_refusesToOverwriteAnApprovedPapersPdf() {
+        byte[] pdf = new QuestionBankPdfGenerator().generate(pendingExam(9),
+                List.of(QuestionDTO.builder().question("Student question").build()));
+        when(questionPaperMutationPolicy.lockAndValidate(9))
+                .thenThrow(new ExamInUseException("The approved exam question paper is frozen"));
+
+        assertThatThrownBy(() -> questionBankService.saveUploadedPdf(9, "questions.pdf", pdf, true))
+                .isInstanceOf(ExamInUseException.class)
+                .hasMessageContaining("paper is frozen");
+        verify(questionBankRepository, never()).save(9, "questions.pdf", pdf);
     }
 
     @Test
@@ -89,6 +112,12 @@ class QuestionBankServiceTest {
         Exam exam = new Exam();
         exam.setExamId(examId);
         exam.setExamName("Sample exam");
+        return exam;
+    }
+
+    private Exam pendingExam(int examId) {
+        Exam exam = exam(examId);
+        exam.setStatus("Pending");
         return exam;
     }
 }

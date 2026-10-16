@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.skillcheckr.exception.GlobalExceptionHandler;
+import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.service.ExamService;
@@ -235,6 +236,19 @@ class QuestionControllerTest {
                         .content("{\"question\":\"updated\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.question").value("updated"));
+    }
+
+    @Test
+    void updateQuestion_returnsConflictWhenAssignedPaperIsFrozen() throws Exception {
+        when(questionService.updateQuestion(any()))
+                .thenThrow(new ExamInUseException("The approved exam question paper is frozen"));
+
+        mockMvc.perform(put("/api/questions/1")
+                        .with(TestAuth.asAdmin(1))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"question\":\"updated\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("The approved exam question paper is frozen"));
     }
 
     @Test

@@ -20,6 +20,12 @@ public interface ExamRepository {
 
 	boolean updateExamStatus(int examId, String status);
 
+	void lockExamForUpdate(int examId);
+
+	Optional<Exam> getExamByIdForUpdate(int examId);
+
+	List<Integer> findExamIdsBySubjectId(int subjectId);
+
 	List<Exam> getAllUpcomingExams();
 
 	List<Exam> getAllCompletedExams();

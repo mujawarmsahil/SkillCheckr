@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,7 +31,6 @@ import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Subject;
 import com.skillcheckr.repository.AttemptAnswerRepository;
 import com.skillcheckr.repository.ExamQuestionRepository;
-import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.repository.QuestionRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,10 +43,10 @@ class QuestionServiceTest {
     private ExamQuestionRepository examQuestionRepository;
 
     @Mock
-    private ExamRepository examRepository;
+    private AttemptAnswerRepository attemptAnswerRepository;
 
     @Mock
-    private AttemptAnswerRepository attemptAnswerRepository;
+    private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @InjectMocks
     private QuestionServiceImpl questionService;
@@ -71,7 +72,7 @@ class QuestionServiceTest {
     private static Exam openExam(int examId, int subjectId) {
         Exam exam = new Exam();
         exam.setExamId(examId);
-        exam.setStatus(ExamConstants.EXAM_STATUS_UPCOMING);
+        exam.setStatus(ExamConstants.EXAM_STATUS_PENDING);
         exam.setDate("2099-01-15 09:00:00");
         exam.setStartTime(LocalTime.of(9, 0));
         exam.setEndTime(LocalTime.of(12, 0));
@@ -88,6 +89,28 @@ class QuestionServiceTest {
         questionService.saveQuestionsWithAnswers(List.of(dto));
 
         verify(questionRepository).saveQuestionWithAnswers(List.of(dto));
+    }
+
+    @Test
+    void saveQuestionsWithAnswers_acceptsAValidDescriptiveQuestion() {
+        QuestionDTO dto = subjective();
+
+        questionService.saveQuestionsWithAnswers(List.of(dto));
+
+        verify(questionRepository).saveQuestionWithAnswers(List.of(dto));
+    }
+
+    @Test
+    void saveQuestionsWithAnswers_locksTheExamBeforeAssigningQuestions() {
+        QuestionDTO dto = mcq();
+        dto.setExamId(3);
+        when(questionPaperMutationPolicy.lockAndValidate(3)).thenReturn(openExam(3, 1));
+
+        questionService.saveQuestionsWithAnswers(List.of(dto));
+
+        InOrder order = inOrder(questionPaperMutationPolicy, questionRepository);
+        order.verify(questionPaperMutationPolicy).lockAndValidate(3);
+        order.verify(questionRepository).saveQuestionWithAnswers(List.of(dto));
     }
 
     @Test
@@ -143,7 +166,7 @@ class QuestionServiceTest {
 
     @Test
     void attachQuestionsToExam_attachesDistinctQuestionsInOrder() {
-        when(examRepository.getExamById(3)).thenReturn(Optional.of(openExam(3, 1)));
+        when(questionPaperMutationPolicy.lockAndValidate(3)).thenReturn(openExam(3, 1));
         when(examQuestionRepository.getNextQuestionOrder(3)).thenReturn(1);
         when(questionRepository.findQuestionDetailsById(anyInt())).thenReturn(Optional.of(questionInSubject(1)));
         when(examQuestionRepository.attachQuestion(anyInt(), anyInt(), anyInt())).thenReturn(true);
@@ -151,13 +174,14 @@ class QuestionServiceTest {
         int attached = questionService.attachQuestionsToExam(3, List.of(10, 10, 11));
 
         assertThat(attached).isEqualTo(2);
+        verify(questionPaperMutationPolicy).lockAndValidate(3);
         verify(examQuestionRepository).attachQuestion(3, 10, 1);
         verify(examQuestionRepository).attachQuestion(3, 11, 2);
     }
 
     @Test
     void attachQuestionsToExam_countsOnlyNewlyAttachedQuestions() {
-        when(examRepository.getExamById(3)).thenReturn(Optional.of(openExam(3, 1)));
+        when(questionPaperMutationPolicy.lockAndValidate(3)).thenReturn(openExam(3, 1));
         when(examQuestionRepository.getNextQuestionOrder(3)).thenReturn(1);
         when(questionRepository.findQuestionDetailsById(anyInt())).thenReturn(Optional.of(questionInSubject(1)));
         // 10 is new and gets a row; 11 is already in the exam, so the repository inserts nothing.
@@ -171,7 +195,7 @@ class QuestionServiceTest {
 
     @Test
     void attachQuestionsToExam_doesNotConsumeAnOrderForAnAlreadyAttachedQuestion() {
-        when(examRepository.getExamById(3)).thenReturn(Optional.of(openExam(3, 1)));
+        when(questionPaperMutationPolicy.lockAndValidate(3)).thenReturn(openExam(3, 1));
         when(examQuestionRepository.getNextQuestionOrder(3)).thenReturn(1);
         when(questionRepository.findQuestionDetailsById(anyInt())).thenReturn(Optional.of(questionInSubject(1)));
         when(examQuestionRepository.attachQuestion(3, 10, 1)).thenReturn(false);
@@ -192,7 +216,8 @@ class QuestionServiceTest {
 
     @Test
     void attachQuestionsToExam_reportsAMissingExam() {
-        when(examRepository.getExamById(3)).thenReturn(Optional.empty());
+        when(questionPaperMutationPolicy.lockAndValidate(3)).thenThrow(
+                new ResourceNotFoundException("Exam not found with id: 3"));
 
         assertThatThrownBy(() -> questionService.attachQuestionsToExam(3, List.of(10)))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -201,7 +226,7 @@ class QuestionServiceTest {
 
     @Test
     void attachQuestionsToExam_rejectsQuestionsFromAnotherSubject() {
-        when(examRepository.getExamById(3)).thenReturn(Optional.of(openExam(3, 1)));
+        when(questionPaperMutationPolicy.lockAndValidate(3)).thenReturn(openExam(3, 1));
         when(examQuestionRepository.getNextQuestionOrder(3)).thenReturn(1);
         when(questionRepository.findQuestionDetailsById(10)).thenReturn(Optional.of(questionInSubject(2)));
 
@@ -217,7 +242,7 @@ class QuestionServiceTest {
         started.setDate("2020-01-15 09:00:00");
         started.setStartTime(LocalTime.of(9, 0));
         started.setEndTime(LocalTime.of(12, 0));
-        when(examRepository.getExamById(3)).thenReturn(Optional.of(started));
+        when(questionPaperMutationPolicy.lockAndValidate(3)).thenReturn(started);
 
         assertThatThrownBy(() -> questionService.attachQuestionsToExam(3, List.of(10)))
                 .isInstanceOf(ExamInUseException.class)
@@ -270,6 +295,35 @@ class QuestionServiceTest {
                 .hasMessageContaining("already been attempted");
 
         verify(questionRepository, never()).updateQuestion(any());
+    }
+
+    @Test
+    void updateQuestion_rejectsEditWhenAnAssignedExamIsFrozen() {
+        QuestionDTO dto = mcq();
+        dto.setQuestionId(5);
+        when(examQuestionRepository.findExamIdsByQuestionId(5)).thenReturn(List.of(4));
+        when(questionPaperMutationPolicy.lockAndValidate(4))
+                .thenThrow(new ExamInUseException("The approved exam question paper is frozen"));
+
+        assertThatThrownBy(() -> questionService.updateQuestion(dto))
+                .isInstanceOf(ExamInUseException.class)
+                .hasMessageContaining("paper is frozen");
+        verify(questionRepository, never()).updateQuestion(any());
+    }
+
+    @Test
+    void updateQuestion_checksAllAssignedExamsInDeterministicOrder() {
+        QuestionDTO dto = mcq();
+        dto.setQuestionId(5);
+        when(examQuestionRepository.findExamIdsByQuestionId(5)).thenReturn(List.of(9, 4));
+        when(questionPaperMutationPolicy.lockAndValidate(4)).thenReturn(openExam(4, 1));
+        when(questionPaperMutationPolicy.lockAndValidate(9)).thenReturn(openExam(9, 1));
+
+        questionService.updateQuestion(dto);
+
+        InOrder order = inOrder(questionPaperMutationPolicy);
+        order.verify(questionPaperMutationPolicy).lockAndValidate(4);
+        order.verify(questionPaperMutationPolicy).lockAndValidate(9);
     }
 
     @Test

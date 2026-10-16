@@ -46,8 +46,9 @@ public class ExamRepositoryImpl implements ExamRepository {
 				exam.setExamId(rs.getInt("exam_id"));
 				exam.setTeacherId(rs.getInt("teacher_id"));
 				exam.setExamName(rs.getString("exam_name"));
-				exam.setDate(formatExamDate(rs.getObject("exam_date", LocalDateTime.class)));
 				exam.setStatus(rs.getString("status"));
+				exam.setPaperFrozen(rs.getBoolean("paper_frozen"));
+				exam.setDate(formatExamDate(rs.getObject("exam_date", LocalDateTime.class)));
 
 				Time sqlStartTime = rs.getTime("start_time");
 				Time sqlEndTime = rs.getTime("end_time");
@@ -236,16 +237,43 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public boolean acceptExam(int examId) {
-		String sql = "UPDATE exam SET status = 'Upcoming' WHERE exam_id = ?";
+		String sql = "UPDATE exam SET status = 'Upcoming', paper_frozen = TRUE WHERE exam_id = ?";
 		int rowsAffected = jdbcTemplate.update(sql, examId);
 		return rowsAffected > 0;
 	}
 
 	@Override
 	public boolean updateExamStatus(int examId, String status) {
-		String sql = "UPDATE exam SET status = ? WHERE exam_id = ?";
-		int rowsAffected = jdbcTemplate.update(sql, status, examId);
+		String sql = "UPDATE exam SET status = ?, "
+				+ "paper_frozen = CASE WHEN LOWER(?) IN ('upcoming', 'approved') "
+				+ "THEN TRUE ELSE paper_frozen END WHERE exam_id = ?";
+		int rowsAffected = jdbcTemplate.update(sql, status, status, examId);
 		return rowsAffected > 0;
+	}
+
+	@Override
+	public void lockExamForUpdate(int examId) {
+		jdbcTemplate.queryForList("SELECT exam_id FROM exam WHERE exam_id = ? FOR UPDATE",
+				Integer.class, examId);
+	}
+
+	@Override
+	public Optional<Exam> getExamByIdForUpdate(int examId) {
+		// One locking read of the full row. Locking the row and then reading it with a
+		// plain SELECT would return this transaction's REPEATABLE READ snapshot, which
+		// predates the commit the lock was waiting for, so the caller would validate
+		// stale exam state.
+		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
+				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id WHERE e.exam_id = ? FOR UPDATE";
+		List<Exam> exams = jdbcTemplate.query(query, getExamRowMapper(), examId);
+		return exams.stream().findFirst();
+	}
+
+	@Override
+	public List<Integer> findExamIdsBySubjectId(int subjectId) {
+		return jdbcTemplate.queryForList(
+				"SELECT exam_id FROM exam WHERE subject_id = ? ORDER BY exam_id",
+				Integer.class, subjectId);
 	}
 
 	@Override

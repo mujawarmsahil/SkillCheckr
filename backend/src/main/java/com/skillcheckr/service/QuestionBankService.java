@@ -7,6 +7,7 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.ResourceNotFoundException;
@@ -24,11 +25,15 @@ public class QuestionBankService {
     private QuestionBankRepository questionBankRepository;
 
     @Autowired
+    private QuestionPaperMutationPolicy questionPaperMutationPolicy;
+
+    @Autowired
     private QuestionService questionService;
 
     @Autowired
     private QuestionBankPdfGenerator pdfGenerator;
 
+    @Transactional
     public void saveUploadedPdf(int examId, String originalFilename, byte[] content, boolean questionOnlyConfirmed) {
         if (!questionOnlyConfirmed) {
             throw new BadRequestException("Confirm that the PDF contains student-facing questions only");
@@ -43,6 +48,7 @@ public class QuestionBankService {
             throw new BadRequestException("Only PDF files are supported");
         }
         validatePdf(content);
+        questionPaperMutationPolicy.lockAndValidate(examId);
         questionBankRepository.save(examId, safeFilename(originalFilename), content);
     }
 

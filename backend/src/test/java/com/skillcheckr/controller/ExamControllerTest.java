@@ -50,6 +50,7 @@ import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.AttemptAnswerException;
 import com.skillcheckr.exception.AttemptStartException;
 import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.exception.ExamSubmissionException;
 import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.AttemptAnswerResponse;
@@ -698,6 +699,20 @@ class ExamControllerTest {
                         .content("{\"questionIds\":[4]}"))
                 .andExpect(status().isForbidden());
         verify(questionService, never()).attachQuestionsToExam(anyInt(), any());
+    }
+
+    @Test
+    void attachExistingQuestions_returnsConflictWhenPaperIsFrozen() throws Exception {
+        when(examService.getExamById(1)).thenReturn(Optional.of(ownedExam(1)));
+        when(questionService.attachQuestionsToExam(1, List.of(4)))
+                .thenThrow(new ExamInUseException("The approved exam question paper is frozen"));
+
+        mockMvc.perform(post("/api/exams/1/questions")
+                        .with(TestAuth.asTeacher(TEACHER_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"questionIds\":[4]}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("The approved exam question paper is frozen"));
     }
 
     @Test

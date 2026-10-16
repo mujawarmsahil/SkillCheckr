@@ -6,6 +6,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,6 @@ import com.skillcheckr.model.Question;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.repository.AttemptAnswerRepository;
 import com.skillcheckr.repository.ExamQuestionRepository;
-import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.repository.QuestionRepository;
 import com.skillcheckr.validation.ExamCreationValidator;
 import com.skillcheckr.validation.QuestionValidator;
@@ -30,23 +30,34 @@ public class QuestionServiceImpl implements QuestionService {
 
     private final QuestionRepository questionRepository;
     private final ExamQuestionRepository examQuestionRepository;
-    private final ExamRepository examRepository;
     private final AttemptAnswerRepository attemptAnswerRepository;
+    private final QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @Autowired
     public QuestionServiceImpl(QuestionRepository questionRepository,
-            ExamQuestionRepository examQuestionRepository, ExamRepository examRepository,
-            AttemptAnswerRepository attemptAnswerRepository) {
+            ExamQuestionRepository examQuestionRepository,
+            AttemptAnswerRepository attemptAnswerRepository,
+            QuestionPaperMutationPolicy questionPaperMutationPolicy) {
         this.questionRepository = questionRepository;
         this.examQuestionRepository = examQuestionRepository;
-        this.examRepository = examRepository;
         this.attemptAnswerRepository = attemptAnswerRepository;
+        this.questionPaperMutationPolicy = questionPaperMutationPolicy;
     }
 
     @Override
     @Transactional
     public void saveQuestionsWithAnswers(List<QuestionDTO> questions) {
         QuestionValidator.validate(questions);
+        Set<Integer> examIds = new TreeSet<>();
+        for (QuestionDTO question : questions) {
+            if (question != null && question.getExamId() != null && question.getExamId() > 0) {
+                examIds.add(question.getExamId());
+            }
+        }
+        for (int examId : examIds) {
+            Exam exam = questionPaperMutationPolicy.lockAndValidate(examId);
+            requirePendingPaper(exam);
+        }
         questionRepository.saveQuestionWithAnswers(questions);
     }
 
@@ -96,11 +107,18 @@ public class QuestionServiceImpl implements QuestionService {
             throw new BadRequestException("Select at least one question to add to the exam");
         }
 
-        Exam exam = examRepository.getExamById(examId)
-                .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
-        if (!ExamConstants.isOpenForRegistration(exam.getStatus())) {
-            throw new BadRequestException("Questions can only be changed while the exam is open");
+        Set<Integer> distinctQuestionIds = new java.util.TreeSet<>();
+        for (Integer questionId : questionIds) {
+            if (questionId != null && questionId > 0) {
+                distinctQuestionIds.add(questionId);
+            }
         }
+        for (int questionId : distinctQuestionIds) {
+            questionRepository.lockQuestionForUpdate(questionId);
+        }
+
+        Exam exam = questionPaperMutationPolicy.lockAndValidate(examId);
+        requirePendingPaper(exam);
         try {
             if (LocalDateTime.now().isAfter(ExamCreationValidator.resolveWindowStart(exam))) {
                 throw new ExamInUseException("The exam has already started and its question paper is locked");
@@ -111,11 +129,11 @@ public class QuestionServiceImpl implements QuestionService {
             throw new BadRequestException("The exam schedule could not be read");
         }
 
-        Set<Integer> distinctQuestionIds = new LinkedHashSet<>();
+        Set<Integer> distinctQuestionIdsForAttach = new LinkedHashSet<>();
         int attached = 0;
         int order = examQuestionRepository.getNextQuestionOrder(examId);
         for (Integer questionId : questionIds) {
-            if (questionId == null || questionId <= 0 || !distinctQuestionIds.add(questionId)) {
+            if (questionId == null || questionId <= 0 || !distinctQuestionIdsForAttach.add(questionId)) {
                 continue;
             }
             Question question = questionRepository.findQuestionDetailsById(questionId)
@@ -136,6 +154,13 @@ public class QuestionServiceImpl implements QuestionService {
     public boolean updateQuestion(QuestionDTO question) {
         QuestionValidator.validate(question);
 
+        questionRepository.lockQuestionForUpdate(question.getQuestionId());
+        Set<Integer> assignedExamIds = new TreeSet<>(
+                examQuestionRepository.findExamIdsByQuestionId(question.getQuestionId()));
+        for (Integer examId : assignedExamIds) {
+            questionPaperMutationPolicy.lockAndValidate(examId);
+        }
+
         if (attemptAnswerRepository.hasAttemptHistory(question.getQuestionId())) {
             throw new ExamInUseException(
                     "This question has already been attempted and cannot be edited.");
@@ -155,11 +180,26 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
+    @Transactional
     public boolean deleteQuestionById(int questionId) {
+        questionRepository.lockQuestionForUpdate(questionId);
+        Set<Integer> assignedExamIds = new TreeSet<>(examQuestionRepository.findExamIdsByQuestionId(questionId));
+        for (Integer examId : assignedExamIds) {
+            questionPaperMutationPolicy.lockAndValidate(examId);
+        }
+        if (attemptAnswerRepository.hasAttemptHistory(questionId)) {
+            throw new ExamInUseException("This question has student-answer history and cannot be deleted.");
+        }
         if (examQuestionRepository.isQuestionAssignedToAnyExam(questionId)) {
             throw new ExamInUseException(
                     "This question is used by an exam and cannot be deleted. Delete the exam that uses it first.");
         }
         return questionRepository.deleteQuestionById(questionId);
+    }
+
+    private void requirePendingPaper(Exam exam) {
+        if (!ExamConstants.EXAM_STATUS_PENDING.equalsIgnoreCase(exam.getStatus())) {
+            throw new BadRequestException("Questions can only be changed while the exam is pending approval");
+        }
     }
 }

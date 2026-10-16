@@ -96,4 +96,51 @@ public class ExamQuestionRepositoryImpl implements ExamQuestionRepository {
                         + "WHERE eq.question_id = ?",
                 Integer.class, questionId);
     }
+
+    @Override
+    public List<Integer> findExamIdsByQuestionId(int questionId) {
+        return jdbcTemplate.queryForList(
+                "SELECT exam_id FROM exam_question WHERE question_id = ? ORDER BY exam_id",
+                Integer.class, questionId);
+    }
+
+    @Override
+    public boolean isExamReadyForApproval(int examId) {
+        String sql = "SELECT CASE WHEN COUNT(eq.question_id) > 0 "
+                + "AND SUM(CASE WHEN eq.question_id IS NOT NULL AND ("
+                + "q.question_id IS NULL "
+                + "OR q.question_text IS NULL "
+                + "OR TRIM(q.question_text) = '' "
+                + "OR CHAR_LENGTH(q.question_text) > 4000 "
+                + "OR q.marks IS NULL OR q.marks < 1 OR q.marks > 100 "
+                + "OR q.subject_id IS NULL "
+                + "OR q.subject_id <> e.subject_id "
+                + "OR (UPPER(TRIM(COALESCE(q.question_type, 'MCQ'))) NOT IN ('MCQ', 'QUESTION_ANSWER')) "
+                + "OR (UPPER(TRIM(COALESCE(q.question_type, 'MCQ'))) = 'MCQ' AND ("
+                + "q.word_limit IS NOT NULL "
+                + "OR COALESCE(a.answer_count, 0) < 2 OR COALESCE(a.answer_count, 0) > 4 "
+                + "OR COALESCE(a.answer_count, 0) <> COALESCE(a.distinct_answer_count, 0) "
+                + "OR COALESCE(a.correct_answer_count, 0) <> 1 "
+                + "OR COALESCE(a.invalid_answer_count, 0) > 0)) "
+                + "OR (UPPER(TRIM(COALESCE(q.question_type, 'MCQ'))) = 'QUESTION_ANSWER' AND ("
+                + "(q.word_limit IS NOT NULL AND (q.word_limit < 1 OR q.word_limit > 5000)) "
+                + "OR COALESCE(a.overlength_answer_count, 0) > 0))) "
+                + "THEN 1 ELSE 0 END) = 0 THEN 1 ELSE 0 END "
+                + "FROM exam e "
+                + "LEFT JOIN exam_question eq ON eq.exam_id = e.exam_id "
+                + "LEFT JOIN question q ON q.question_id = eq.question_id "
+                + "LEFT JOIN (SELECT ans.question_id, COUNT(*) AS answer_count, "
+                + "COUNT(DISTINCT LOWER(TRIM(ans.option_text))) AS distinct_answer_count, "
+                + "SUM(CASE WHEN ans.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answer_count, "
+                + "SUM(CASE WHEN ans.option_text IS NULL OR TRIM(ans.option_text) = '' "
+                + "OR CHAR_LENGTH(ans.option_text) > 500 "
+                + "THEN 1 ELSE 0 END) AS invalid_answer_count, "
+                + "SUM(CASE WHEN CHAR_LENGTH(ans.option_text) > 5000 THEN 1 ELSE 0 END) "
+                + "AS overlength_answer_count "
+                + "FROM answer ans JOIN exam_question assigned ON assigned.question_id = ans.question_id "
+                + "WHERE assigned.exam_id = ? GROUP BY ans.question_id) a ON a.question_id = q.question_id "
+                + "WHERE e.exam_id = ?";
+        Integer ready = jdbcTemplate.queryForObject(sql, Integer.class, examId, examId);
+        return ready != null && ready == 1;
+    }
 }

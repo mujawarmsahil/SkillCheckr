@@ -84,6 +84,14 @@ public class ExamAttemptRepositoryImpl implements ExamAttemptRepository {
     }
 
     @Override
+    public boolean hasAttemptsForExam(int examId) {
+        Boolean exists = jdbcTemplate.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM exam_attempt WHERE exam_id = ?)",
+                Boolean.class, examId);
+        return Boolean.TRUE.equals(exists);
+    }
+
+    @Override
     public ExamAttempt findByIdForUpdate(int attemptId) {
         String sql = "SELECT attempt_id, exam_id, student_id, started_at, expires_at, submitted_at, status "
                 + "FROM exam_attempt WHERE attempt_id = ? FOR UPDATE";

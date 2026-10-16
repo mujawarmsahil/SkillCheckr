@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.AttemptStartException;
 import com.skillcheckr.exception.BadRequestException;
+import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.AttemptStartResult;
 import com.skillcheckr.model.Exam;
@@ -20,6 +21,7 @@ import com.skillcheckr.model.ExamAttempt;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.repository.ExamAttemptRepository;
+import com.skillcheckr.repository.ExamQuestionRepository;
 import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.validation.ExamCreationValidator;
 
@@ -33,6 +35,9 @@ public class ExamServiceImpl implements ExamService {
 	private ExamRepository examRepository;
 
 	@Autowired
+	private ExamQuestionRepository examQuestionRepository;
+
+	@Autowired
 	private ExamAttemptRepository examAttemptRepository;
 
 	@Autowired
@@ -40,6 +45,9 @@ public class ExamServiceImpl implements ExamService {
 
 	@Autowired
 	private AttemptExpiryPolicy attemptExpiryPolicy;
+
+	@Autowired
+	private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
 	@Override
 	public Exam saveExam(Exam exam, int teacherId) {
@@ -58,21 +66,48 @@ public class ExamServiceImpl implements ExamService {
 	@Override
 	@Transactional
 	public boolean deleteExamById(int examId) {
+		questionPaperMutationPolicy.lockAndValidate(examId);
 		return examRepository.deleteExamById(examId);
 	}
 
 	@Override
+	@Transactional
 	public boolean acceptExam(int examId) {
-		Exam exam = requireExam(examId);
+		Exam exam = examRepository.getExamByIdForUpdate(examId)
+				.orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
 		ExamCreationValidator.validateStatusChange(exam, ExamConstants.EXAM_STATUS_UPCOMING);
+		if (!ExamConstants.isOpenForRegistration(exam.getStatus())) {
+			validateApprovalReadiness(exam);
+		}
 		return examRepository.acceptExam(examId);
 	}
 
 	@Override
+	@Transactional
 	public boolean updateExamStatus(int examId, String status) {
-		Exam exam = requireExam(examId);
+		Exam exam = examRepository.getExamByIdForUpdate(examId)
+				.orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
 		ExamCreationValidator.validateStatusChange(exam, status);
+		if ((exam.isPaperFrozen() || ExamConstants.isOpenForRegistration(exam.getStatus())
+				|| ExamConstants.EXAM_STATUS_COMPLETED.equalsIgnoreCase(exam.getStatus()))
+				&& !ExamConstants.isOpenForRegistration(status)) {
+			throw new ExamInUseException(
+					"An approved exam cannot return to an unapproved status");
+		}
+		if (ExamConstants.isOpenForRegistration(status)
+				&& !ExamConstants.isOpenForRegistration(exam.getStatus())) {
+			validateApprovalReadiness(exam);
+		}
 		return examRepository.updateExamStatus(examId, status.trim());
+	}
+
+	private void validateApprovalReadiness(Exam exam) {
+		ExamCreationValidator.validateSchedule(exam);
+		ExamCreationValidator.validateMarks(exam);
+		if (!examQuestionRepository.isExamReadyForApproval(exam.getExamId())) {
+			throw new BadRequestException(
+					"Exam must have at least one valid assigned question before it can be approved");
+		}
 	}
 
 	@Override
@@ -91,8 +126,13 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	@Transactional(noRollbackFor = AttemptStartException.class)
 	public AttemptStartResult startAttempt(int examId, int studentId) {
-		Exam exam = requireExam(examId);
+		if (examId <= 0) {
+			throw new AttemptStartException(404, "Exam not found");
+		}
+		Exam exam = examRepository.getExamByIdForUpdate(examId)
+				.orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
 		if (studentId <= 0) {
 			throw new AttemptStartException(404, "Student not found");
 		}
