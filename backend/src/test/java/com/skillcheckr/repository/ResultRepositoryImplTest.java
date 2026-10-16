@@ -1,6 +1,7 @@
 package com.skillcheckr.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -150,6 +151,43 @@ class ResultRepositoryImplTest {
                 .build());
 
         assertThat(saved.getStudentName()).isNull();
+    }
+
+    @Test
+    void insertSubmissionResult_rejectsAMissingSubmittedAt() {
+        ExamResultDTO result = ExamResultDTO.builder()
+                .examId(1)
+                .studentId(7)
+                .marksObtained(50)
+                .totalMarks(100)
+                .passingMarks(40)
+                .percentage(50.0)
+                .status("Pass")
+                .attemptId(1)
+                .build();
+
+        assertThatThrownBy(() -> repository.insertSubmissionResult(result))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("submitted_at is required");
+    }
+
+    @Test
+    void insertSubmissionResult_rejectsAnUnreadableSubmittedAt() {
+        ExamResultDTO result = ExamResultDTO.builder()
+                .examId(1)
+                .studentId(7)
+                .marksObtained(50)
+                .totalMarks(100)
+                .passingMarks(40)
+                .percentage(50.0)
+                .status("Pass")
+                .submittedAt("2026-09-24T10:00:00")
+                .attemptId(1)
+                .build();
+
+        assertThatThrownBy(() -> repository.insertSubmissionResult(result))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("yyyy-MM-dd HH:mm:ss");
     }
 
     @Test

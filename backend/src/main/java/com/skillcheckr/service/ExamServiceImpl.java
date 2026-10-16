@@ -38,6 +38,9 @@ public class ExamServiceImpl implements ExamService {
 	@Autowired
 	private ExamSubmissionService examSubmissionService;
 
+	@Autowired
+	private AttemptExpiryPolicy attemptExpiryPolicy;
+
 	@Override
 	public Exam saveExam(Exam exam, int teacherId) {
 		// Ownership and lifecycle status are decided by the server, never by the request body.
@@ -103,7 +106,9 @@ public class ExamServiceImpl implements ExamService {
 			if (!ExamConstants.ATTEMPT_STATUS_IN_PROGRESS.equalsIgnoreCase(attempt.getStatus())) {
 				throw new AttemptStartException(409, "This exam has already been submitted");
 			}
-			if (attempt.getExpiresAt() != null && attempt.getExpiresAt().isAfter(now)) {
+			LocalDateTime effectiveExpiry = attemptExpiryPolicy.effectiveExpiry(attempt, exam);
+			if (effectiveExpiry != null && now.isBefore(effectiveExpiry)) {
+				attempt.setExpiresAt(effectiveExpiry);
 				return new AttemptStartResult(attempt, true);
 			}
 			// The attempt window elapsed without an explicit submission. Grade what was
@@ -116,14 +121,19 @@ public class ExamServiceImpl implements ExamService {
 			throw new AttemptStartException(409, "Exam cannot be started at this time");
 		}
 
-		LocalDateTime expiresAt = now.plusMinutes(exam.getDurationMinutes());
+		LocalDateTime requestedExpiry = now.plusMinutes(exam.getDurationMinutes());
 		ExamAttempt attempt = ExamAttempt.builder()
 				.exam(exam)
 				.student(Student.builder().studentId(studentId).build())
 				.startedAt(now)
-				.expiresAt(expiresAt)
+				.expiresAt(requestedExpiry)
 				.status(ExamConstants.ATTEMPT_STATUS_IN_PROGRESS)
 				.build();
+		LocalDateTime expiresAt = attemptExpiryPolicy.effectiveExpiry(attempt, exam);
+		if (expiresAt == null || !now.isBefore(expiresAt)) {
+			throw new AttemptStartException(409, "Exam cannot be started at this time");
+		}
+		attempt.setExpiresAt(expiresAt);
 		int attemptId;
 		try {
 			attemptId = examAttemptRepository.createAttempt(attempt);

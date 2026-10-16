@@ -5,10 +5,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Time;
-import java.sql.Timestamp;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +46,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 				exam.setExamId(rs.getInt("exam_id"));
 				exam.setTeacherId(rs.getInt("teacher_id"));
 				exam.setExamName(rs.getString("exam_name"));
-				exam.setDate(rs.getString("exam_date"));
+				exam.setDate(formatExamDate(rs.getObject("exam_date", LocalDateTime.class)));
 				exam.setStatus(rs.getString("status"));
 
 				Time sqlStartTime = rs.getTime("start_time");
@@ -106,9 +106,13 @@ public class ExamRepositoryImpl implements ExamRepository {
 			exam.setExamType(ExamConstants.QUESTION_TYPE_MCQ);
 		}
 
-		Timestamp examDate;
+		// exam_date is a MySQL DATETIME: a wall-clock value with no zone. Binding it as
+		// java.sql.Timestamp would let the JDBC driver convert between the connection
+		// timezone and the JVM zone, which can move an exam onto the previous calendar
+		// day. setObject(LocalDateTime) sends the value verbatim.
+		LocalDateTime examDate;
 		try {
-			examDate = Timestamp.valueOf(parseExamDate(exam.getDate()));
+			examDate = parseExamDate(exam.getDate());
 		} catch (DateTimeException ex) {
 			throw new BadRequestException("Exam date must be a valid date and time value");
 		}
@@ -126,7 +130,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 			}
 			ps.setString(3, exam.getExamName());
 			ps.setString(4, exam.getExamType());
-			ps.setTimestamp(5, examDate);
+			ps.setObject(5, examDate);
 			ps.setInt(6, exam.getDurationMinutes());
 			ps.setInt(7, exam.getTotalMarks());
 			ps.setInt(8, exam.getPassingMarks());
@@ -163,6 +167,18 @@ public class ExamRepositoryImpl implements ExamRepository {
 			// fall through to a date only value
 		}
 		return LocalDate.parse(value.split("[ T]")[0]).atStartOfDay();
+	}
+
+	/**
+	 * Renders a stored exam_date wall-clock value back into the string shape the model and
+	 * ExamCreationValidator accept. Reading through LocalDateTime keeps the value exactly as
+	 * written; no JDBC timezone conversion is involved.
+	 */
+	private String formatExamDate(LocalDateTime examDate) {
+		if (examDate == null) {
+			return null;
+		}
+		return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(examDate);
 	}
 
 	private Optional<Subject> findSubjectByCode(String subjectCode) {
@@ -330,7 +346,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 			exam.setExamId(rs.getInt("exam_id"));
 			exam.setExamName(rs.getString("exam_name"));
 			exam.setExamType(rs.getString("exam_type"));
-			exam.setDate(rs.getString("exam_date"));
+			exam.setDate(formatExamDate(rs.getObject("exam_date", LocalDateTime.class)));
 			exam.setStatus(rs.getString("exam_status"));
 			Time sqlStartTime = rs.getTime("start_time");
 			Time sqlEndTime = rs.getTime("end_time");

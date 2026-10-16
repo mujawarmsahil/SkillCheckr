@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Test;
@@ -43,8 +42,9 @@ class ExamAttemptRowMapperTest {
     @Test
     void mapsTimestamps() throws SQLException {
         ResultSet rs = baseResultSet();
-        when(rs.getTimestamp("started_at")).thenReturn(Timestamp.valueOf(LocalDateTime.of(2026, 9, 25, 10, 0)));
-        when(rs.getTimestamp("expires_at")).thenReturn(Timestamp.valueOf(LocalDateTime.of(2026, 9, 25, 12, 0)));
+        when(rs.getObject("started_at", LocalDateTime.class)).thenReturn(LocalDateTime.of(2026, 9, 25, 10, 0));
+        when(rs.getObject("expires_at", LocalDateTime.class)).thenReturn(LocalDateTime.of(2026, 9, 25, 12, 0));
+        when(rs.getObject("submitted_at", LocalDateTime.class)).thenReturn(null);
 
         ExamAttempt attempt = ExamAttemptRowMapper.INSTANCE.mapRow(rs, 0);
 
