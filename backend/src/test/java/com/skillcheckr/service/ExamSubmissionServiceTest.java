@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -65,6 +66,8 @@ class ExamSubmissionServiceTest {
     @Mock
     private QuestionBreakdownService questionBreakdownService;
 
+    private final AnswerKeyReleasePolicy answerKeyReleasePolicy = new AnswerKeyReleasePolicy();
+
     private ExamSubmissionServiceImpl service;
     private ExamAttempt attempt;
     private Exam exam;
@@ -72,8 +75,10 @@ class ExamSubmissionServiceTest {
     @BeforeEach
     void setUp() {
         service = new ExamSubmissionServiceImpl(examRepository, examAttemptRepository,
-                examQuestionRepository, attemptAnswerRepository, resultRepository, questionBreakdownService);
+                examQuestionRepository, attemptAnswerRepository, resultRepository, questionBreakdownService,
+                answerKeyReleasePolicy);
         exam = Exam.builder().examId(EXAM_ID).examName("Math").examType(ExamConstants.QUESTION_TYPE_MCQ)
+                .date("2030-01-15").startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(10, 0))
                 .totalMarks(10).passingMarks(4).build();
         attempt = ExamAttempt.builder().attemptId(ATTEMPT_ID).exam(exam)
                 .student(Student.builder().studentId(STUDENT_ID).build())
@@ -112,11 +117,22 @@ class ExamSubmissionServiceTest {
     }
 
     @Test
-    void submit_returnsTheServerDerivedBreakdownOnTheInsertedResult() {
+    void submit_hidesTheBreakdownUntilTheExamWindowCloses() {
         ExamResultDTO result = service.submit(EXAM_ID, ATTEMPT_ID, STUDENT_ID);
 
-        assertThat(result.getQuestionBreakdown()).hasSize(1);
+        assertThat(result.getAnswerKeyReleased()).isFalse();
+        assertThat(result.getQuestionBreakdown()).isEmpty();
         verify(questionBreakdownService).build(EXAM_ID, ATTEMPT_ID);
+    }
+
+    @Test
+    void submit_releasesTheBreakdownAfterTheExamWindowCloses() {
+        exam.setDate("2020-01-15");
+
+        ExamResultDTO result = service.submit(EXAM_ID, ATTEMPT_ID, STUDENT_ID);
+
+        assertThat(result.getAnswerKeyReleased()).isTrue();
+        assertThat(result.getQuestionBreakdown()).hasSize(1);
     }
 
     @Test
@@ -155,7 +171,8 @@ class ExamSubmissionServiceTest {
         ExamResultDTO result = service.submit(EXAM_ID, ATTEMPT_ID, STUDENT_ID);
 
         assertThat(result.getResultId()).isEqualTo(88);
-        assertThat(result.getQuestionBreakdown()).hasSize(1);
+        assertThat(result.getAnswerKeyReleased()).isFalse();
+        assertThat(result.getQuestionBreakdown()).isEmpty();
         verify(examQuestionRepository, never()).findByExamId(EXAM_ID);
         verify(resultRepository, never()).insertSubmissionResult(any());
     }

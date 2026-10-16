@@ -100,6 +100,9 @@ public class QuestionController {
 	public ResponseEntity<List<QuestionDTO>> getQuestionsByExam(@PathVariable("examId") Integer examId,
 			HttpServletRequest request) {
 		AuthGuard.requireStaff(request);
+		AuthGuard.requireExamAccess(request,
+				examService.getExamById(examId)
+						.orElseThrow(() -> new ResourceNotFoundException("Exam not found")));
 		List<QuestionDTO> questions = questionService.getQuestionsByExamId(examId);
 		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}

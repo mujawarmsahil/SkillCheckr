@@ -259,6 +259,8 @@ export default function TakeExam() {
       resultData.subject_name || resultData.subjectName || exam?.subject?.subject_name || "General";
 
     const breakdownList = resultData.question_breakdown || resultData.questionBreakdown || [];
+    const answerKeyReleased =
+      resultData.answer_key_released ?? resultData.answerKeyReleased;
 
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 select-none">
@@ -299,6 +301,14 @@ export default function TakeExam() {
               <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">Evaluation Pending</p>
               <p className="text-sm font-semibold text-blue-900 mt-1">
                 Your written answers need teacher evaluation. The result is updated after grading.
+              </p>
+            </div>
+          )}
+
+          {answerKeyReleased === false && (
+            <div className="bg-amber-50 border-b border-amber-200 p-4 text-center">
+              <p className="text-sm font-semibold text-amber-900">
+                Detailed answer review will be available after the scheduled exam window closes.
               </p>
             </div>
           )}

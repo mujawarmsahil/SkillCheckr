@@ -9,13 +9,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +29,7 @@ import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.service.ExamService;
+import com.skillcheckr.service.AnswerKeyReleasePolicy;
 import com.skillcheckr.service.ResultService;
 import com.skillcheckr.support.TestAuth;
 
@@ -41,10 +46,32 @@ class ResultControllerTest {
     @Mock
     private ExamService examService;
 
+    @Spy
+    private AnswerKeyReleasePolicy answerKeyReleasePolicy = new AnswerKeyReleasePolicy();
+
     @InjectMocks
     private ResultController resultController;
 
     private MockMvc mockMvc;
+
+    private Exam examWithReleaseWindow(int examId, boolean released) {
+        Exam exam = new Exam();
+        exam.setExamId(examId);
+        exam.setTeacherId(TEACHER_ID);
+        exam.setDate(LocalDate.now().plusDays(released ? -1 : 1).toString());
+        exam.setStartTime(LocalTime.of(9, 0));
+        exam.setEndTime(LocalTime.of(10, 0));
+        return exam;
+    }
+
+    private ExamResultDTO resultWithAnswerKey() {
+        return ExamResultDTO.builder()
+                .resultId(101)
+                .examId(5)
+                .studentId(STUDENT_ID)
+                .questionBreakdown(List.of(Map.of("correctAnswer", "B", "isCorrect", true)))
+                .build();
+    }
 
     @BeforeEach
     void setUp() {
@@ -73,17 +100,28 @@ class ResultControllerTest {
 
     @Test
     void checkStudentExamStatus_returnsHasSubmittedTrue_whenResultExists() throws Exception {
-        ExamResultDTO existing = ExamResultDTO.builder()
-                .resultId(101)
-                .examId(5)
-                .studentId(STUDENT_ID)
-                .build();
+        ExamResultDTO existing = resultWithAnswerKey();
+        when(examService.getExamById(5)).thenReturn(Optional.of(examWithReleaseWindow(5, false)));
         when(resultService.getResultByExamAndStudent(5, STUDENT_ID)).thenReturn(Optional.of(existing));
 
         mockMvc.perform(get("/api/results/check/5/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasSubmitted").value(true))
-                .andExpect(jsonPath("$.result.result_id").value(101));
+                .andExpect(jsonPath("$.result.result_id").value(101))
+                .andExpect(jsonPath("$.result.answer_key_released").value(false))
+                .andExpect(jsonPath("$.result.question_breakdown").isEmpty());
+    }
+
+    @Test
+    void checkStudentExamStatus_releasesAnswerBreakdownAfterTheExamWindowCloses() throws Exception {
+        when(examService.getExamById(5)).thenReturn(Optional.of(examWithReleaseWindow(5, true)));
+        when(resultService.getResultByExamAndStudent(5, STUDENT_ID))
+                .thenReturn(Optional.of(resultWithAnswerKey()));
+
+        mockMvc.perform(get("/api/results/check/5/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.answer_key_released").value(true))
+                .andExpect(jsonPath("$.result.question_breakdown[0].correctAnswer").value("B"));
     }
 
     @Test
@@ -104,12 +142,26 @@ class ResultControllerTest {
 
     @Test
     void getResultsByStudent_returnsList_whenPresent() throws Exception {
-        ExamResultDTO dto = ExamResultDTO.builder().resultId(1).studentId(STUDENT_ID).build();
+        ExamResultDTO dto = resultWithAnswerKey();
+        when(examService.getExamById(5)).thenReturn(Optional.of(examWithReleaseWindow(5, false)));
         when(resultService.getResultsByStudentId(STUDENT_ID)).thenReturn(List.of(dto));
 
         mockMvc.perform(get("/api/results/student/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].result_id").value(1));
+                .andExpect(jsonPath("$[0].result_id").value(101))
+                .andExpect(jsonPath("$[0].answer_key_released").value(false))
+                .andExpect(jsonPath("$[0].question_breakdown").isEmpty());
+    }
+
+    @Test
+    void getResultsByStudent_releasesAnswerBreakdownAfterTheExamWindowCloses() throws Exception {
+        when(examService.getExamById(5)).thenReturn(Optional.of(examWithReleaseWindow(5, true)));
+        when(resultService.getResultsByStudentId(STUDENT_ID)).thenReturn(List.of(resultWithAnswerKey()));
+
+        mockMvc.perform(get("/api/results/student/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].answer_key_released").value(true))
+                .andExpect(jsonPath("$[0].question_breakdown[0].correctAnswer").value("B"));
     }
 
     @Test
@@ -139,6 +191,18 @@ class ResultControllerTest {
         mockMvc.perform(get("/api/results/check/5/" + OTHER_STUDENT_ID).with(TestAuth.asTeacher(TEACHER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasSubmitted").value(false));
+    }
+
+    @Test
+    void checkStudentExamStatus_preservesAnswerBreakdownForTheOwningTeacher() throws Exception {
+        when(examService.getExamById(5)).thenReturn(Optional.of(examWithReleaseWindow(5, false)));
+        when(resultService.getResultByExamAndStudent(5, OTHER_STUDENT_ID))
+                .thenReturn(Optional.of(resultWithAnswerKey()));
+
+        mockMvc.perform(get("/api/results/check/5/" + OTHER_STUDENT_ID)
+                        .with(TestAuth.asTeacher(TEACHER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.question_breakdown[0].correctAnswer").value("B"));
     }
 
     @Test
