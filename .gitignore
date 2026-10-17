@@ -1,3 +1,11 @@
+# ==============================================================================
+# SkillCheckr - single consolidated ignore file (applies to the whole repo)
+#
+# The per-module files (frontend/.gitignore, backend/.gitignore) were removed.
+# frontend/.gitignore was a 100% duplicate of this file; the rules that only
+# existed in backend/.gitignore are folded in below under their own headings.
+# ==============================================================================
+
 # Logs
 logs/
 *.log
@@ -17,16 +25,25 @@ dist-ssr/
 target/
 build/
 *.local
+# Spring Initializr convention: keep build output nested under src/ trackable.
+!**/src/main/**/target/
+!**/src/test/**/target/
+# Keep the Maven wrapper jar trackable.
+!.mvn/wrapper/maven-wrapper.jar
 
 # Editor & IDE files
 .idea/
 *.iml
 *.iws
 *.ipr
-.metadata/
+*.metadata/
 .settings/
 .classpath
+.factorypath
 .project
+.springBeans
+.sts4-cache/
+.apt_generated
 .vscode/*
 !.vscode/extensions.json
 *.suo
@@ -35,22 +52,34 @@ build/
 *.sln
 *.sw?
 
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+HELP.md
+
 # Operating System & Temporary Files
 .DS_Store
 Thumbs.db
 *.tmp
 *.temp
 
+# Test coverage & Reports
+coverage/
+.nyc_output/
+jacoco.exec
+
 # Local Tooling & AI assistant caches
+#
+# NOTE: .agents/ is deliberately NOT ignored. It is the single canonical,
+# version-controlled home for the shared agent skills and rules, replacing the
+# previous per-tool copies under .claude/ and .github/skills/.
 .claude/
 .gemini/
 .antigravity/
 .cursor/
 .opencode/
-
-# Test coverage
-coverage/
-.nyc_output/
 
 # Environment & Local Secrets
 .env
