@@ -3,9 +3,11 @@ import { getAllExams, approveExam, rejectExam, cancelExam, deleteExam } from "..
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 import { isExamDateTimePassed } from "../../utils/examUtils";
+import QuestionBankViewer from "../common/QuestionBankViewer";
 
 export default function AcceptExam() {
   const [exams, setExams] = useState([]);
+  const [questionBankExam, setQuestionBankExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL"); // "ALL", "PENDING", "UPCOMING", "COMPLETED", "CANCELLED"
@@ -224,6 +226,15 @@ export default function AcceptExam() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setQuestionBankExam(exam)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-800 transition-colors hover:bg-indigo-100"
+                            title="View question bank PDF"
+                          >
+                            <Icon name="file-text" className="h-3.5 w-3.5" />
+                            View PDF
+                          </button>
                           {isPending && (
                             <>
                               <button
@@ -269,6 +280,9 @@ export default function AcceptExam() {
             </table>
           </div>
         </div>
+      )}
+      {questionBankExam && (
+        <QuestionBankViewer exam={questionBankExam} onClose={() => setQuestionBankExam(null)} />
       )}
     </div>
   );

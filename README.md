@@ -176,8 +176,10 @@ sample answers. The application cannot reliably detect answer keys inside
 arbitrary uploaded PDFs, so the teacher must confirm the uploaded PDF contains
 questions only.
 
-The question-bank download is available to students only after an exam is
-approved. Flyway applies
+Students can preview or download the question bank only after an exam is
+approved. Administrators can preview it from the exam approval list before
+making an approval decision. Typed questions and reference answers continue to
+use the existing question and answer tables. Flyway applies
 `backend/src/main/resources/db/migration/V3__add_exam_question_bank.sql`
 automatically on startup; no manual SQL migration is required.
 

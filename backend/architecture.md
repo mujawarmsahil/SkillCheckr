@@ -176,10 +176,12 @@ must not be edited.
 
 `V3__add_exam_question_bank.sql` adds optional per-exam student PDF storage.
 Teachers may upload a question-only PDF while their exam is pending approval.
-Students can download it only once the exam is approved; when no PDF is
-uploaded, PDFBox generates one from student-safe question data and excludes
-correct options and descriptive sample answers. Uploaded PDFs are stored in
-MySQL to survive container restarts.
+Administrators can preview the question bank during review, and students can
+preview or download it only once the exam is approved. When no PDF is uploaded,
+PDFBox generates one from student-safe question data and excludes correct
+options and descriptive sample answers. Typed questions and reference answers
+continue to use the existing `question` and `answer` tables. Uploaded PDFs are
+stored in MySQL to survive container restarts.
 
 RowMappers use explicit query projections rather than runtime metadata fallback. Repositories explicitly project the required columns (such as `student.name AS student_name` via `LEFT JOIN`), eliminating `ResultSetMetaData` and `hasColumn` probing.
 
