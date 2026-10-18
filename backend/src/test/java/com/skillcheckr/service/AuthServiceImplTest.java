@@ -46,17 +46,16 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void login_upgradesPlaintextPassword_whenMatching() {
+    void login_rejectsPlaintextPassword() {
         User legacyUser = user(2, "Teacher", "Active");
         legacyUser.setPassword("plainPass");
         when(authRepository.findByUsername("legacyTeacher")).thenReturn(Optional.of(legacyUser));
-        when(passwordEncoder.encode("plainPass")).thenReturn("$2a$10$newHash");
+        when(passwordEncoder.matches("plainPass", "plainPass")).thenReturn(false);
 
         Optional<User> loggedIn = authService.login("legacyTeacher", "plainPass");
 
-        assertThat(loggedIn).containsSame(legacyUser);
-        assertThat(legacyUser.getPassword()).isEqualTo("$2a$10$newHash");
-        verify(authRepository).updatePassword(2, "$2a$10$newHash");
+        assertThat(loggedIn).isEmpty();
+        verify(authRepository, never()).updatePassword(2, "$2a$10$newHash");
     }
 
     @Test
@@ -246,10 +245,11 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void verifyCurrentPassword_returnsTrue_whenPlaintextMatches() {
+    void verifyCurrentPassword_rejectsPlaintext() {
         when(authRepository.findPasswordByUserId(1)).thenReturn(Optional.of("plainSecret"));
+        when(passwordEncoder.matches("plainSecret", "plainSecret")).thenReturn(false);
 
-        assertThat(authService.verifyCurrentPassword(1, "plainSecret")).isTrue();
+        assertThat(authService.verifyCurrentPassword(1, "plainSecret")).isFalse();
     }
 
     @Test
