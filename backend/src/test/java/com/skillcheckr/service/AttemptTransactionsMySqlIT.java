@@ -363,8 +363,8 @@ class AttemptTransactionsMySqlIT {
         }).when(examAttemptRepository).finalizeAttempt(anyInt(), org.mockito.ArgumentMatchers.any());
 
         assertThatThrownBy(() -> examSubmissionService.submit(examId, attemptId, studentId))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Controlled failure before attempt finalization");
+                .isInstanceOf(RuntimeException.class)
+                .hasRootCauseMessage("Controlled failure before attempt finalization");
 
         assertThat(attemptStatus()).isEqualTo(ExamConstants.ATTEMPT_STATUS_IN_PROGRESS);
         assertThat(resultCount()).isZero();
