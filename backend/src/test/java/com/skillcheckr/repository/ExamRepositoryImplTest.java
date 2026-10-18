@@ -7,10 +7,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalTime;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -199,10 +203,13 @@ class ExamRepositoryImplTest {
         Exam exam = new Exam();
         exam.setExamId(1);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of(exam));
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(Map.of("exam_id", 1, "question_count", 0)));
 
         List<Exam> exams = repository.getAllUpcomingExams();
 
         assertThat(exams).containsExactly(exam);
+        assertListingCountQueryUses(exams, 1);
     }
 
     @Test
@@ -211,10 +218,13 @@ class ExamRepositoryImplTest {
         Exam exam = new Exam();
         exam.setExamId(2);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of(exam));
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(Map.of("exam_id", 2, "question_count", 0)));
 
         List<Exam> exams = repository.getAllCompletedExams();
 
         assertThat(exams).containsExactly(exam);
+        assertListingCountQueryUses(exams, 2);
     }
 
     @Test
@@ -223,10 +233,57 @@ class ExamRepositoryImplTest {
         Exam exam = new Exam();
         exam.setExamId(3);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of(exam));
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(Map.of("exam_id", 3, "question_count", 2)));
 
         List<Exam> exams = repository.getAllExams();
 
         assertThat(exams).containsExactly(exam);
+        ArgumentCaptor<String> query = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).query(query.capture(), any(RowMapper.class));
+        assertThat(query.getValue()).contains("ORDER BY e.exam_id DESC")
+                .doesNotContain("SELECT COUNT(*) FROM exam_question");
+        ArgumentCaptor<String> countsQuery = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> examIds = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).queryForList(countsQuery.capture(), examIds.capture());
+        assertThat(countsQuery.getValue()).contains("WHERE exam_id IN (?)", "GROUP BY exam_id");
+        assertThat(examIds.getValue()).containsExactly(3);
+        assertThat(exams.get(0).getQuestionCount()).isEqualTo(2);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getAllExamsReturnsEmptyWhenTheRepositoryHasNoRows() {
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of());
+
+        assertThat(repository.getAllExams()).isEmpty();
+        verify(jdbcTemplate, never()).queryForList(anyString(), any(Object[].class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getAllExamsMapsQuestionCountsForEachExamInListingOrder() throws SQLException {
+        ResultSet firstRow = examRow(11);
+        ResultSet secondRow = examRow(8);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenAnswer(invocation -> {
+            RowMapper<Exam> mapper = invocation.getArgument(1);
+            return List.of(mapper.mapRow(firstRow, 0), mapper.mapRow(secondRow, 1));
+        });
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
+                Map.of("exam_id", 11, "question_count", 4),
+                Map.of("exam_id", 8, "question_count", 0)));
+
+        List<Exam> exams = repository.getAllExams();
+
+        assertThat(exams).extracting(Exam::getExamId).containsExactly(11, 8);
+        assertThat(exams).extracting(Exam::getQuestionCount).containsExactly(4, 0);
+    }
+
+    private ResultSet examRow(int examId) throws SQLException {
+        ResultSet row = mock(ResultSet.class);
+        lenient().when(row.getInt("exam_id")).thenReturn(examId);
+        when(row.getObject("exam_date", java.time.LocalDateTime.class)).thenReturn(null);
+        return row;
     }
 
     @Test
@@ -247,10 +304,25 @@ class ExamRepositoryImplTest {
         Exam exam = new Exam();
         exam.setExamId(1);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(10))).thenReturn(List.of(exam));
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(Map.of("exam_id", 1, "question_count", 0)));
 
         List<Exam> exams = repository.getExamsByTeacherId(10);
 
         assertThat(exams).containsExactly(exam);
+        assertListingCountQueryUses(exams, 1);
+        ArgumentCaptor<String> listingQuery = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).query(listingQuery.capture(), any(RowMapper.class), eq(10));
+        assertThat(listingQuery.getValue()).contains("WHERE e.teacher_id = ?");
+    }
+
+    private void assertListingCountQueryUses(List<Exam> exams, int examId) {
+        assertThat(exams).singleElement().extracting(Exam::getQuestionCount).isEqualTo(0);
+        ArgumentCaptor<String> countQuery = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> examIds = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).queryForList(countQuery.capture(), examIds.capture());
+        assertThat(countQuery.getValue()).contains("WHERE exam_id IN (?)", "GROUP BY exam_id");
+        assertThat(examIds.getValue()).containsExactly(examId);
     }
 
     @Test

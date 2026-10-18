@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -64,4 +65,8 @@ public class Exam {
 
 	@JsonIgnore
 	private boolean paperFrozen;
+
+	@JsonProperty("question_count")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private Integer questionCount;
 }

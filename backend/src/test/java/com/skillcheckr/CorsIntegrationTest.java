@@ -14,7 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Covers the CORS behaviour of a real deployment. No profile is active here on purpose:
  * that is exactly the production default, and it must not trust loopback origins.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.exam.attempt-finalizer-initial-delay-ms=3600000")
 @AutoConfigureMockMvc
 class CorsIntegrationTest {
 

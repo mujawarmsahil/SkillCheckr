@@ -21,7 +21,7 @@ import com.skillcheckr.model.QuestionDTO;
  * tests run against the real context so that a regression in that configuration is caught here
  * rather than in production, where a fractional mark would be stored as a different mark.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.exam.attempt-finalizer-initial-delay-ms=3600000")
 class JacksonNumberBindingTest {
 
     @Autowired
