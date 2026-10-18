@@ -1,6 +1,7 @@
 package com.skillcheckr.repository;
 
 import java.util.List;
+import java.util.Collections;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -28,7 +29,25 @@ public class ExamQuestionRepositoryImpl implements ExamQuestionRepository {
                 + "JOIN exam e ON e.exam_id = eq.exam_id "
                 + "JOIN question q ON q.question_id = eq.question_id "
                 + "WHERE eq.exam_id = ? ORDER BY eq.question_order ASC";
-        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+        return jdbcTemplate.query(sql, this::mapExamQuestion, examId);
+    }
+
+    @Override
+    public List<ExamQuestion> findByExamIds(List<Integer> examIds) {
+        if (examIds == null || examIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(examIds.size(), "?"));
+        String sql = "SELECT eq.exam_question_id, eq.question_order, "
+                + "e.exam_id, e.exam_name, q.question_id, q.subject_id, q.question_text, "
+                + "q.question_type, q.marks, q.word_limit "
+                + "FROM exam_question eq JOIN exam e ON e.exam_id = eq.exam_id "
+                + "JOIN question q ON q.question_id = eq.question_id "
+                + "WHERE eq.exam_id IN (" + placeholders + ") ORDER BY eq.exam_id, eq.question_order ASC";
+        return jdbcTemplate.query(sql, this::mapExamQuestion, examIds.toArray());
+    }
+
+    private ExamQuestion mapExamQuestion(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
             Question question = Question.builder()
                     .questionId(rs.getInt("question_id"))
                     .questionText(rs.getString("question_text"))
@@ -43,7 +62,6 @@ public class ExamQuestionRepositoryImpl implements ExamQuestionRepository {
                     .question(question)
                     .questionOrder(rs.getInt("question_order"))
                     .build();
-        }, examId);
     }
 
     @Override

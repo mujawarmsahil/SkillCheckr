@@ -1,14 +1,18 @@
 package com.skillcheckr.service;
 
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.constant.ExamConstants;
@@ -41,6 +45,9 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
     private final QuestionBreakdownService questionBreakdownService;
     private final AnswerKeyReleasePolicy answerKeyReleasePolicy;
 
+    @Autowired(required = false)
+    private Clock clock;
+
     public ExamSubmissionServiceImpl(ExamRepository examRepository,
             ExamAttemptRepository examAttemptRepository,
             ExamQuestionRepository examQuestionRepository,
@@ -72,7 +79,7 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
         }
         ExamAttemptValidator.validateAttemptCanSubmit(attempt);
 
-        LocalDateTime submittedAt = LocalDateTime.now();
+        LocalDateTime submittedAt = clock == null ? LocalDateTime.now() : LocalDateTime.now(clock);
 
         // Multiple choice answers are graded here, descriptive answers stay pending until
         // a teacher awards marks for them.
@@ -123,10 +130,17 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
     @Override
     public List<ExamSubmissionSummaryDTO> listSubmissions(int examId) {
         requireExam(examId);
-        List<ExamSubmissionSummaryDTO> submissions = new ArrayList<>();
-        for (ExamSubmissionSummaryDTO summary : resultRepository.findSubmissionSummariesByExamId(examId)) {
-            summary.setPendingEvaluation(hasPendingEvaluation(examId, summary.getAttemptId()));
-            submissions.add(summary);
+        List<ExamSubmissionSummaryDTO> submissions = resultRepository.findSubmissionSummariesByExamId(examId);
+        if (submissions == null || submissions.isEmpty()) {
+            return submissions == null ? List.of() : submissions;
+        }
+        Set<Integer> descriptiveQuestionIds = descriptiveQuestionIds(examQuestionRepository.findByExamId(examId));
+        List<Integer> attemptIds = submissions.stream().map(ExamSubmissionSummaryDTO::getAttemptId).toList();
+        Map<Integer, Map<Integer, AttemptAnswer>> answersByAttempt = answersByAttempt(
+                attemptAnswerRepository.findByAttemptIds(attemptIds));
+        for (ExamSubmissionSummaryDTO summary : submissions) {
+            summary.setPendingEvaluation(hasPendingEvaluation(descriptiveQuestionIds,
+                    answersByAttempt.getOrDefault(summary.getAttemptId(), Map.of())));
         }
         return submissions;
     }
@@ -255,6 +269,7 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
     private int gradeObjectiveAnswers(int examId, int attemptId, boolean resetPending) {
         Map<Integer, AttemptAnswer> answers = answersByQuestion(attemptId);
         int marksObtained = 0;
+        Map<Integer, Integer> marksByQuestionId = new HashMap<>();
         for (ExamQuestion assignment : examQuestionRepository.findByExamId(examId)) {
             Question question = assignment.getQuestion();
             if (question == null) {
@@ -266,27 +281,22 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
                         && answer.getSelectedAnswer().isCorrect()
                         ? Math.max(0, question.getMarks())
                         : 0;
-                attemptAnswerRepository.updateMarks(attemptId, question.getQuestionId(), awarded);
+                marksByQuestionId.put(question.getQuestionId(), awarded);
                 marksObtained += awarded;
             } else if (resetPending && answers.containsKey(question.getQuestionId())) {
-                attemptAnswerRepository.updateMarks(attemptId, question.getQuestionId(), null);
+                marksByQuestionId.put(question.getQuestionId(), null);
             }
         }
+        attemptAnswerRepository.updateMarksBatch(attemptId, marksByQuestionId);
         return marksObtained;
     }
 
     private int awardedDescriptiveMarks(int attemptId, int examId) {
-        List<Integer> descriptiveQuestionIds = new ArrayList<>();
-        for (ExamQuestion assignment : examQuestionRepository.findByExamId(examId)) {
-            if (assignment.getQuestion() != null
-                    && !ExamConstants.QUESTION_TYPE_MCQ.equalsIgnoreCase(assignment.getQuestion().getQuestionType())) {
-                descriptiveQuestionIds.add(assignment.getQuestion().getQuestionId());
-            }
-        }
+        Set<Integer> descriptiveQuestionIds = descriptiveQuestionIds(examQuestionRepository.findByExamId(examId));
 
         int awarded = 0;
         for (AttemptAnswer answer : answersByQuestion(attemptId).values()) {
-            if (descriptiveQuestionIds.contains(answer.getQuestion().getQuestionId())
+            if (answer.getQuestion() != null && descriptiveQuestionIds.contains(answer.getQuestion().getQuestionId())
                     && answer.getMarksObtained() != null) {
                 awarded += answer.getMarksObtained();
             }
@@ -299,18 +309,22 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
      * awarded marks.
      */
     private boolean hasPendingEvaluation(int examId, int attemptId) {
-        List<Integer> descriptiveQuestionIds = new ArrayList<>();
-        for (ExamQuestion assignment : examQuestionRepository.findByExamId(examId)) {
-            if (assignment.getQuestion() != null
-                    && !ExamConstants.QUESTION_TYPE_MCQ.equalsIgnoreCase(assignment.getQuestion().getQuestionType())) {
-                descriptiveQuestionIds.add(assignment.getQuestion().getQuestionId());
+        Set<Integer> descriptiveQuestionIds = descriptiveQuestionIds(examQuestionRepository.findByExamId(examId));
+        return hasPendingEvaluation(descriptiveQuestionIds, answersByQuestion(attemptId));
+    }
+
+    private Set<Integer> descriptiveQuestionIds(List<ExamQuestion> assignments) {
+        Set<Integer> ids = new HashSet<>();
+        for (ExamQuestion assignment : assignments) {
+            Question question = assignment.getQuestion();
+            if (question != null && !ExamConstants.QUESTION_TYPE_MCQ.equalsIgnoreCase(question.getQuestionType())) {
+                ids.add(question.getQuestionId());
             }
         }
-        if (descriptiveQuestionIds.isEmpty()) {
-            return false;
-        }
+        return ids;
+    }
 
-        Map<Integer, AttemptAnswer> answers = answersByQuestion(attemptId);
+    private boolean hasPendingEvaluation(Set<Integer> descriptiveQuestionIds, Map<Integer, AttemptAnswer> answers) {
         for (Integer questionId : descriptiveQuestionIds) {
             AttemptAnswer answer = answers.get(questionId);
             if (answer == null || answer.getMarksObtained() == null) {
@@ -318,6 +332,17 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
             }
         }
         return false;
+    }
+
+    private Map<Integer, Map<Integer, AttemptAnswer>> answersByAttempt(List<AttemptAnswer> answers) {
+        Map<Integer, Map<Integer, AttemptAnswer>> grouped = new HashMap<>();
+        for (AttemptAnswer answer : answers) {
+            if (answer.getAttempt() != null && answer.getQuestion() != null) {
+                grouped.computeIfAbsent(answer.getAttempt().getAttemptId(), ignored -> new HashMap<>())
+                        .put(answer.getQuestion().getQuestionId(), answer);
+            }
+        }
+        return grouped;
     }
 
     private String statusForMarks(int marksObtained, int passingMarks) {

@@ -2,6 +2,8 @@ package com.skillcheckr.service;
 
 import java.time.DateTimeException;
 import java.time.LocalDateTime;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,12 +51,15 @@ public class ExamServiceImpl implements ExamService {
 	@Autowired
 	private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
+	@Autowired(required = false)
+	private Clock clock;
+
 	@Override
 	public Exam saveExam(Exam exam, int teacherId) {
 		// Ownership and lifecycle status are decided by the server, never by the request body.
 		exam.setTeacherId(teacherId);
 		exam.setStatus(ExamConstants.EXAM_STATUS_PENDING);
-		ExamCreationValidator.validateExamForCreation(exam);
+		ExamCreationValidator.validateExamForCreation(exam, clock == null ? LocalDate.now() : LocalDate.now(clock));
 		return examRepository.saveExam(exam);
 	}
 
@@ -140,7 +145,7 @@ public class ExamServiceImpl implements ExamService {
 			throw new AttemptStartException(403, "Student is not registered for this exam");
 		}
 
-		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime now = clock == null ? LocalDateTime.now() : LocalDateTime.now(clock);
 		List<ExamAttempt> existing = examAttemptRepository.findByExamIdAndStudentId(examId, studentId);
 		for (ExamAttempt attempt : existing) {
 			if (!ExamConstants.ATTEMPT_STATUS_IN_PROGRESS.equalsIgnoreCase(attempt.getStatus())) {
@@ -278,6 +283,6 @@ public class ExamServiceImpl implements ExamService {
 			log.warn("Could not resolve the exam start window for examId={}, treating it as started", exam.getExamId());
 			return true;
 		}
-		return LocalDateTime.now().isAfter(windowStart);
+		return (clock == null ? LocalDateTime.now() : LocalDateTime.now(clock)).isAfter(windowStart);
 	}
 }

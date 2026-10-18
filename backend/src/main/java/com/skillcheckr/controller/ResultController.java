@@ -2,6 +2,8 @@ package com.skillcheckr.controller;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -59,7 +61,9 @@ public class ResultController {
 		AuthPrincipal principal = AuthGuard.requireSelfOrAdminForRoleData(request, studentId);
 		List<ExamResultDTO> results = resultService.getResultsByStudentId(studentId);
 		if (principal.isStudent() && results != null) {
-			results.forEach(result -> answerKeyReleasePolicy.protectStudentResult(result, requireExam(result.getExamId())));
+			Map<Integer, Exam> examsById = new HashMap<>();
+			results.forEach(result -> answerKeyReleasePolicy.protectStudentResult(result,
+					examsById.computeIfAbsent(result.getExamId(), this::requireExam)));
 		}
 		return ResponseEntity.ok(results != null ? results : List.of());
 	}

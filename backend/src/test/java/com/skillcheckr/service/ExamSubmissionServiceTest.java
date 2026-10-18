@@ -111,8 +111,7 @@ class ExamSubmissionServiceTest {
         assertThat(result.getMarksObtained()).isEqualTo(5);
         assertThat(result.getTotalMarks()).isEqualTo(10);
         assertThat(result.getStatus()).isEqualTo(ExamConstants.RESULT_STATUS_PASS);
-        verify(attemptAnswerRepository).updateMarks(ATTEMPT_ID, 100, 5);
-        verify(attemptAnswerRepository).updateMarks(ATTEMPT_ID, 101, 0);
+        verify(attemptAnswerRepository).updateMarksBatch(ATTEMPT_ID, Map.of(100, 5, 101, 0));
         verify(examAttemptRepository).finalizeAttempt(any(Integer.class), any(LocalDateTime.class));
     }
 
@@ -158,7 +157,10 @@ class ExamSubmissionServiceTest {
 
         assertThat(result.getMarksObtained()).isEqualTo(5);
         assertThat(result.getStatus()).isEqualTo(ExamConstants.RESULT_STATUS_SUBMITTED_FOR_EVALUATION);
-        verify(attemptAnswerRepository).updateMarks(ATTEMPT_ID, 102, null);
+        Map<Integer, Integer> expectedMarks = new java.util.HashMap<>();
+        expectedMarks.put(100, 5);
+        expectedMarks.put(102, null);
+        verify(attemptAnswerRepository).updateMarksBatch(ATTEMPT_ID, expectedMarks);
     }
 
     @Test
@@ -210,13 +212,13 @@ class ExamSubmissionServiceTest {
                 assignment(100, ExamConstants.QUESTION_TYPE_MCQ, 5),
                 assignment(102, ExamConstants.QUESTION_TYPE_QUESTION_ANSWER, 5)));
         // Attempt 1 was already graded by a teacher, attempt 2 still waits for marks.
-        when(attemptAnswerRepository.findByAttemptId(1)).thenReturn(List.of(
-                answer(100, true),
-                AttemptAnswer.builder().question(Question.builder().questionId(102).build())
-                        .textAnswer("graded").marksObtained(4).build()));
-        when(attemptAnswerRepository.findByAttemptId(2)).thenReturn(List.of(
-                answer(100, true),
-                AttemptAnswer.builder().question(Question.builder().questionId(102).build())
+        when(attemptAnswerRepository.findByAttemptIds(List.of(1, 2))).thenReturn(List.of(
+                answer(1, 100, true), answer(2, 100, true),
+                AttemptAnswer.builder().attempt(ExamAttempt.builder().attemptId(1).build())
+                        .question(Question.builder().questionId(102).build())
+                        .textAnswer("graded").marksObtained(4).build(),
+                AttemptAnswer.builder().attempt(ExamAttempt.builder().attemptId(2).build())
+                        .question(Question.builder().questionId(102).build())
                         .textAnswer("not graded yet").build()));
 
         List<ExamSubmissionSummaryDTO> submissions = service.listSubmissions(EXAM_ID);
@@ -348,5 +350,11 @@ class ExamSubmissionServiceTest {
                 .question(Question.builder().questionId(questionId).build())
                 .selectedAnswer(Answer.builder().answerId(questionId + 1).correct(correct).build())
                 .build();
+    }
+
+    private AttemptAnswer answer(int attemptId, int questionId, boolean correct) {
+        AttemptAnswer answer = answer(questionId, correct);
+        answer.setAttempt(ExamAttempt.builder().attemptId(attemptId).build());
+        return answer;
     }
 }

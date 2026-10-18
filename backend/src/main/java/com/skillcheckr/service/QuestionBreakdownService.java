@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,8 +35,28 @@ public class QuestionBreakdownService {
 			return List.of();
 		}
 
-		List<ExamQuestion> assignedQuestions = examQuestionRepository.findByExamId(examId);
-		List<AttemptAnswer> answers = attemptAnswerRepository.findByAttemptId(attemptId);
+		return build(examQuestionRepository.findByExamId(examId), attemptAnswerRepository.findByAttemptId(attemptId));
+	}
+
+	public Map<Integer, List<Map<String, Object>>> buildBatch(List<Integer> examIds, List<Integer> attemptIds) {
+		if (examIds == null || attemptIds == null || examIds.isEmpty() || attemptIds.isEmpty()
+				|| examIds.size() != attemptIds.size()) {
+			return Map.of();
+		}
+		Map<Integer, List<ExamQuestion>> questionsByExam = examQuestionRepository.findByExamIds(examIds).stream()
+				.collect(Collectors.groupingBy(item -> item.getExam().getExamId()));
+		Map<Integer, List<AttemptAnswer>> answersByAttempt = attemptAnswerRepository.findByAttemptIds(attemptIds).stream()
+				.filter(answer -> answer.getAttempt() != null)
+				.collect(Collectors.groupingBy(answer -> answer.getAttempt().getAttemptId()));
+		Map<Integer, List<Map<String, Object>>> result = new java.util.LinkedHashMap<>();
+		for (int i = 0; i < examIds.size(); i++) {
+			result.put(attemptIds.get(i), build(questionsByExam.getOrDefault(examIds.get(i), List.of()),
+					answersByAttempt.getOrDefault(attemptIds.get(i), List.of())));
+		}
+		return result;
+	}
+
+	private List<Map<String, Object>> build(List<ExamQuestion> assignedQuestions, List<AttemptAnswer> answers) {
 
 		Map<Integer, AttemptAnswer> answersByQuestion = new HashMap<>();
 		for (AttemptAnswer answer : answers) {

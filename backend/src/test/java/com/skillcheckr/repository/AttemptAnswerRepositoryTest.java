@@ -2,9 +2,11 @@ package com.skillcheckr.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +15,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.Map;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.KeyHolder;
 
 import com.skillcheckr.model.AttemptAnswer;
@@ -64,5 +68,26 @@ class AttemptAnswerRepositoryTest {
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(connection).prepareStatement(sql.capture(), eq(Statement.RETURN_GENERATED_KEYS));
         assertThat(sql.getValue()).contains("attempt_answer_id = LAST_INSERT_ID(attempt_answer_id)");
+    }
+
+    @Test
+    void findByAttemptIdsReturnsEmptyWithoutQueryForEmptyIds() {
+        assertThat(repository.findByAttemptIds(List.of())).isEmpty();
+        verify(jdbcTemplate, never()).query(anyString(), any(RowMapper.class), any(Object[].class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findByAttemptIdsUsesOneOrderedQueryForAllAttempts() {
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        assertThat(repository.findByAttemptIds(List.of(9, 3))).isEmpty();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class), arguments.capture());
+        assertThat(arguments.getValue()).containsExactly(9, 3);
+        assertThat(sql.getValue()).contains("aa.attempt_id IN (?,?)", "ORDER BY aa.attempt_id, aa.question_id",
+                "MIN(answer_id) AS answer_id");
     }
 }

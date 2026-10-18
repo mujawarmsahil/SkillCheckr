@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.RowMapper;
 import com.skillcheckr.model.Answer;
 import com.skillcheckr.model.AttemptAnswer;
 import com.skillcheckr.model.Question;
+import com.skillcheckr.model.ExamAttempt;
 
 public class AttemptAnswerRowMapper implements RowMapper<AttemptAnswer> {
 
@@ -26,6 +27,7 @@ public class AttemptAnswerRowMapper implements RowMapper<AttemptAnswer> {
 
         return AttemptAnswer.builder()
                 .attemptAnswerId(rs.getInt("attempt_answer_id"))
+                .attempt(ExamAttempt.builder().attemptId(rs.getInt("attempt_id")).build())
                 .question(Question.builder().questionId(rs.getInt("question_id")).build())
                 .selectedAnswer(selectedAnswer)
                 .textAnswer(rs.getString("text_answer"))

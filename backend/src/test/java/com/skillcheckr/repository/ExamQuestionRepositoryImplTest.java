@@ -7,13 +7,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class ExamQuestionRepositoryImplTest {
@@ -54,5 +58,25 @@ class ExamQuestionRepositoryImplTest {
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(3))).thenReturn(4);
 
         assertThat(repository.getNextQuestionOrder(3)).isEqualTo(5);
+    }
+
+    @Test
+    void findByExamIdsReturnsEmptyWithoutQueryForEmptyIds() {
+        assertThat(repository.findByExamIds(List.of())).isEmpty();
+        verify(jdbcTemplate, never()).query(anyString(), any(RowMapper.class), any(Object[].class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findByExamIdsUsesOneOrderedQueryForAllExams() {
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        assertThat(repository.findByExamIds(List.of(8, 2))).isEmpty();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class), arguments.capture());
+        assertThat(arguments.getValue()).containsExactly(8, 2);
+        assertThat(sql.getValue()).contains("eq.exam_id IN (?,?)", "ORDER BY eq.exam_id, eq.question_order");
     }
 }

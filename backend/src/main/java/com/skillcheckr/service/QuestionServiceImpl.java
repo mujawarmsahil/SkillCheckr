@@ -1,6 +1,7 @@
 package com.skillcheckr.service;
 
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,6 +33,9 @@ public class QuestionServiceImpl implements QuestionService {
     private final ExamQuestionRepository examQuestionRepository;
     private final AttemptAnswerRepository attemptAnswerRepository;
     private final QuestionPaperMutationPolicy questionPaperMutationPolicy;
+
+    @Autowired(required = false)
+    private Clock clock;
 
     @Autowired
     public QuestionServiceImpl(QuestionRepository questionRepository,
@@ -120,7 +124,8 @@ public class QuestionServiceImpl implements QuestionService {
         Exam exam = questionPaperMutationPolicy.lockAndValidate(examId);
         requirePendingPaper(exam);
         try {
-            if (LocalDateTime.now().isAfter(ExamCreationValidator.resolveWindowStart(exam))) {
+            LocalDateTime now = clock == null ? LocalDateTime.now() : LocalDateTime.now(clock);
+            if (now.isAfter(ExamCreationValidator.resolveWindowStart(exam))) {
                 throw new ExamInUseException("The exam has already started and its question paper is locked");
             }
         } catch (ExamInUseException | BadRequestException ex) {
