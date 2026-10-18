@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * loopback origins the Vite dev server needs. Keeping this in a separate context proves the
  * loopback origins are granted by the profile rather than baked into the shared defaults.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.exam.attempt-finalizer-initial-delay-ms=3600000")
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
 class DevCorsIntegrationTest {

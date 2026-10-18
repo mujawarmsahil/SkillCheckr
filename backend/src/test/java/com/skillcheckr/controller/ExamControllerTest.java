@@ -163,11 +163,12 @@ class ExamControllerTest {
     }
 
     @Test
-    void getAllExams_returns404_whenNoExamsExist() throws Exception {
+    void getAllExams_returnsEmptyList_whenNoExamsExist() throws Exception {
         when(examService.getAllExams()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/exams").with(TestAuth.asAdmin(1)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().json("[]"));
     }
 
     @Test
@@ -785,11 +786,12 @@ class ExamControllerTest {
     }
 
     @Test
-    void getAllCompletedExams_returns404_whenEmpty() throws Exception {
+    void getAllCompletedExams_returnsEmptyList_whenEmpty() throws Exception {
         when(examService.getAllCompletedExams()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/exams/completed").with(TestAuth.asStudent(STUDENT_ID)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().json("[]"));
     }
 
     @Test

@@ -10,6 +10,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,6 +77,27 @@ public class ExamRepositoryImpl implements ExamRepository {
 				return exam;
 			}
 		};
+	}
+
+	private List<Exam> addQuestionCounts(List<Exam> exams) {
+		if (exams.isEmpty()) {
+			return exams;
+		}
+
+		String placeholders = String.join(",", Collections.nCopies(exams.size(), "?"));
+		String query = "SELECT exam_id, COUNT(*) AS question_count FROM exam_question "
+				+ "WHERE exam_id IN (" + placeholders + ") GROUP BY exam_id";
+		Object[] examIds = exams.stream().map(Exam::getExamId).toArray();
+		Map<Integer, Integer> questionCounts = new HashMap<>();
+		for (Map<String, Object> row : jdbcTemplate.queryForList(query, examIds)) {
+			questionCounts.put(((Number) row.get("exam_id")).intValue(),
+					((Number) row.get("question_count")).intValue());
+		}
+
+		for (Exam exam : exams) {
+			exam.setQuestionCount(questionCounts.getOrDefault(exam.getExamId(), 0));
+		}
+		return exams;
 	}
 
 	@Override
@@ -287,7 +311,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 				+ "  OR (DATE(e.exam_date) = CURDATE() AND (e.end_time IS NULL OR e.end_time >= CURTIME()))"
 				+ ") "
 				+ "ORDER BY e.exam_id DESC";
-		return jdbcTemplate.query(query, getExamRowMapper());
+		return addQuestionCounts(jdbcTemplate.query(query, getExamRowMapper()));
 	}
 
 	@Override
@@ -304,14 +328,15 @@ public class ExamRepositoryImpl implements ExamRepository {
 				+ "  )"
 				+ ") "
 				+ "ORDER BY e.exam_id DESC";
-		return jdbcTemplate.query(selectQuery, getExamRowMapper());
+		return addQuestionCounts(jdbcTemplate.query(selectQuery, getExamRowMapper()));
 	}
 
 	@Override
 	public List<Exam> getAllExams() {
 		syncExamStatuses();
-		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id ORDER BY e.exam_id DESC";
-		return jdbcTemplate.query(query, getExamRowMapper());
+		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
+				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id ORDER BY e.exam_id DESC";
+		return addQuestionCounts(jdbcTemplate.query(query, getExamRowMapper()));
 	}
 
 
@@ -325,8 +350,10 @@ public class ExamRepositoryImpl implements ExamRepository {
 	@Override
 	public List<Exam> getExamsByTeacherId(int teacherId) {
 		syncExamStatuses();
-		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e LEFT JOIN subject s ON e.subject_id = s.subject_id WHERE e.teacher_id = ? ORDER BY e.exam_id DESC";
-		return jdbcTemplate.query(query, getExamRowMapper(), teacherId);
+		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
+				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
+				+ "WHERE e.teacher_id = ? ORDER BY e.exam_id DESC";
+		return addQuestionCounts(jdbcTemplate.query(query, getExamRowMapper(), teacherId));
 	}
 
 	@Override

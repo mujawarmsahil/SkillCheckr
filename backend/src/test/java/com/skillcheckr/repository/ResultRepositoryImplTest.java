@@ -6,11 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.LocalDateTime;
+import java.sql.ResultSet;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +25,7 @@ import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.KeyHolder;
 
+import com.skillcheckr.model.ExamSubmissionSummaryDTO;
 import com.skillcheckr.model.ExamResultDTO;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +78,32 @@ class ResultRepositoryImplTest {
         List<ExamResultDTO> results = repository.getAllResults();
 
         assertThat(results).isNotEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findSubmissionSummariesByExamIdPreservesZeroDefaultsForUnsubmittedAttempt() throws Exception {
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(25))).thenAnswer(invocation -> {
+            RowMapper<ExamSubmissionSummaryDTO> rowMapper = invocation.getArgument(1);
+            ResultSet row = mock(ResultSet.class);
+            when(row.getInt("attempt_id")).thenReturn(7);
+            when(row.getInt("student_id")).thenReturn(9);
+            when(row.getInt("marks_obtained")).thenReturn(0);
+            when(row.getInt("total_marks")).thenReturn(0);
+            when(row.getInt("passing_marks")).thenReturn(0);
+            when(row.getDouble("percentage")).thenReturn(0.0);
+            when(row.getObject("started_at", LocalDateTime.class)).thenReturn(null);
+            when(row.getObject("submitted_at", LocalDateTime.class)).thenReturn(null);
+
+            return List.of(rowMapper.mapRow(row, 0));
+        });
+
+        ExamSubmissionSummaryDTO summary = repository.findSubmissionSummariesByExamId(25).get(0);
+
+        assertThat(summary.getMarksObtained()).isZero();
+        assertThat(summary.getTotalMarks()).isZero();
+        assertThat(summary.getPassingMarks()).isZero();
+        assertThat(summary.getPercentage()).isZero();
     }
 
     @Test

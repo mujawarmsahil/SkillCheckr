@@ -38,7 +38,12 @@ import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.AttemptAnswerException;
 import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.model.AttemptAnswerRequest;
+import com.skillcheckr.model.Answer;
+import com.skillcheckr.model.AttemptAnswer;
+import com.skillcheckr.model.ExamAttempt;
 import com.skillcheckr.model.QuestionDTO;
+import com.skillcheckr.model.Question;
+import com.skillcheckr.repository.AttemptAnswerRepository;
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.repository.ExamAttemptRepositoryImpl;
 import com.skillcheckr.repository.ExamRepositoryImpl;
@@ -61,6 +66,9 @@ class AttemptTransactionsMySqlIT {
 
     @Autowired
     private AttemptAnswerService attemptAnswerService;
+
+    @Autowired
+    private AttemptAnswerRepository attemptAnswerRepository;
 
     @Autowired
     private ExamSubmissionService examSubmissionService;
@@ -164,6 +172,48 @@ class AttemptTransactionsMySqlIT {
 
         installLockGate();
         installExamLockGate();
+    }
+
+    @Test
+    void coreFlowIndexesAreAppliedByFlyway() {
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT INDEX_NAME FROM information_schema.statistics "
+                        + "WHERE table_schema = DATABASE() AND index_name IN "
+                        + "('idx_attempt_status_id', 'idx_exam_question_order')",
+                String.class)).contains("idx_attempt_status_id", "idx_exam_question_order");
+    }
+
+    @Test
+    void answerUpsertReturnsTheExistingIdAndUpdatesNullableFields() {
+        int initialAnswerId = jdbcTemplate.queryForObject(
+                "SELECT attempt_answer_id FROM attempt_answer WHERE attempt_id = ? AND question_id = ?",
+                Integer.class, attemptId, questionId);
+        AttemptAnswer updatedMcq = AttemptAnswer.builder()
+                .attempt(ExamAttempt.builder().attemptId(attemptId).build())
+                .question(com.skillcheckr.model.Question.builder().questionId(questionId).build())
+                .selectedAnswer(Answer.builder().answerId(correctAnswerId).build())
+                .build();
+
+        AttemptAnswer savedMcq = attemptAnswerRepository.saveAndReturn(updatedMcq);
+        assertThat(savedMcq.getAttemptAnswerId()).isEqualTo(initialAnswerId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT selected_answer_id FROM attempt_answer WHERE attempt_id = ? AND question_id = ?",
+                Integer.class, attemptId, questionId)).isEqualTo(correctAnswerId);
+
+        AttemptAnswer updatedText = AttemptAnswer.builder()
+                .attempt(ExamAttempt.builder().attemptId(attemptId).build())
+                .question(Question.builder().questionId(questionId).build())
+                .textAnswer("Updated draft")
+                .build();
+        AttemptAnswer savedText = attemptAnswerRepository.saveAndReturn(updatedText);
+
+        assertThat(savedText.getAttemptAnswerId()).isEqualTo(initialAnswerId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT selected_answer_id FROM attempt_answer WHERE attempt_id = ? AND question_id = ?",
+                Integer.class, attemptId, questionId)).isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT text_answer FROM attempt_answer WHERE attempt_id = ? AND question_id = ?",
+                String.class, attemptId, questionId)).isEqualTo("Updated draft");
     }
 
     @AfterEach
