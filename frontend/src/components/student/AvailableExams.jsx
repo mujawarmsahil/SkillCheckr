@@ -4,7 +4,6 @@ import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { Icon } from "../common/Icons";
 import {
-  downloadExamQuestionBank,
   getUpcomingExams,
   getStudentRegistrations,
   registerForExam,
@@ -12,6 +11,7 @@ import {
 import { getStudentResults } from "../../api/resultApi";
 import { parseExamSchedule } from "../../utils/dateUtils";
 import { QUESTION_TYPES } from "../../constants/examConstants";
+import QuestionBankViewer from "../common/QuestionBankViewer";
 
 export default function AvailableExams() {
   const [exams, setExams] = useState([]);
@@ -19,7 +19,7 @@ export default function AvailableExams() {
   const [registeredExamsMap, setRegisteredExamsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [registeringId, setRegisteringId] = useState(null);
-  const [downloadingId, setDownloadingId] = useState(null);
+  const [questionBankExam, setQuestionBankExam] = useState(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("ALL"); // ALL, REGISTERED, MCQ, QUESTION_ANSWER
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -103,32 +103,6 @@ export default function AvailableExams() {
       showError(errorMsg);
     } finally {
       setRegisteringId(null);
-    }
-  };
-
-  const handleQuestionBankDownload = async (examId) => {
-    setDownloadingId(examId);
-    try {
-      const response = await downloadExamQuestionBank(examId);
-      const disposition = response.headers["content-disposition"] || "";
-      const filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)/i);
-      const filename = filenameMatch?.[1]
-        ? decodeURIComponent(filenameMatch[1].trim())
-        : `question-bank-${examId}.pdf`;
-      const url = window.URL.createObjectURL(
-        new Blob([response.data], { type: "application/pdf" })
-      );
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-    } catch (error) {
-      showError(error.message || "Failed to download the question bank");
-    } finally {
-      setDownloadingId(null);
     }
   };
 
@@ -310,12 +284,11 @@ export default function AvailableExams() {
 
                 <button
                   type="button"
-                  disabled={downloadingId === examId}
-                  onClick={() => handleQuestionBankDownload(examId)}
-                  className="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  onClick={() => setQuestionBankExam(exam)}
+                  className="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
                 >
                   <Icon name="file-text" className="w-4 h-4" />
-                  {downloadingId === examId ? "Preparing PDF..." : "Download Question Bank (PDF)"}
+                  View Question Bank (PDF)
                 </button>
 
                 <div className="pt-1">
@@ -419,6 +392,9 @@ export default function AvailableExams() {
             );
           })}
         </div>
+      )}
+      {questionBankExam && (
+        <QuestionBankViewer exam={questionBankExam} onClose={() => setQuestionBankExam(null)} />
       )}
     </div>
   );
