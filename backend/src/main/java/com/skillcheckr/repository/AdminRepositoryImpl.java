@@ -1,29 +1,38 @@
 package com.skillcheckr.repository;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
+import com.skillcheckr.persistence.entity.StudentProfileEntity;
+import com.skillcheckr.persistence.entity.TeacherProfileEntity;
+import com.skillcheckr.persistence.entity.UserAccountEntity;
+import com.skillcheckr.persistence.repository.StudentProfileJpaRepository;
+import com.skillcheckr.persistence.repository.TeacherProfileJpaRepository;
+import com.skillcheckr.persistence.repository.UserAccountJpaRepository;
 
 @Repository
 public class AdminRepositoryImpl implements AdminRepository {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
+    private final UserAccountJpaRepository accountRepository;
+    private final StudentProfileJpaRepository studentRepository;
+    private final TeacherProfileJpaRepository teacherRepository;
+
+    public AdminRepositoryImpl(JdbcTemplate jdbcTemplate, UserAccountJpaRepository accountRepository,
+            StudentProfileJpaRepository studentRepository, TeacherProfileJpaRepository teacherRepository) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.accountRepository = accountRepository;
+        this.studentRepository = studentRepository;
+        this.teacherRepository = teacherRepository;
+    }
 
     @Override
     public Optional<RegistrationRequest> findRequestById(int requestId) {
@@ -46,56 +55,87 @@ public class AdminRepositoryImpl implements AdminRepository {
         return requests.stream().findFirst();
     }
 
+    private Student toStudent(StudentProfileEntity entity) {
+        Student student = new Student();
+        student.setStudentId(entity.getStudentId());
+        student.setUserId(entity.getUser().getUserId());
+        student.setName(entity.getName());
+        student.setContact(entity.getContact());
+        student.setEmail(entity.getEmail());
+        student.setProfileImage(entity.getProfileImage());
+        student.setStatus(entity.getStatus() == null || entity.getStatus().isBlank()
+                ? "Active" : entity.getStatus());
+        return student;
+    }
+
+    private Teacher toTeacher(TeacherProfileEntity entity) {
+        Teacher teacher = new Teacher();
+        teacher.setTeacherId(entity.getTeacherId());
+        teacher.setUserId(entity.getUser().getUserId());
+        teacher.setName(entity.getName());
+        teacher.setContact(entity.getContact());
+        teacher.setEmail(entity.getEmail());
+        teacher.setProfileImage(entity.getProfileImage());
+        teacher.setStatus(entity.getStatus() == null || entity.getStatus().isBlank()
+                ? "Active" : entity.getStatus());
+        return teacher;
+    }
+
     @Override
     public boolean existsUserByUsername(String username) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?)", Integer.class, username);
-        return count != null && count > 0;
+        return username != null && accountRepository.existsByUsernameIgnoreCase(username.trim());
     }
 
     @Override
     public boolean existsTeacherByEmail(String email) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM teacher WHERE LOWER(email) = LOWER(?)", Integer.class, email);
-        return count != null && count > 0;
+        return email != null && teacherRepository.existsByEmailIgnoreCase(email.trim());
     }
 
     @Override
     public boolean existsStudentByEmail(String email) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM student WHERE LOWER(email) = LOWER(?)", Integer.class, email);
-        return count != null && count > 0;
+        return email != null && studentRepository.existsByEmailIgnoreCase(email.trim());
     }
 
     @Override
+    @Transactional
     public int createUser(String username, String encodedPassword, String role) {
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO user (username, password, user_role) VALUES (?, ?, ?)",
-                    Statement.RETURN_GENERATED_KEYS);
-            statement.setString(1, username);
-            statement.setString(2, encodedPassword);
-            statement.setString(3, role);
-            return statement;
-        }, keyHolder);
-        Number generatedKey = keyHolder.getKey();
-        if (generatedKey == null) {
+        UserAccountEntity account = new UserAccountEntity();
+        account.setUsername(username);
+        account.setPassword(encodedPassword);
+        account.setRole(role);
+        account.setAuthProvider("LOCAL");
+        account.setStatus("Active");
+        UserAccountEntity saved = accountRepository.save(account);
+        if (saved.getUserId() == null) {
             throw new IllegalStateException("Unable to create the account for this request");
         }
-        return generatedKey.intValue();
+        return saved.getUserId();
     }
 
     @Override
+    @Transactional
     public void createTeacher(int userId, String name, String contact, String email) {
-        jdbcTemplate.update("INSERT INTO teacher (user_id, name, contact, email) VALUES (?, ?, ?, ?)",
-                userId, name, contact, email);
+        TeacherProfileEntity teacher = new TeacherProfileEntity();
+        teacher.setUser(accountRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("Account not found for teacher profile")));
+        teacher.setName(name);
+        teacher.setContact(contact);
+        teacher.setEmail(email);
+        teacher.setStatus("Active");
+        teacherRepository.save(teacher);
     }
 
     @Override
+    @Transactional
     public void createStudent(int userId, String name, String contact, String email) {
-        jdbcTemplate.update("INSERT INTO student (user_id, name, contact, email) VALUES (?, ?, ?, ?)",
-                userId, name, contact, email);
+        StudentProfileEntity student = new StudentProfileEntity();
+        student.setUser(accountRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("Account not found for student profile")));
+        student.setName(name);
+        student.setContact(contact);
+        student.setEmail(email);
+        student.setStatus("Active");
+        studentRepository.save(student);
     }
 
     @Override
@@ -105,73 +145,67 @@ public class AdminRepositoryImpl implements AdminRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Teacher> getAllTeacher() {
-        return jdbcTemplate.query("SELECT * FROM teacher ORDER BY teacher_id DESC", new RowMapper<Teacher>() {
-            @Override
-            public Teacher mapRow(ResultSet rs, int rowNum) throws SQLException {
-                Teacher teacher = new Teacher();
-                teacher.setTeacherId(rs.getInt("teacher_id"));
-                teacher.setUserId(rs.getInt("user_id"));
-                teacher.setName(rs.getString("name"));
-                teacher.setEmail(rs.getString("email"));
-                teacher.setContact(rs.getString("contact"));
-                teacher.setProfileImage(rs.getString("profile_image"));
-                teacher.setStatus(readStatus(rs));
-                return teacher;
-            }
-        });
+        return teacherRepository.findAllByOrderByTeacherIdDesc().stream()
+                .map(this::toTeacher)
+                .toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Student> getAllStudent() {
-        return jdbcTemplate.query("SELECT * FROM student ORDER BY student_id DESC", new RowMapper<Student>() {
-            @Override
-            public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
-                Student student = new Student();
-                student.setStudentId(rs.getInt("student_id"));
-                student.setUserId(rs.getInt("user_id"));
-                student.setName(rs.getString("name"));
-                student.setEmail(rs.getString("email"));
-                student.setContact(rs.getString("contact"));
-                student.setProfileImage(rs.getString("profile_image"));
-                student.setStatus(readStatus(rs));
-                return student;
-            }
-        });
+        return studentRepository.findAllByOrderByStudentIdDesc().stream()
+                .map(this::toStudent)
+                .toList();
     }
 
     @Override
+    @Transactional
     public boolean deleteTeacherById(int teacherId) {
-        List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM teacher WHERE teacher_id = ?",
-                (rs, rowNum) -> rs.getInt("user_id"), teacherId);
+        Optional<TeacherProfileEntity> result = teacherRepository.findById(teacherId);
+        if (result.isEmpty()) {
+            return false;
+        }
+        TeacherProfileEntity teacher = result.get();
+        UserAccountEntity account = teacher.getUser();
 
         if (count("SELECT COUNT(*) FROM exam WHERE teacher_id = ?", teacherId) > 0) {
-            deactivate("teacher", teacherId, userIds);
+            teacher.setStatus("Inactive");
+            account.setStatus("Inactive");
+            teacherRepository.save(teacher);
+            accountRepository.save(account);
             return true;
         }
 
-        int teacherDeleted = jdbcTemplate.update("DELETE FROM teacher WHERE teacher_id = ?", teacherId);
-        if (!userIds.isEmpty() && teacherDeleted > 0) {
-            jdbcTemplate.update("DELETE FROM user WHERE user_id = ?", userIds.get(0));
-        }
-        return teacherDeleted > 0;
+        teacherRepository.delete(teacher);
+        teacherRepository.flush();
+        accountRepository.delete(account);
+        return true;
     }
 
     @Override
+    @Transactional
     public boolean deleteStudentById(int studentId) {
-        List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM student WHERE student_id = ?",
-                (rs, rowNum) -> rs.getInt("user_id"), studentId);
+        Optional<StudentProfileEntity> result = studentRepository.findById(studentId);
+        if (result.isEmpty()) {
+            return false;
+        }
+        StudentProfileEntity student = result.get();
+        UserAccountEntity account = student.getUser();
 
         if (hasAcademicHistory(studentId)) {
-            deactivate("student", studentId, userIds);
+            student.setStatus("Inactive");
+            account.setStatus("Inactive");
+            studentRepository.save(student);
+            accountRepository.save(account);
             return true;
         }
 
-        int studentDeleted = jdbcTemplate.update("DELETE FROM student WHERE student_id = ?", studentId);
-        if (!userIds.isEmpty() && studentDeleted > 0) {
-            jdbcTemplate.update("DELETE FROM user WHERE user_id = ?", userIds.get(0));
-        }
-        return studentDeleted > 0;
+        studentRepository.delete(student);
+        studentRepository.flush();
+        accountRepository.delete(account);
+        return true;
     }
 
     private boolean hasAcademicHistory(int studentId) {
@@ -179,44 +213,33 @@ public class AdminRepositoryImpl implements AdminRepository {
                 || count("SELECT COUNT(*) FROM exam_attempt WHERE student_id = ?", studentId) > 0;
     }
 
-    private void deactivate(String table, int profileId, List<Integer> userIds) {
-        jdbcTemplate.update("UPDATE " + table + " SET status = 'Inactive' WHERE "
-                + (table.equals("student") ? "student_id" : "teacher_id") + " = ?", profileId);
-        if (!userIds.isEmpty()) {
-            jdbcTemplate.update("UPDATE user SET status = 'Inactive' WHERE user_id = ?", userIds.get(0));
-        }
-    }
-
     private int count(String sql, int id) {
         Integer result = jdbcTemplate.queryForObject(sql, Integer.class, id);
         return result == null ? 0 : result;
     }
 
-    private static String readStatus(ResultSet rs) throws SQLException {
-        String status = rs.getString("status");
-        return status == null || status.trim().isEmpty() ? "Active" : status;
-    }
-
     @Override
+    @Transactional
     public boolean toggleTeacherStatus(int teacherId, String status) {
-        List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM teacher WHERE teacher_id = ?",
-                (rs, rowNum) -> rs.getInt("user_id"), teacherId);
-        int rows = jdbcTemplate.update("UPDATE teacher SET status = ? WHERE teacher_id = ?", status, teacherId);
-        if (rows > 0 && !userIds.isEmpty()) {
-            jdbcTemplate.update("UPDATE user SET status = ? WHERE user_id = ?", status, userIds.get(0));
-        }
-        return rows > 0;
+        return teacherRepository.findById(teacherId).map(teacher -> {
+            teacher.setStatus(status);
+            teacher.getUser().setStatus(status);
+            teacherRepository.save(teacher);
+            accountRepository.save(teacher.getUser());
+            return true;
+        }).orElse(false);
     }
 
     @Override
+    @Transactional
     public boolean toggleStudentStatus(int studentId, String status) {
-        List<Integer> userIds = jdbcTemplate.query("SELECT user_id FROM student WHERE student_id = ?",
-                (rs, rowNum) -> rs.getInt("user_id"), studentId);
-        int rows = jdbcTemplate.update("UPDATE student SET status = ? WHERE student_id = ?", status, studentId);
-        if (rows > 0 && !userIds.isEmpty()) {
-            jdbcTemplate.update("UPDATE user SET status = ? WHERE user_id = ?", status, userIds.get(0));
-        }
-        return rows > 0;
+        return studentRepository.findById(studentId).map(student -> {
+            student.setStatus(status);
+            student.getUser().setStatus(status);
+            studentRepository.save(student);
+            accountRepository.save(student.getUser());
+            return true;
+        }).orElse(false);
     }
 
     @Override
