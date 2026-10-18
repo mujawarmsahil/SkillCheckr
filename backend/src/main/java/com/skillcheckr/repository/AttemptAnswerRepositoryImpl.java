@@ -1,7 +1,6 @@
 package com.skillcheckr.repository;
 
 import java.sql.PreparedStatement;
-import java.sql.Statement;
 import java.sql.Types;
 import java.util.List;
 import java.util.Map;
@@ -9,8 +8,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.AttemptAnswer;
@@ -68,9 +65,8 @@ public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {
                 + "ON DUPLICATE KEY UPDATE attempt_answer_id = LAST_INSERT_ID(attempt_answer_id), "
                 + "selected_answer_id = VALUES(selected_answer_id), "
                 + "text_answer = VALUES(text_answer), marks_obtained = VALUES(marks_obtained)";
-        KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
-            PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement statement = connection.prepareStatement(sql);
             statement.setInt(1, answer.getAttempt().getAttemptId());
             statement.setInt(2, answer.getQuestion().getQuestionId());
             if (answer.getSelectedAnswer() == null) {
@@ -89,9 +85,11 @@ public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {
                 statement.setInt(5, answer.getMarksObtained());
             }
             return statement;
-        }, keyHolder);
-        Number answerId = keyHolder.getKey();
-        answer.setAttemptAnswerId(answerId == null ? 0 : answerId.intValue());
+        });
+        Integer answerId = jdbcTemplate.queryForObject(
+                "SELECT attempt_answer_id FROM attempt_answer WHERE attempt_id = ? AND question_id = ?",
+                Integer.class, answer.getAttempt().getAttemptId(), answer.getQuestion().getQuestionId());
+        answer.setAttemptAnswerId(answerId);
         return answer;
     }
 

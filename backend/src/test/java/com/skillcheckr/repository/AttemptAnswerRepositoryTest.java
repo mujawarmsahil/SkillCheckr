@@ -12,9 +12,7 @@ import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.Statement;
 import java.sql.Types;
-import java.util.Map;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -26,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.KeyHolder;
 
 import com.skillcheckr.model.AttemptAnswer;
 import com.skillcheckr.model.ExamAttempt;
@@ -45,15 +42,13 @@ class AttemptAnswerRepositoryTest {
     void saveAndReturnUsesGeneratedKeyUpsertAndExplicitSqlNullTypes() throws Exception {
         Connection connection = mock(Connection.class);
         PreparedStatement statement = mock(PreparedStatement.class);
-        when(connection.prepareStatement(anyString(), eq(Statement.RETURN_GENERATED_KEYS))).thenReturn(statement);
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
         doAnswer(invocation -> {
             PreparedStatementCreator creator = invocation.getArgument(0);
-            KeyHolder keyHolder = invocation.getArgument(1);
             creator.createPreparedStatement(connection);
-            keyHolder.getKeyList().add(Map.of("attempt_answer_id", 42L));
             return 1;
-        }).when(jdbcTemplate).update(org.mockito.ArgumentMatchers.any(PreparedStatementCreator.class),
-                org.mockito.ArgumentMatchers.any(KeyHolder.class));
+        }).when(jdbcTemplate).update(org.mockito.ArgumentMatchers.any(PreparedStatementCreator.class));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(5), eq(8))).thenReturn(42);
         AttemptAnswer answer = AttemptAnswer.builder()
                 .attempt(ExamAttempt.builder().attemptId(5).build())
                 .question(Question.builder().questionId(8).build())
@@ -66,8 +61,9 @@ class AttemptAnswerRepositoryTest {
         verify(statement).setNull(4, Types.VARCHAR);
         verify(statement).setNull(5, Types.INTEGER);
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(connection).prepareStatement(sql.capture(), eq(Statement.RETURN_GENERATED_KEYS));
+        verify(connection).prepareStatement(sql.capture());
         assertThat(sql.getValue()).contains("attempt_answer_id = LAST_INSERT_ID(attempt_answer_id)");
+        verify(jdbcTemplate).queryForObject(anyString(), eq(Integer.class), eq(5), eq(8));
     }
 
     @Test

@@ -1,162 +1,234 @@
 package com.skillcheckr.repository;
 
-import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.model.User;
 import com.skillcheckr.model.UserProfileDTO;
+import com.skillcheckr.persistence.entity.AdminProfileEntity;
+import com.skillcheckr.persistence.entity.StudentProfileEntity;
+import com.skillcheckr.persistence.entity.TeacherProfileEntity;
+import com.skillcheckr.persistence.entity.UserAccountEntity;
+import com.skillcheckr.persistence.repository.AdminProfileJpaRepository;
+import com.skillcheckr.persistence.repository.StudentProfileJpaRepository;
+import com.skillcheckr.persistence.repository.TeacherProfileJpaRepository;
+import com.skillcheckr.persistence.repository.UserAccountJpaRepository;
 
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 @Repository
 public class AuthRepositoryImpl implements AuthRepository {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final UserAccountJpaRepository accountRepository;
+    private final StudentProfileJpaRepository studentRepository;
+    private final TeacherProfileJpaRepository teacherRepository;
+    private final AdminProfileJpaRepository adminRepository;
+
+    public AuthRepositoryImpl(UserAccountJpaRepository accountRepository,
+            StudentProfileJpaRepository studentRepository,
+            TeacherProfileJpaRepository teacherRepository,
+            AdminProfileJpaRepository adminRepository) {
+        this.accountRepository = accountRepository;
+        this.studentRepository = studentRepository;
+        this.teacherRepository = teacherRepository;
+        this.adminRepository = adminRepository;
+    }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<User> findByUsername(String username) {
-        if (username == null || username.trim().isEmpty()) {
+        if (username == null || username.isBlank()) {
             return Optional.empty();
         }
-        String sql = "SELECT * FROM user WHERE LOWER(username) = LOWER(?)";
-        List<User> users = jdbcTemplate.query(sql, (rs, rowNum) -> {
-            User u = new User();
-            u.setUserId(rs.getInt("user_id"));
-            u.setUsername(rs.getString("username"));
-            u.setPassword(rs.getString("password"));
-            u.setRole(rs.getString("user_role"));
-            u.setProfileImage(rs.getString("profile_image"));
-            u.setAuthProvider(rs.getString("auth_provider"));
-            u.setProviderId(rs.getString("provider_id"));
-            u.setStatus(rs.getString("status"));
-            return u;
-        }, username.trim());
-
-        return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+        return accountRepository.findByUsernameIgnoreCase(username.trim()).map(this::toUser);
     }
 
     @Override
+    @Transactional
     public boolean updatePassword(int userId, String passwordHash) {
-        int updated = jdbcTemplate.update("UPDATE user SET password = ? WHERE user_id = ?",
-                passwordHash, userId);
-        return updated > 0;
+        return accountRepository.findById(userId).map(account -> {
+            account.setPassword(passwordHash);
+            accountRepository.save(account);
+            return true;
+        }).orElse(false);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<String> findPasswordByUserId(int userId) {
         if (userId <= 0) {
             return Optional.empty();
         }
-        String sql = "SELECT password FROM user WHERE user_id = ?";
-        try {
-            String storedPassword = jdbcTemplate.queryForObject(sql, String.class, userId);
-            return Optional.ofNullable(storedPassword);
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
+        return accountRepository.findById(userId).map(UserAccountEntity::getPassword);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getStudentIdByUserId(int userId) {
-        String sql = "SELECT student_id FROM student WHERE user_id = ?";
-        try {
-            return jdbcTemplate.queryForObject(sql, Integer.class, userId);
-        } catch (EmptyResultDataAccessException e) {
-            return 0;
-        }
+        return studentRepository.findByUser_UserId(userId).map(StudentProfileEntity::getStudentId).orElse(0);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getTeacherIdByUserId(int userId) {
-        String sql = "SELECT teacher_id FROM teacher WHERE user_id = ?";
-        try {
-            return jdbcTemplate.queryForObject(sql, Integer.class, userId);
-        } catch (EmptyResultDataAccessException e) {
-            return 0;
-        }
+        return teacherRepository.findByUser_UserId(userId).map(TeacherProfileEntity::getTeacherId).orElse(0);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getAdminIdByUserId(int userId) {
-        String sql = "SELECT admin_id FROM admin WHERE user_id = ?";
-        try {
-            return jdbcTemplate.queryForObject(sql, Integer.class, userId);
-        } catch (EmptyResultDataAccessException e) {
-            return 0;
-        }
+        return adminRepository.findByUser_UserId(userId).map(AdminProfileEntity::getAdminId).orElse(0);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<UserProfileDTO> getUserProfile(int userId) {
-        String userSql = "SELECT * FROM user WHERE user_id = ?";
-        List<User> users = jdbcTemplate.query(userSql, (rs, rowNum) -> {
-            User u = new User();
-            u.setUserId(rs.getInt("user_id"));
-            u.setUsername(rs.getString("username"));
-            u.setRole(rs.getString("user_role"));
-            u.setProfileImage(rs.getString("profile_image"));
-            u.setAuthProvider(rs.getString("auth_provider"));
-            u.setProviderId(rs.getString("provider_id"));
-            return u;
-        }, userId);
+        return accountRepository.findById(userId).map(this::toProfile);
+    }
 
-        if (users.isEmpty()) {
+    @Override
+    @Transactional
+    public Optional<UserProfileDTO> updateUserProfile(UserProfileDTO profile) {
+        if (profile == null || profile.getUserId() <= 0) {
             return Optional.empty();
         }
 
-        User user = users.get(0);
-        UserProfileDTO profile = new UserProfileDTO();
-        profile.setUserId(user.getUserId());
-        profile.setUsername(user.getUsername());
-        profile.setRole(user.getRole());
-        profile.setProfileImage(user.getProfileImage());
-
-        String role = user.getRole() != null ? user.getRole().trim().toLowerCase() : "";
-
-        if ("student".equals(role)) {
-            jdbcTemplate.query("SELECT * FROM student WHERE user_id = ?", rs -> {
-                profile.setRoleId(rs.getInt("student_id"));
-                profile.setName(rs.getString("name"));
-                profile.setEmail(rs.getString("email"));
-                profile.setContact(rs.getString("contact"));
-                String img = rs.getString("profile_image");
-                if (img != null && !img.trim().isEmpty()) {
-                    profile.setProfileImage(img);
-                }
-            }, userId);
-        } else if ("teacher".equals(role)) {
-            jdbcTemplate.query("SELECT * FROM teacher WHERE user_id = ?", rs -> {
-                profile.setRoleId(rs.getInt("teacher_id"));
-                profile.setName(rs.getString("name"));
-                profile.setEmail(rs.getString("email"));
-                profile.setContact(rs.getString("contact"));
-                String img = rs.getString("profile_image");
-                if (img != null && !img.trim().isEmpty()) {
-                    profile.setProfileImage(img);
-                }
-            }, userId);
-        } else if ("admin".equals(role)) {
-            jdbcTemplate.query("SELECT * FROM admin WHERE user_id = ?", rs -> {
-                profile.setRoleId(rs.getInt("admin_id"));
-                profile.setName(rs.getString("name"));
-                profile.setEmail(rs.getString("email"));
-                profile.setContact(rs.getString("contact"));
-                String img = rs.getString("profile_image");
-                if (img != null && !img.trim().isEmpty()) {
-                    profile.setProfileImage(img);
-                }
-            }, userId);
+        Optional<UserAccountEntity> accountResult = accountRepository.findById(profile.getUserId());
+        if (accountResult.isEmpty()) {
+            return Optional.empty();
         }
 
-        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
-            profile.setName(user.getUsername());
+        UserAccountEntity account = accountResult.get();
+        boolean profileUpdated = switch (normalizedRole(account.getRole())) {
+            case "student" -> updateStudentProfile(profile);
+            case "teacher" -> updateTeacherProfile(profile);
+            case "admin" -> updateAdminProfile(profile);
+            default -> false;
+        };
+        if (!profileUpdated) {
+            return Optional.empty();
+        }
+
+        account.setUsername(profile.getUsername());
+        account.setProfileImage(profile.getProfileImage());
+        if (profile.getPassword() != null && !profile.getPassword().isBlank()) {
+            account.setPassword(profile.getPassword());
+        }
+        accountRepository.save(account);
+
+        return Optional.of(toProfile(account));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isUsernameInUse(String username, int excludeUserId) {
+        return username != null
+                && accountRepository.existsByUsernameIgnoreCaseAndUserIdNot(username.trim(), excludeUserId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByUsername(String username) {
+        return username != null && accountRepository.existsByUsernameIgnoreCase(username.trim());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isEmailInUse(String email, int excludeUserId) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        String normalizedEmail = email.trim();
+        return studentRepository.existsByEmailIgnoreCaseAndUser_UserIdNot(normalizedEmail, excludeUserId)
+                || teacherRepository.existsByEmailIgnoreCaseAndUser_UserIdNot(normalizedEmail, excludeUserId)
+                || adminRepository.existsByEmailIgnoreCaseAndUser_UserIdNot(normalizedEmail, excludeUserId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isUserActive(int userId) {
+        if (userId <= 0) {
+            return false;
+        }
+        return accountRepository.findById(userId)
+                .map(UserAccountEntity::getStatus)
+                .map(status -> status == null || status.isBlank() || !"Inactive".equalsIgnoreCase(status.trim()))
+                .orElse(false);
+    }
+
+    private boolean updateStudentProfile(UserProfileDTO profile) {
+        return studentRepository.findByUser_UserId(profile.getUserId()).map(entity -> {
+            copyProfile(profile, entity.getName(), entity::setName, entity::setEmail, entity::setContact,
+                    entity::setProfileImage);
+            studentRepository.save(entity);
+            return true;
+        }).orElse(false);
+    }
+
+    private boolean updateTeacherProfile(UserProfileDTO profile) {
+        return teacherRepository.findByUser_UserId(profile.getUserId()).map(entity -> {
+            copyProfile(profile, entity.getName(), entity::setName, entity::setEmail, entity::setContact,
+                    entity::setProfileImage);
+            teacherRepository.save(entity);
+            return true;
+        }).orElse(false);
+    }
+
+    private boolean updateAdminProfile(UserProfileDTO profile) {
+        return adminRepository.findByUser_UserId(profile.getUserId()).map(entity -> {
+            copyProfile(profile, entity.getName(), entity::setName, entity::setEmail, entity::setContact,
+                    entity::setProfileImage);
+            adminRepository.save(entity);
+            return true;
+        }).orElse(false);
+    }
+
+    private void copyProfile(UserProfileDTO source, String currentName,
+            java.util.function.Consumer<String> setName,
+            java.util.function.Consumer<String> setEmail,
+            java.util.function.Consumer<String> setContact,
+            java.util.function.Consumer<String> setProfileImage) {
+        setName.accept(source.getName() == null ? currentName : source.getName());
+        setEmail.accept(source.getEmail());
+        setContact.accept(source.getContact());
+        setProfileImage.accept(source.getProfileImage());
+    }
+
+    private UserProfileDTO toProfile(UserAccountEntity account) {
+        UserProfileDTO profile = new UserProfileDTO();
+        profile.setUserId(account.getUserId());
+        profile.setUsername(account.getUsername());
+        profile.setRole(account.getRole());
+        profile.setProfileImage(account.getProfileImage());
+
+        switch (normalizedRole(account.getRole())) {
+            case "student" -> studentRepository.findByUser_UserId(account.getUserId()).ifPresent(entity -> {
+                profile.setRoleId(entity.getStudentId());
+                profile.setName(entity.getName());
+                profile.setEmail(entity.getEmail());
+                profile.setContact(entity.getContact());
+                useProfileImage(profile, entity.getProfileImage());
+            });
+            case "teacher" -> teacherRepository.findByUser_UserId(account.getUserId()).ifPresent(entity -> {
+                profile.setRoleId(entity.getTeacherId());
+                profile.setName(entity.getName());
+                profile.setEmail(entity.getEmail());
+                profile.setContact(entity.getContact());
+                useProfileImage(profile, entity.getProfileImage());
+            });
+            case "admin" -> adminRepository.findByUser_UserId(account.getUserId()).ifPresent(entity -> {
+                profile.setRoleId(entity.getAdminId());
+                profile.setName(entity.getName());
+                profile.setEmail(entity.getEmail());
+                profile.setContact(entity.getContact());
+                useProfileImage(profile, entity.getProfileImage());
+            });
+            default -> {
+            }
+        }
+
+        if (profile.getName() == null || profile.getName().isBlank()) {
+            profile.setName(account.getUsername());
         }
         if (profile.getEmail() == null) {
             profile.setEmail("");
@@ -164,100 +236,29 @@ public class AuthRepositoryImpl implements AuthRepository {
         if (profile.getContact() == null) {
             profile.setContact("");
         }
-
-        return Optional.of(profile);
+        return profile;
     }
 
-    @Override
-    public Optional<UserProfileDTO> updateUserProfile(UserProfileDTO profile) {
-        if (profile == null || profile.getUserId() <= 0) {
-            return Optional.empty();
-        }
-
-        if (profile.getPassword() != null && !profile.getPassword().trim().isEmpty()) {
-            jdbcTemplate.update(
-                    "UPDATE user SET username = ?, password = ?, profile_image = ? WHERE user_id = ?",
-                    profile.getUsername(), profile.getPassword().trim(), profile.getProfileImage(), profile.getUserId());
-        } else {
-            jdbcTemplate.update(
-                    "UPDATE user SET username = ?, profile_image = ? WHERE user_id = ?",
-                    profile.getUsername(), profile.getProfileImage(), profile.getUserId());
-        }
-
-        String roleSql = "SELECT user_role FROM user WHERE user_id = ?";
-        String role = jdbcTemplate.queryForObject(roleSql, String.class, profile.getUserId());
-        String roleStr = role != null ? role.trim().toLowerCase() : "";
-
-        if ("student".equals(roleStr)) {
-            updateOrInsertRole(profile, "student");
-        } else if ("teacher".equals(roleStr)) {
-            updateOrInsertRole(profile, "teacher");
-        } else if ("admin".equals(roleStr)) {
-            updateOrInsertRole(profile, "admin");
-        }
-
-        // Sync updated profile to request table as well
-        jdbcTemplate.update(
-                "UPDATE request SET name = ?, email = ?, contact = ? WHERE username = ?",
-                profile.getName(), profile.getEmail(), profile.getContact(), profile.getUsername());
-
-        return getUserProfile(profile.getUserId());
+    private User toUser(UserAccountEntity account) {
+        User user = new User();
+        user.setUserId(account.getUserId());
+        user.setUsername(account.getUsername());
+        user.setPassword(account.getPassword());
+        user.setRole(account.getRole());
+        user.setProfileImage(account.getProfileImage());
+        user.setAuthProvider(account.getAuthProvider());
+        user.setProviderId(account.getProviderId());
+        user.setStatus(account.getStatus());
+        return user;
     }
 
-    private void updateOrInsertRole(UserProfileDTO profile, String role) {
-        int updated = jdbcTemplate.update(
-                "UPDATE " + role + " SET name = ?, email = ?, contact = ?, profile_image = ? WHERE user_id = ?",
-                profile.getName(), profile.getEmail(), profile.getContact(), profile.getProfileImage(), profile.getUserId());
-        if (updated == 0) {
-            jdbcTemplate.update(
-                    "INSERT INTO " + role + " (user_id, name, contact, email, profile_image) VALUES (?, ?, ?, ?, ?)",
-                    profile.getUserId(), profile.getName(), profile.getContact(), profile.getEmail(), profile.getProfileImage());
+    private static void useProfileImage(UserProfileDTO profile, String roleProfileImage) {
+        if (roleProfileImage != null && !roleProfileImage.isBlank()) {
+            profile.setProfileImage(roleProfileImage);
         }
     }
 
-    @Override
-    public boolean isUsernameInUse(String username, int excludeUserId) {
-        String sql = "SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?) AND user_id != ?";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username, excludeUserId);
-        return count != null && count > 0;
-    }
-
-    @Override
-    public boolean existsByUsername(String username) {
-        String sql = "SELECT COUNT(*) FROM user WHERE LOWER(username) = LOWER(?)";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, username);
-        return count != null && count > 0;
-    }
-
-    @Override
-    public boolean isEmailInUse(String email, int excludeUserId) {
-        if (email == null || email.trim().isEmpty()) {
-            return false;
-        }
-        String trimmed = email.trim();
-        for (String table : new String[]{"student", "teacher", "admin"}) {
-            String sql = "SELECT COUNT(*) FROM " + table + " WHERE email = ? AND (user_id != ? OR user_id IS NULL)";
-            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, trimmed, excludeUserId);
-            if (count != null && count > 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public boolean isUserActive(int userId) {
-        if (userId <= 0) {
-            return false;
-        }
-        List<String> statuses = jdbcTemplate.query(
-                "SELECT status FROM user WHERE user_id = ?",
-                (rs, rowNum) -> rs.getString("status"),
-                userId);
-        if (statuses.isEmpty()) {
-            return false;
-        }
-        String status = statuses.get(0);
-        return status == null || status.trim().isEmpty() || !"Inactive".equalsIgnoreCase(status.trim());
+    private static String normalizedRole(String role) {
+        return role == null ? "" : role.trim().toLowerCase();
     }
 }

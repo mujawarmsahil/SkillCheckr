@@ -1,10 +1,7 @@
 package com.skillcheckr.service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,24 +14,18 @@ import com.skillcheckr.repository.AuthRepository;
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    @Autowired
-    private AuthRepository authRepository;
+    private final AuthRepository authRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    public AuthServiceImpl(AuthRepository authRepository, PasswordEncoder passwordEncoder) {
+        this.authRepository = authRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     /**
-     * Verifies the credentials and then refuses a deactivated account. The check lives here rather
-     * than in the controller so that every caller of the service is covered, and so the
-     * "wrong password" answer cannot accidentally be given to a user whose account was switched off
-     * by an administrator.
+     * Verifies BCrypt credentials and rejects accounts that have been deactivated.
      *
-     * <p>A stored value that is not a BCrypt hash is treated as legacy plaintext and is upgraded
-     * to BCrypt on the next successful sign in. The comparison is done in constant
-     * time so it does not leak the matching prefix length through response timing.
-     *
-     * @return the authenticated user, never empty for a disabled account: that case throws
-     * @throws AccountDisabledException when the password is correct but the account is inactive
+     * @throws AccountDisabledException when the credentials are valid but the account is inactive
      */
     @Override
     @Transactional
@@ -51,28 +42,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userOpt.get();
         String storedPassword = user.getPassword();
 
-        boolean matches = false;
-        if (storedPassword != null) {
-            if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")
-                    || storedPassword.startsWith("$2y$")) {
-                matches = passwordEncoder.matches(password, storedPassword);
-            } else {
-                matches = MessageDigest.isEqual(
-                        storedPassword.getBytes(StandardCharsets.UTF_8),
-                        password.getBytes(StandardCharsets.UTF_8));
-                if (matches) {
-                    try {
-                        String newHash = passwordEncoder.encode(password);
-                        authRepository.updatePassword(user.getUserId(), newHash);
-                        user.setPassword(newHash);
-                    } catch (Exception ignored) {
-                        // Non-critical auto-upgrade failure
-                    }
-                }
-            }
-        }
-
-        if (!matches) {
+        if (storedPassword == null || !passwordEncoder.matches(password, storedPassword)) {
             return Optional.empty();
         }
 
@@ -149,11 +119,6 @@ public class AuthServiceImpl implements AuthService {
         if (storedPassword == null) {
             return false;
         }
-        if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")
-                || storedPassword.startsWith("$2y$")) {
-            return passwordEncoder.matches(oldPassword, storedPassword);
-        } else {
-            return storedPassword.equals(oldPassword);
-        }
+        return passwordEncoder.matches(oldPassword, storedPassword);
     }
 }
