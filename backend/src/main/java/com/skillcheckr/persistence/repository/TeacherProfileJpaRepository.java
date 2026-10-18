@@ -1,5 +1,6 @@
 package com.skillcheckr.persistence.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,5 +11,9 @@ public interface TeacherProfileJpaRepository extends JpaRepository<TeacherProfil
 
     Optional<TeacherProfileEntity> findByUser_UserId(Integer userId);
 
+    boolean existsByEmailIgnoreCase(String email);
+
     boolean existsByEmailIgnoreCaseAndUser_UserIdNot(String email, Integer userId);
+
+    List<TeacherProfileEntity> findAllByOrderByTeacherIdDesc();
 }
