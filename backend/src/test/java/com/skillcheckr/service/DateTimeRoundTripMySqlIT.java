@@ -63,6 +63,7 @@ class DateTimeRoundTripMySqlIT {
     private ResultRepository resultRepository;
 
     private int subjectId;
+    private int userId;
     private int studentId;
 
     @DynamicPropertySource
@@ -93,8 +94,10 @@ class DateTimeRoundTripMySqlIT {
                 java.time.ZoneId.systemDefault(), jdbcTemplate.queryForObject("SELECT DATABASE()", String.class));
         subjectId = insertAndGetId("INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)",
                 "Round Trip IT", "RT-" + System.nanoTime());
-        studentId = insertAndGetId("INSERT INTO student (name, email) VALUES (?, ?)",
-                "Round Trip Student", "rt-" + System.nanoTime() + "@example.test");
+        userId = insertAndGetId("INSERT INTO `user` (username, password, user_role) VALUES (?, ?, ?)",
+                "rt-" + System.nanoTime(), "$2a$10$integration-test-hash", "Student");
+        studentId = insertAndGetId("INSERT INTO student (user_id, name, email) VALUES (?, ?, ?)",
+                userId, "Round Trip Student", "rt-" + System.nanoTime() + "@example.test");
     }
 
     @AfterEach
@@ -107,6 +110,7 @@ class DateTimeRoundTripMySqlIT {
                 + "(SELECT exam_id FROM exam WHERE subject_id = ?)", subjectId);
         jdbcTemplate.update("DELETE FROM exam WHERE subject_id = ?", subjectId);
         jdbcTemplate.update("DELETE FROM student WHERE student_id = ?", studentId);
+        jdbcTemplate.update("DELETE FROM `user` WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId);
     }
 

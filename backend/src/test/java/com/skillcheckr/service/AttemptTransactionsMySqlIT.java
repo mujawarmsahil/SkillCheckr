@@ -91,6 +91,7 @@ class AttemptTransactionsMySqlIT {
     private final AtomicReference<LockGate> activeGate = new AtomicReference<>();
     private final AtomicReference<ExamLockGate> activeExamGate = new AtomicReference<>();
     private int subjectId;
+    private int userId;
     private int studentId;
     private int examId;
     private int questionId;
@@ -142,8 +143,10 @@ class AttemptTransactionsMySqlIT {
 
         subjectId = insertAndGetId("INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)",
                 "Concurrency IT", "IT-" + System.nanoTime());
-        studentId = insertAndGetId("INSERT INTO student (name, email) VALUES (?, ?)",
-                "Concurrency Test Student", "it-" + System.nanoTime() + "@example.test");
+        userId = insertAndGetId("INSERT INTO `user` (username, password, user_role) VALUES (?, ?, ?)",
+                "it-" + System.nanoTime(), "$2a$10$integration-test-hash", "Student");
+        studentId = insertAndGetId("INSERT INTO student (user_id, name, email) VALUES (?, ?, ?)",
+                userId, "Concurrency Test Student", "it-" + System.nanoTime() + "@example.test");
         examId = insertAndGetId("INSERT INTO exam "
                         + "(subject_id, exam_name, exam_type, exam_date, start_time, end_time, duration_minutes, "
                         + "total_marks, pass_marks, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -257,6 +260,9 @@ class AttemptTransactionsMySqlIT {
         }
         if (studentId > 0) {
             jdbcTemplate.update("DELETE FROM student WHERE student_id = ?", studentId);
+        }
+        if (userId > 0) {
+            jdbcTemplate.update("DELETE FROM `user` WHERE user_id = ?", userId);
         }
         if (subjectId > 0) {
             jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId);
