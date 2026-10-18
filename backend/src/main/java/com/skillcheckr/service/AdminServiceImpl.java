@@ -15,16 +15,12 @@ import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
 import com.skillcheckr.repository.AdminRepository;
-import com.skillcheckr.repository.ExamRepository;
 
 @Service
 public class AdminServiceImpl implements AdminService {
 
     @Autowired
     private AdminRepository adminRepository;
-
-    @Autowired
-    private ExamRepository examRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -124,7 +120,6 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public AdminStatsResponse getAdminStats() {
-        examRepository.syncExamStatuses();
         return adminRepository.getAdminStats();
     }
 }

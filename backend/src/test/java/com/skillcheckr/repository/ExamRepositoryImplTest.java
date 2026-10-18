@@ -171,6 +171,8 @@ class ExamRepositoryImplTest {
                 eq(Integer.class), eq(1))).thenReturn(1);
         when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?"),
                 eq(Integer.class), eq(1))).thenReturn(0);
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?"),
+                eq(Integer.class), eq(1))).thenReturn(0);
         when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);
 
         assertThat(repository.deleteExamById(1)).isTrue();
@@ -187,6 +189,21 @@ class ExamRepositoryImplTest {
                 eq(Integer.class), eq(9))).thenReturn(0);
 
         assertThat(repository.deleteExamById(9)).isFalse();
+    }
+
+    @Test
+    void deleteExamById_refusesAnExamWithRegistrations() {
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam WHERE exam_id = ?"),
+                eq(Integer.class), eq(1))).thenReturn(1);
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?"),
+                eq(Integer.class), eq(1))).thenReturn(0);
+        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?"),
+                eq(Integer.class), eq(1))).thenReturn(2);
+
+        assertThatThrownBy(() -> repository.deleteExamById(1))
+                .isInstanceOf(ExamInUseException.class)
+                .hasMessageContaining("student registrations");
+        verify(jdbcTemplate, never()).update(eq("DELETE FROM exam WHERE exam_id = ?"), eq(1));
     }
 
     @Test
@@ -210,6 +227,7 @@ class ExamRepositoryImplTest {
 
         assertThat(exams).containsExactly(exam);
         assertListingCountQueryUses(exams, 1);
+        verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
     }
 
     @Test
@@ -225,6 +243,7 @@ class ExamRepositoryImplTest {
 
         assertThat(exams).containsExactly(exam);
         assertListingCountQueryUses(exams, 2);
+        verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
     }
 
     @Test
@@ -249,6 +268,7 @@ class ExamRepositoryImplTest {
         assertThat(countsQuery.getValue()).contains("WHERE exam_id IN (?)", "GROUP BY exam_id");
         assertThat(examIds.getValue()).containsExactly(3);
         assertThat(exams.get(0).getQuestionCount()).isEqualTo(2);
+        verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
     }
 
     @Test
@@ -311,6 +331,7 @@ class ExamRepositoryImplTest {
 
         assertThat(exams).containsExactly(exam);
         assertListingCountQueryUses(exams, 1);
+        verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
         ArgumentCaptor<String> listingQuery = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(listingQuery.capture(), any(RowMapper.class), eq(10));
         assertThat(listingQuery.getValue()).contains("WHERE e.teacher_id = ?");
