@@ -36,16 +36,7 @@ public class AttemptAnswerServiceImpl implements AttemptAnswerService {
     private final AttemptExpiryPolicy attemptExpiryPolicy;
     private final Clock clock;
 
-    @Autowired
     public AttemptAnswerServiceImpl(ExamAttemptRepository examAttemptRepository,
-            ExamQuestionRepository examQuestionRepository, ExamRepository examRepository,
-            QuestionRepository questionRepository, AttemptAnswerRepository attemptAnswerRepository,
-            AttemptExpiryPolicy attemptExpiryPolicy) {
-        this(examAttemptRepository, examQuestionRepository, examRepository, questionRepository,
-                attemptAnswerRepository, attemptExpiryPolicy, Clock.systemDefaultZone());
-    }
-
-    AttemptAnswerServiceImpl(ExamAttemptRepository examAttemptRepository,
             ExamQuestionRepository examQuestionRepository, ExamRepository examRepository,
             QuestionRepository questionRepository, AttemptAnswerRepository attemptAnswerRepository,
             AttemptExpiryPolicy attemptExpiryPolicy, Clock clock) {

@@ -1,7 +1,5 @@
 package com.skillcheckr.validation;
 
-import java.time.LocalDateTime;
-
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.AttemptAnswerException;
 import com.skillcheckr.exception.ExamSubmissionException;
@@ -42,9 +40,6 @@ public final class ExamAttemptValidator {
                 throw new AttemptAnswerException(409, "Exam attempt has already been submitted");
             }
             throw new AttemptAnswerException(409, "Exam attempt cannot be modified");
-        }
-        if (attempt.getExpiresAt() == null || !LocalDateTime.now().isBefore(attempt.getExpiresAt())) {
-            throw new AttemptAnswerException(409, "Exam attempt has expired");
         }
     }
 

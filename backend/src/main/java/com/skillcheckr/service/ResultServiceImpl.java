@@ -2,6 +2,7 @@ package com.skillcheckr.service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -45,7 +46,16 @@ public class ResultServiceImpl implements ResultService {
 		if (results == null) {
 			return List.of();
 		}
-		results.forEach(this::withBreakdown);
+		List<ExamResultDTO> withAttempts = results.stream()
+				.filter(result -> result != null && result.getAttemptId() > 0).toList();
+		Map<Integer, List<Map<String, Object>>> breakdowns = questionBreakdownService.buildBatch(
+				withAttempts.stream().map(ExamResultDTO::getExamId).toList(),
+				withAttempts.stream().map(ExamResultDTO::getAttemptId).toList());
+		for (ExamResultDTO result : results) {
+			if (result != null && result.getAttemptId() > 0) {
+				result.setQuestionBreakdown(breakdowns.getOrDefault(result.getAttemptId(), List.of()));
+			}
+		}
 		return results;
 	}
 }

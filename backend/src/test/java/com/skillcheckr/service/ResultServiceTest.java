@@ -44,13 +44,14 @@ class ResultServiceTest {
     void getResultsByStudentId_attachesTheServerDerivedBreakdown() {
         ExamResultDTO stored = result(1, 5, 12, 2);
         when(resultRepository.getResultsByStudentId(2)).thenReturn(List.of(stored));
-        when(questionBreakdownService.build(5, 12)).thenReturn(List.of(Map.of("question_id", 3)));
+        when(questionBreakdownService.buildBatch(List.of(5), List.of(12)))
+                .thenReturn(Map.of(12, List.of(Map.of("question_id", 3))));
 
         List<ExamResultDTO> actual = resultService.getResultsByStudentId(2);
 
         assertThat(actual).hasSize(1);
         assertThat(actual.get(0).getQuestionBreakdown()).hasSize(1);
-        verify(questionBreakdownService).build(5, 12);
+        verify(questionBreakdownService).buildBatch(List.of(5), List.of(12));
     }
 
     @Test
@@ -91,10 +92,10 @@ class ResultServiceTest {
     @Test
     void getAllResults_attachesTheBreakdownToEveryResult() {
         when(resultRepository.getAllResults()).thenReturn(List.of(result(1, 5, 12, 2), result(2, 6, 13, 3)));
-        when(questionBreakdownService.build(anyInt(), anyInt())).thenReturn(List.of(Map.of("marks", 1)));
+        when(questionBreakdownService.buildBatch(List.of(5, 6), List.of(12, 13)))
+                .thenReturn(Map.of(12, List.of(Map.of("marks", 1)), 13, List.of(Map.of("marks", 1))));
 
         assertThat(resultService.getAllResults()).hasSize(2);
-        verify(questionBreakdownService).build(5, 12);
-        verify(questionBreakdownService).build(6, 13);
+        verify(questionBreakdownService).buildBatch(List.of(5, 6), List.of(12, 13));
     }
 }

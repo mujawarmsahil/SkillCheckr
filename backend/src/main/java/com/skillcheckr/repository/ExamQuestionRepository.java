@@ -8,6 +8,8 @@ public interface ExamQuestionRepository {
 
     List<ExamQuestion> findByExamId(int examId);
 
+    List<ExamQuestion> findByExamIds(List<Integer> examIds);
+
     boolean isQuestionAssigned(int examId, int questionId);
 
     boolean isQuestionAssignedToAnyExam(int questionId);

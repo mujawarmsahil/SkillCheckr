@@ -165,6 +165,18 @@ class ResultControllerTest {
     }
 
     @Test
+    void getResultsByStudent_resolvesEachExamOnce() throws Exception {
+        when(examService.getExamById(5)).thenReturn(Optional.of(examWithReleaseWindow(5, true)));
+        when(resultService.getResultsByStudentId(STUDENT_ID))
+                .thenReturn(List.of(resultWithAnswerKey(), resultWithAnswerKey()));
+
+        mockMvc.perform(get("/api/results/student/" + STUDENT_ID).with(TestAuth.asStudent(STUDENT_ID)))
+                .andExpect(status().isOk());
+
+        verify(examService, org.mockito.Mockito.times(1)).getExamById(5);
+    }
+
+    @Test
     void getResultsByStudent_returnsEmptyList_whenNull() throws Exception {
         when(resultService.getResultsByStudentId(STUDENT_ID)).thenReturn(null);
 

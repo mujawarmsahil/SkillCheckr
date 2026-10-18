@@ -4,6 +4,9 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collections;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -24,13 +27,29 @@ public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {
 
     @Override
     public List<AttemptAnswer> findByAttemptId(int attemptId) {
-        String sql = "SELECT aa.attempt_answer_id, aa.attempt_id, aa.question_id, aa.selected_answer_id, "
-                + "aa.text_answer, aa.marks_obtained, a.option_text, a.is_correct, "
-                + "(SELECT c.option_text FROM answer c WHERE c.question_id = aa.question_id "
-                + "  AND c.is_correct = 1 ORDER BY c.answer_id ASC LIMIT 1) AS correct_option_text "
-                + "FROM attempt_answer aa LEFT JOIN answer a ON a.answer_id = aa.selected_answer_id "
-                + "WHERE aa.attempt_id = ? ORDER BY aa.question_id";
+        String sql = answerSelect() + "WHERE aa.attempt_id = ? ORDER BY aa.question_id";
         return jdbcTemplate.query(sql, AttemptAnswerRowMapper.INSTANCE, attemptId);
+    }
+
+    @Override
+    public List<AttemptAnswer> findByAttemptIds(List<Integer> attemptIds) {
+        if (attemptIds == null || attemptIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(attemptIds.size(), "?"));
+        return jdbcTemplate.query(answerSelect() + "WHERE aa.attempt_id IN (" + placeholders
+                + ") ORDER BY aa.attempt_id, aa.question_id", AttemptAnswerRowMapper.INSTANCE, attemptIds.toArray());
+    }
+
+    private String answerSelect() {
+        return "SELECT aa.attempt_answer_id, aa.attempt_id, aa.question_id, aa.selected_answer_id, "
+                + "aa.text_answer, aa.marks_obtained, a.option_text, a.is_correct, "
+                + "correct_option.option_text AS correct_option_text "
+                + "FROM attempt_answer aa LEFT JOIN answer a ON a.answer_id = aa.selected_answer_id "
+                + "LEFT JOIN (SELECT question_id, MIN(answer_id) AS answer_id FROM answer "
+                + "WHERE is_correct = 1 GROUP BY question_id) first_correct "
+                + "ON first_correct.question_id = aa.question_id "
+                + "LEFT JOIN answer correct_option ON correct_option.answer_id = first_correct.answer_id ";
     }
 
     @Override
@@ -80,6 +99,31 @@ public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {
     public boolean updateMarks(int attemptId, int questionId, Integer marksObtained) {
         return jdbcTemplate.update("UPDATE attempt_answer SET marks_obtained = ? "
                 + "WHERE attempt_id = ? AND question_id = ?", marksObtained, attemptId, questionId) > 0;
+    }
+
+    @Override
+    public int updateMarksBatch(int attemptId, Map<Integer, Integer> marksByQuestionId) {
+        if (marksByQuestionId == null || marksByQuestionId.isEmpty()) {
+            return 0;
+        }
+        List<Map.Entry<Integer, Integer>> entries = new ArrayList<>(marksByQuestionId.entrySet());
+        int[][] counts = jdbcTemplate.batchUpdate("UPDATE attempt_answer SET marks_obtained = ? "
+                + "WHERE attempt_id = ? AND question_id = ?", entries, entries.size(), (statement, entry) -> {
+                    if (entry.getValue() == null) {
+                        statement.setNull(1, Types.INTEGER);
+                    } else {
+                        statement.setInt(1, entry.getValue());
+                    }
+                    statement.setInt(2, attemptId);
+                    statement.setInt(3, entry.getKey());
+                });
+        int updated = 0;
+        for (int[] batchCounts : counts) {
+            for (int count : batchCounts) {
+                updated += Math.max(count, 0);
+            }
+        }
+        return updated;
     }
 
     @Override

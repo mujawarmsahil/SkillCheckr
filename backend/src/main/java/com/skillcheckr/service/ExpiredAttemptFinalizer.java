@@ -1,9 +1,11 @@
 package com.skillcheckr.service;
 
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.util.List;
 
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.skillcheckr.constant.ExamConstants;
@@ -21,6 +23,9 @@ public class ExpiredAttemptFinalizer {
     private final ExamAttemptRepository examAttemptRepository;
     private final ExamSubmissionService examSubmissionService;
     private final AttemptExpiryPolicy attemptExpiryPolicy;
+
+    @Autowired(required = false)
+    private Clock clock;
 
     public ExpiredAttemptFinalizer(ExamAttemptRepository examAttemptRepository,
             ExamSubmissionService examSubmissionService, AttemptExpiryPolicy attemptExpiryPolicy) {
@@ -41,7 +46,8 @@ public class ExpiredAttemptFinalizer {
             }
             for (ExamAttempt attempt : attempts) {
                 afterAttemptId = attempt.getAttemptId();
-                if (!attemptExpiryPolicy.isExpired(attempt, attempt.getExam(), LocalDateTime.now())) {
+                LocalDateTime now = clock == null ? LocalDateTime.now() : LocalDateTime.now(clock);
+                if (!attemptExpiryPolicy.isExpired(attempt, attempt.getExam(), now)) {
                     continue;
                 }
                 try {
