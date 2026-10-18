@@ -235,6 +235,12 @@ public class ExamRepositoryImpl implements ExamRepository {
 			throw new ExamInUseException("This exam already has student attempts and cannot be deleted. "
 					+ "Cancel the exam instead to keep the recorded results.");
 		}
+		Integer registrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?", Integer.class, examId);
+		if (registrationCount != null && registrationCount > 0) {
+			throw new ExamInUseException("This exam has student registrations and cannot be deleted. "
+					+ "Cancel the exam instead.");
+		}
 
 		// Only the exam and its question assignments belong to this exam. Questions and
 		// answers are subject level records shared with other exams and must survive.
@@ -302,7 +308,6 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public List<Exam> getAllUpcomingExams() {
-		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 				+ "WHERE (e.status = 'Upcoming' OR e.status = 'Approved') "
@@ -316,7 +321,6 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public List<Exam> getAllCompletedExams() {
-		syncExamStatuses();
 		String selectQuery = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 				+ "WHERE e.status = 'Completed' "
@@ -333,7 +337,6 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public List<Exam> getAllExams() {
-		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id ORDER BY e.exam_id DESC";
 		return addQuestionCounts(jdbcTemplate.query(query, getExamRowMapper()));
@@ -349,7 +352,6 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public List<Exam> getExamsByTeacherId(int teacherId) {
-		syncExamStatuses();
 		String query = "SELECT e.*, s.subject_name, s.subject_code FROM exam e "
 				+ "LEFT JOIN subject s ON e.subject_id = s.subject_id "
 				+ "WHERE e.teacher_id = ? ORDER BY e.exam_id DESC";

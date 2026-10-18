@@ -216,12 +216,12 @@ class AdminServiceTest {
     }
 
     @Test
-    void getAdminStats_syncsExamStatusesAndDelegatesToRepository() {
+    void getAdminStats_delegatesToRepository() {
         AdminStatsResponse stats = AdminStatsResponse.builder().totalStudents(5).build();
         when(adminRepository.getAdminStats()).thenReturn(stats);
 
         assertThat(adminService.getAdminStats()).isEqualTo(stats);
-        verify(examRepository).syncExamStatuses();
+        verify(examRepository, never()).syncExamStatuses();
         verify(adminRepository).getAdminStats();
     }
 }

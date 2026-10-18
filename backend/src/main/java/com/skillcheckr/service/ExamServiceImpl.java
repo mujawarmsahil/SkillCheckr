@@ -48,9 +48,6 @@ public class ExamServiceImpl implements ExamService {
 	@Autowired
 	private AttemptExpiryPolicy attemptExpiryPolicy;
 
-	@Autowired
-	private QuestionPaperMutationPolicy questionPaperMutationPolicy;
-
 	@Autowired(required = false)
 	private Clock clock;
 
@@ -65,13 +62,14 @@ public class ExamServiceImpl implements ExamService {
 
 	@Override
 	public List<Exam> getAllExams() {
-		return examRepository.getAllExams();
+		return projectStatuses(examRepository.getAllExams());
 	}
 
 	@Override
 	@Transactional
 	public boolean deleteExamById(int examId) {
-		questionPaperMutationPolicy.lockAndValidate(examId);
+		examRepository.getExamByIdForUpdate(examId)
+				.orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
 		return examRepository.deleteExamById(examId);
 	}
 
@@ -117,17 +115,27 @@ public class ExamServiceImpl implements ExamService {
 
 	@Override
 	public List<Exam> getAllUpcomingExams() {
-		return examRepository.getAllUpcomingExams();
+		return projectStatuses(examRepository.getAllUpcomingExams());
 	}
 
 	@Override
 	public List<Exam> getAllCompletedExams() {
-		return examRepository.getAllCompletedExams();
+		return projectStatuses(examRepository.getAllCompletedExams());
 	}
 
 	@Override
 	public Optional<Exam> getExamById(int examId) {
-		return examRepository.getExamById(examId);
+		return examRepository.getExamById(examId).map(exam -> ExamStatusProjector.project(exam, now()));
+	}
+
+	private List<Exam> projectStatuses(List<Exam> exams) {
+		LocalDateTime now = now();
+		exams.forEach(exam -> ExamStatusProjector.project(exam, now));
+		return exams;
+	}
+
+	private LocalDateTime now() {
+		return clock == null ? LocalDateTime.now() : LocalDateTime.now(clock);
 	}
 
 	@Override
@@ -221,12 +229,14 @@ public class ExamServiceImpl implements ExamService {
 
 	@Override
 	public List<Exam> getExamsByTeacherId(int teacherId) {
-		return examRepository.getExamsByTeacherId(teacherId);
+		return projectStatuses(examRepository.getExamsByTeacherId(teacherId));
 	}
 
 	@Override
+	@Transactional
 	public void registerStudentForExam(int studentId, int examId) {
-		Exam exam = requireExam(examId);
+		Exam exam = examRepository.getExamByIdForUpdate(examId)
+				.orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
 		if (!ExamConstants.isOpenForRegistration(exam.getStatus())) {
 			throw new BadRequestException("Registration is closed: this exam is not open for registration");
 		}
@@ -250,7 +260,11 @@ public class ExamServiceImpl implements ExamService {
 
 	@Override
 	public List<ExamRegistration> getRegistrationsByStudentId(int studentId) {
-		return examRepository.getRegistrationsByStudentId(studentId);
+		List<ExamRegistration> registrations = examRepository.getRegistrationsByStudentId(studentId);
+		LocalDateTime now = now();
+		registrations.stream().map(ExamRegistration::getExam)
+				.forEach(exam -> ExamStatusProjector.project(exam, now));
+		return registrations;
 	}
 
 	@Override

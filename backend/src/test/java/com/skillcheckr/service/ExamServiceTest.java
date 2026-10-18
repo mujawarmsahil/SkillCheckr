@@ -11,8 +11,11 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 
 import java.time.LocalDate;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.AttemptStartException;
@@ -56,9 +60,6 @@ class ExamServiceTest {
 
     @Mock
     private ExamSubmissionService examSubmissionService;
-
-    @Mock
-    private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @Spy
     private AttemptExpiryPolicy attemptExpiryPolicy = new AttemptExpiryPolicy();
@@ -175,15 +176,30 @@ class ExamServiceTest {
     }
 
     @Test
+    void getAllExams_projectsExpiredUpcomingStatusWithoutChangingStoredRows() {
+        Exam exam = examAt(9, ExamConstants.EXAM_STATUS_UPCOMING,
+                LocalDateTime.parse("2030-01-15T09:00:00"), LocalTime.of(10, 30));
+        when(examRepository.getAllExams()).thenReturn(List.of(exam));
+        ReflectionTestUtils.setField(examService, "clock",
+                Clock.fixed(Instant.parse("2030-01-15T10:30:00Z"), ZoneOffset.UTC));
+
+        List<Exam> exams = examService.getAllExams();
+
+        assertThat(exams).singleElement().extracting(Exam::getStatus)
+                .isEqualTo(ExamConstants.EXAM_STATUS_COMPLETED);
+        verify(examRepository, never()).syncExamStatuses();
+    }
+
+    @Test
     void deleteExamById_delegatesToRepository() {
         Exam exam = new Exam();
         exam.setExamId(9);
         exam.setStatus(ExamConstants.EXAM_STATUS_PENDING);
-        when(questionPaperMutationPolicy.lockAndValidate(9)).thenReturn(exam);
+        when(examRepository.getExamById(9)).thenReturn(Optional.of(exam));
         when(examRepository.deleteExamById(9)).thenReturn(true);
 
         assertThat(examService.deleteExamById(9)).isTrue();
-        verify(questionPaperMutationPolicy).lockAndValidate(9);
+        verify(examRepository).getExamByIdForUpdate(9);
         verify(examRepository).deleteExamById(9);
     }
 
@@ -425,6 +441,7 @@ class ExamServiceTest {
 
         examService.registerStudentForExam(STUDENT_ID, 2);
 
+        verify(examRepository).getExamByIdForUpdate(2);
         verify(examRepository).registerStudentForExam(STUDENT_ID, 2);
     }
 
