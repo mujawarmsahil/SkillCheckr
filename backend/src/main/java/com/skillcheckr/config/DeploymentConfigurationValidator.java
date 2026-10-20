@@ -34,8 +34,8 @@ public class DeploymentConfigurationValidator implements InitializingBean {
     private static final int MINIMUM_SECRET_LENGTH = 32;
 
     /**
-     * Profiles that explicitly opt in to the development fallback. Anything else, including no
-     * active profile at all, is treated as a real deployment and must supply its own secret.
+     * Profiles that opt in to the development fallback and relaxed checks. See
+     * {@link #isDevelopmentProfile()} for how the active profile set is evaluated.
      */
     private static final Set<String> DEVELOPMENT_PROFILES = Set.of("dev", "local", "test");
 
@@ -43,17 +43,14 @@ public class DeploymentConfigurationValidator implements InitializingBean {
 
     private final Environment environment;
     private final String tokenSecret;
-    private final String allowedOrigins;
-    private final boolean allowCredentials;
+    private final CorsProperties corsProperties;
 
     public DeploymentConfigurationValidator(Environment environment,
             @Value("${app.security.token-secret:}") String tokenSecret,
-            @Value("${cors.allowed-origins:}") String allowedOrigins,
-            @Value("${cors.allow-credentials:true}") boolean allowCredentials) {
+            CorsProperties corsProperties) {
         this.environment = environment;
         this.tokenSecret = tokenSecret;
-        this.allowedOrigins = allowedOrigins;
-        this.allowCredentials = allowCredentials;
+        this.corsProperties = corsProperties;
     }
 
     @Override
@@ -108,30 +105,39 @@ public class DeploymentConfigurationValidator implements InitializingBean {
     }
 
     /**
-     * Catches the classic misconfiguration where credentials are enabled while any origin is
-     * accepted. Spring permits this through origin patterns, and the browser then reflects the
-     * requesting origin together with an allow credentials header, which lets a hostile page read
-     * authenticated responses.
+     * Rejects wildcard origins while credentials are enabled: Spring's origin-pattern matching
+     * then reflects the requesting origin with an allow-credentials header, letting any page
+     * read authenticated responses. Any entry containing {@code *} counts as a wildcard —
+     * {@code https://*.example.com} matches every subdomain. The check reads the same
+     * {@link CorsProperties} bean that {@link WebConfig} serves, so it cannot drift from the
+     * effective configuration.
      */
     private void validateCorsOrigins() {
-        if (!allowCredentials) {
+        if (!corsProperties.isAllowCredentials()) {
             return;
         }
         Set<String> offending = new LinkedHashSet<>();
-        Arrays.stream(allowedOrigins.split(","))
-                .map(String::trim)
-                .filter(origin -> origin.equals("*") || origin.startsWith("*"))
+        corsProperties.getAllowedOrigins().stream()
+                .filter(origin -> origin != null && origin.contains("*"))
                 .forEach(offending::add);
         if (!offending.isEmpty()) {
             throw fail("cors.allowed-origins contains the wildcard " + offending
                     + " while cors.allow-credentials is enabled. The browser would then reflect "
-                    + "any requesting origin with credentials allowed. List the exact origins "
+                    + "any matching origin with credentials allowed. List the exact origins "
                     + "instead, or set cors.allow-credentials=false.");
         }
     }
 
+    /**
+     * Development only when every active profile is a development profile and at least one is
+     * active. A mixed set such as {@code prod,dev} must count as a real deployment, because
+     * Spring would otherwise load the development properties (committed fallback secret,
+     * loopback origins) into what the operator believes is production.
+     */
     private boolean isDevelopmentProfile() {
-        return Arrays.stream(environment.getActiveProfiles()).anyMatch(DEVELOPMENT_PROFILES::contains);
+        String[] activeProfiles = environment.getActiveProfiles();
+        return activeProfiles.length > 0
+                && Arrays.stream(activeProfiles).allMatch(DEVELOPMENT_PROFILES::contains);
     }
 
     private IllegalStateException fail(String message) {

@@ -1,12 +1,11 @@
 package com.skillcheckr.config;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -19,41 +18,48 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import com.skillcheckr.security.AuthInterceptor;
 
+/**
+ * Registers the {@code CorsFilter} applied to every route and maps the authentication
+ * interceptor onto the API. There is no Spring Security filter chain in this application
+ * (only {@code spring-security-crypto} is on the classpath), so this filter is the only CORS
+ * mechanism. Origins come from the {@code cors.*} properties via {@link CorsProperties};
+ * there is no hardcoded fallback origin.
+ */
 @Configuration
+@EnableConfigurationProperties(CorsProperties.class)
 public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
+    private final CorsProperties corsProperties;
 
-    public WebConfig(AuthInterceptor authInterceptor) {
+    public WebConfig(AuthInterceptor authInterceptor, CorsProperties corsProperties) {
         this.authInterceptor = authInterceptor;
+        this.corsProperties = corsProperties;
     }
 
-    @Value("${cors.allowed-origins:https://skill-checkr.vercel.app}")
-    private String allowedOrigins;
-
-    @Value("${cors.allow-credentials:true}")
-    private boolean allowCredentials;
-
     /**
-     * Builds the origin patterns the CORS filter will accept.
+     * Origins come from configuration only; no wildcard or loopback origins are appended in
+     * code. Development origins come from the {@code dev} profile.
      *
-     * <p>The list comes from configuration only. Wildcard and loopback origins are no longer
-     * appended unconditionally: a previous version added {@code http://localhost:*} and
-     * {@code http://127.0.0.1:*} here, which meant every deployment, including production,
-     * accepted a CORS request from any loopback port on any machine while credentials were
-     * enabled. Local development origins now come from the {@code dev} profile.
+     * <p>A trailing slash is stripped so {@code https://example.com/} matches the browser
+     * {@code Origin} header {@code https://example.com}; without the strip the entry would
+     * never match and CORS would fail silently for that environment.
      */
     private List<String> getAllowedOriginPatterns() {
         Set<String> origins = new LinkedHashSet<>();
 
-        if (allowedOrigins != null && !allowedOrigins.trim().isEmpty()) {
-            Arrays.stream(allowedOrigins.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .forEach(origin -> {
-                        String clean = origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin;
-                        origins.add(clean);
-                    });
+        for (String origin : corsProperties.getAllowedOrigins()) {
+            if (origin == null) {
+                continue;
+            }
+            String clean = origin.trim();
+            if (clean.isEmpty()) {
+                continue;
+            }
+            if (clean.endsWith("/")) {
+                clean = clean.substring(0, clean.length() - 1);
+            }
+            origins.add(clean);
         }
 
         return new ArrayList<>(origins);
@@ -65,20 +71,19 @@ public class WebConfig implements WebMvcConfigurer {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowCredentials(allowCredentials);
+        config.setAllowCredentials(corsProperties.isAllowCredentials());
 
         List<String> patterns = getAllowedOriginPatterns();
         for (String pattern : patterns) {
             config.addAllowedOriginPattern(pattern);
         }
 
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
-        // The wildcard entries that used to terminate both lists are gone. Allowed headers are
-        // enumerated because credentials are enabled, and a "*" entry is silently widened by
-        // the browser to every header; the explicit list is what the frontend actually sends.
-        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept",
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+        // Headers are enumerated because credentials may be enabled; a "*" entry is widened
+        // by the browser to every header. This list is what the frontend actually sends.
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept",
                 "X-Requested-With", "Origin"));
-        config.setExposedHeaders(Arrays.asList("Content-Disposition"));
+        config.setExposedHeaders(List.of("Content-Disposition"));
         config.setMaxAge(3600L);
 
         source.registerCorsConfiguration("/**", config);

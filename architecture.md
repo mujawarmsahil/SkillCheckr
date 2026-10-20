@@ -10,7 +10,7 @@ document describes the code as it exists today.
 SkillCheckr/
 ├── backend/                  Spring Boot 3.4 API (Java 21, JdbcTemplate, MySQL)
 │   ├── src/main/java/com/skillcheckr/
-│   │   ├── config/           WebConfig, PasswordConfig, DeploymentConfigurationValidator
+│   │   ├── config/           WebConfig, CorsProperties, PasswordConfig, TimeConfig, DeploymentConfigurationValidator
 │   │   ├── constant/         ExamConstants, RoleConstants
 │   │   ├── controller/       Auth, Admin, Exam, Question, Result, Subject, RegistrationRequest
 │   │   ├── exception/        GlobalExceptionHandler, ForbiddenException, ExamInUseException

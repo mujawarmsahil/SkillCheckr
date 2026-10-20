@@ -238,11 +238,11 @@ Unhandled exceptions are logged in full server side and returned to the client a
 
 ## CORS and runtime configuration
 
-`WebConfig` registers one high-precedence `CorsFilter` for all routes. It derives origin patterns from configuration only:
+`WebConfig` registers one high-precedence `CorsFilter` for all routes. It derives origin patterns from the `cors.*` properties, bound once into the `CorsProperties` bean shared with the startup validator, so the validated and the served configuration cannot diverge:
 
 - `cors.allowed-origins`
 
-Loopback origins are **not** appended unconditionally. Earlier revisions added `http://localhost:*` and `http://127.0.0.1:*` to every environment while credentials were enabled, so any deployed instance accepted credentialed cross-origin requests from any loopback port. Those origins now come only from the `dev` profile, as exact `host:port` pairs rather than a wildcard.
+There is no hardcoded fallback origin in the code: when the property is absent or empty, every cross-origin request is rejected. Loopback origins are **not** appended unconditionally. Earlier revisions added `http://localhost:*` and `http://127.0.0.1:*` to every environment while credentials were enabled, so any deployed instance accepted credentialed cross-origin requests from any loopback port. Those origins now come only from the `dev` profile, as exact `host:port` pairs rather than a wildcard.
 
 Allowed and exposed headers are enumerated rather than terminated with `*`, because a `*` entry is widened by the browser to every header. `cors.allow-credentials` stays configurable; the API is stateless and authenticates with an `Authorization` bearer header rather than a cookie.
 
@@ -260,12 +260,14 @@ The production image sets `SPRING_PROFILES_ACTIVE=prod`. `npm run dev:backend` s
 
 `DeploymentConfigurationValidator` runs during context startup and refuses to start when:
 
-- `app.security.token-secret` is empty outside a development profile;
+- `app.security.token-secret` is empty outside a development profile set;
 - it is still the committed development fallback value;
 - it is shorter than 32 characters;
-- `cors.allowed-origins` contains a wildcard while credentials are enabled, which would make the browser reflect any origin.
+- `cors.allowed-origins` contains any origin with a `*` while credentials are enabled, which would make the browser reflect every matching origin.
 
-The base properties file deliberately carries **no** default token secret. An unset secret makes `TokenService` generate a random ephemeral secret for the run — safe, but every issued token stops working after a restart — and the validator then refuses to continue unless the `dev` profile is active. This replaced a committed fallback value that let a deployment which forgot `TOKEN_SECRET` start successfully while signing forgeable tokens.
+Development conveniences apply only when **every** active profile is `dev`, `local` or `test` and at least one profile is active. A mixed set such as `prod,dev` counts as a real deployment, because Spring would load the development properties (the committed fallback secret, the loopback origins) into what the operator believes is production.
+
+The base properties file deliberately carries **no** default token secret. An unset secret makes `TokenService` generate a random ephemeral secret for the run — safe, but every issued token stops working after a restart — and the validator then refuses to continue unless the active profile set is exclusively development. This replaced a committed fallback value that let a deployment which forgot `TOKEN_SECRET` start successfully while signing forgeable tokens.
 
 `src/main/resources/application.properties` contains the runtime defaults. Important environment-backed settings include:
 
