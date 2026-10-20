@@ -28,7 +28,7 @@ public class AuthServiceImpl implements AuthService {
      * @throws AccountDisabledException when the credentials are valid but the account is inactive
      */
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public Optional<User> login(String username, String password) {
         if (username == null || password == null) {
             return Optional.empty();

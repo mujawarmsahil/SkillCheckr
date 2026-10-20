@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.ResourceNotFoundException;
@@ -30,6 +31,7 @@ public class RegistrationRequestServiceImpl implements RegistrationRequestServic
     private PasswordEncoder passwordEncoder;
 
     @Override
+    @Transactional
     public boolean saveRequest(RegistrationRequest request) {
         String username = request.getUsername();
         if (username != null && !username.trim().isEmpty()) {
@@ -70,6 +72,7 @@ public class RegistrationRequestServiceImpl implements RegistrationRequestServic
     }
 
     @Override
+    @Transactional
     public boolean updateRequestStatus(int id, String status) {
         String target = status == null ? "" : status.trim();
 
