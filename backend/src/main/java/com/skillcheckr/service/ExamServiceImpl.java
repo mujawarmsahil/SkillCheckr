@@ -52,6 +52,7 @@ public class ExamServiceImpl implements ExamService {
 	private Clock clock;
 
 	@Override
+	@Transactional
 	public Exam saveExam(Exam exam, int teacherId) {
 		// Ownership and lifecycle status are decided by the server, never by the request body.
 		exam.setTeacherId(teacherId);
@@ -278,6 +279,7 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	@Transactional
 	public void unregisterStudentFromExam(int studentId, int examId) {
 		Exam exam = requireExam(examId);
 		if (hasStarted(exam)) {

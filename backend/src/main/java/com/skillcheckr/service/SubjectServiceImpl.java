@@ -41,6 +41,7 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    @Transactional
     public Subject addSubject(Subject subject) {
         return subjectRepository.addSubject(subject);
     }
