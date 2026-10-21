@@ -11,9 +11,11 @@ import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
+import com.skillcheckr.persistence.entity.RegistrationRequestEntity;
 import com.skillcheckr.persistence.entity.StudentProfileEntity;
 import com.skillcheckr.persistence.entity.TeacherProfileEntity;
 import com.skillcheckr.persistence.entity.UserAccountEntity;
+import com.skillcheckr.persistence.repository.RegistrationRequestJpaRepository;
 import com.skillcheckr.persistence.repository.StudentProfileJpaRepository;
 import com.skillcheckr.persistence.repository.TeacherProfileJpaRepository;
 import com.skillcheckr.persistence.repository.UserAccountJpaRepository;
@@ -25,34 +27,39 @@ public class AdminRepositoryImpl implements AdminRepository {
     private final UserAccountJpaRepository accountRepository;
     private final StudentProfileJpaRepository studentRepository;
     private final TeacherProfileJpaRepository teacherRepository;
+    private final RegistrationRequestJpaRepository requestRepository;
 
     public AdminRepositoryImpl(JdbcTemplate jdbcTemplate, UserAccountJpaRepository accountRepository,
-            StudentProfileJpaRepository studentRepository, TeacherProfileJpaRepository teacherRepository) {
+            StudentProfileJpaRepository studentRepository, TeacherProfileJpaRepository teacherRepository,
+            RegistrationRequestJpaRepository requestRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.accountRepository = accountRepository;
         this.studentRepository = studentRepository;
         this.teacherRepository = teacherRepository;
+        this.requestRepository = requestRepository;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<RegistrationRequest> findRequestById(int requestId) {
-        List<RegistrationRequest> requests = jdbcTemplate.query(
-                "SELECT request_id, name, email, username, password, contact, requested_role, status "
-                        + "FROM request WHERE request_id = ?",
-                (rs, rowNum) -> {
-                    RegistrationRequest req = new RegistrationRequest();
-                    req.setRequestId(rs.getInt("request_id"));
-                    req.setName(rs.getString("name"));
-                    req.setEmail(rs.getString("email"));
-                    req.setUsername(rs.getString("username"));
-                    req.setPassword(rs.getString("password"));
-                    req.setContact(rs.getString("contact"));
-                    req.setRequestedRole(rs.getString("requested_role"));
-                    req.setStatus(rs.getString("status"));
-                    return req;
-                },
-                requestId);
-        return requests.stream().findFirst();
+        return requestRepository.findById(requestId).map(this::toRegistrationRequest);
+    }
+
+    /**
+     * Unlike the list projection in {@link RegistrationRequestRepositoryImpl}, the
+     * approval flow needs the stored password hash to create the account.
+     */
+    private RegistrationRequest toRegistrationRequest(RegistrationRequestEntity entity) {
+        RegistrationRequest request = new RegistrationRequest();
+        request.setRequestId(entity.getRequestId());
+        request.setName(entity.getName());
+        request.setEmail(entity.getEmail());
+        request.setUsername(entity.getUsername());
+        request.setPassword(entity.getPassword());
+        request.setContact(entity.getContact());
+        request.setRequestedRole(entity.getRequestedRole());
+        request.setStatus(entity.getStatus());
+        return request;
     }
 
     private Student toStudent(StudentProfileEntity entity) {
@@ -139,9 +146,9 @@ public class AdminRepositoryImpl implements AdminRepository {
     }
 
     @Override
+    @Transactional
     public boolean updateRequestStatus(int requestId, String status) {
-        int rows = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ?", status, requestId);
-        return rows > 0;
+        return requestRepository.updateStatus(requestId, status) > 0;
     }
 
     @Override

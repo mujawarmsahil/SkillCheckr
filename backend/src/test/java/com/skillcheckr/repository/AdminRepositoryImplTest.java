@@ -24,9 +24,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.RegistrationRequest;
+import com.skillcheckr.persistence.entity.RegistrationRequestEntity;
 import com.skillcheckr.persistence.entity.StudentProfileEntity;
 import com.skillcheckr.persistence.entity.TeacherProfileEntity;
 import com.skillcheckr.persistence.entity.UserAccountEntity;
+import com.skillcheckr.persistence.repository.RegistrationRequestJpaRepository;
 import com.skillcheckr.persistence.repository.StudentProfileJpaRepository;
 import com.skillcheckr.persistence.repository.TeacherProfileJpaRepository;
 import com.skillcheckr.persistence.repository.UserAccountJpaRepository;
@@ -45,6 +47,9 @@ class AdminRepositoryImplTest {
 
     @Mock
     private TeacherProfileJpaRepository teacherRepository;
+
+    @Mock
+    private RegistrationRequestJpaRepository requestRepository;
 
     @InjectMocks
     private AdminRepositoryImpl repository;
@@ -123,33 +128,36 @@ class AdminRepositoryImplTest {
     }
 
     @Test
-    void findRequestByIdMapsTheRegistrationRequest() {
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq(1)))
-                .thenAnswer(invocation -> {
-                    org.springframework.jdbc.core.RowMapper<RegistrationRequest> mapper = invocation.getArgument(1);
-                    java.sql.ResultSet resultSet = org.mockito.Mockito.mock(java.sql.ResultSet.class);
-                    when(resultSet.getInt("request_id")).thenReturn(1);
-                    when(resultSet.getString("name")).thenReturn("Alice");
-                    when(resultSet.getString("email")).thenReturn("alice@example.test");
-                    when(resultSet.getString("username")).thenReturn("alice");
-                    when(resultSet.getString("password")).thenReturn("$2a$10$hash");
-                    when(resultSet.getString("contact")).thenReturn("555-0100");
-                    when(resultSet.getString("requested_role")).thenReturn("Student");
-                    when(resultSet.getString("status")).thenReturn("Pending");
-                    return List.of(mapper.mapRow(resultSet, 0));
-                });
+    void findRequestByIdMapsTheRegistrationRequestIncludingPassword() {
+        RegistrationRequestEntity entity = new RegistrationRequestEntity();
+        entity.setRequestId(1);
+        entity.setName("Alice");
+        entity.setEmail("alice@example.test");
+        entity.setUsername("alice");
+        entity.setPassword("$2a$10$hash");
+        entity.setContact("555-0100");
+        entity.setRequestedRole("Student");
+        entity.setStatus("Pending");
+        when(requestRepository.findById(1)).thenReturn(Optional.of(entity));
 
         Optional<RegistrationRequest> result = repository.findRequestById(1);
 
         assertThat(result).isPresent();
         assertThat(result.get().getUsername()).isEqualTo("alice");
         assertThat(result.get().getRequestedRole()).isEqualTo("Student");
+        assertThat(result.get().getPassword()).isEqualTo("$2a$10$hash");
+    }
+
+    @Test
+    void findRequestByIdReturnsEmptyWhenTheRequestIsMissing() {
+        when(requestRepository.findById(1)).thenReturn(Optional.empty());
+
+        assertThat(repository.findRequestById(1)).isEmpty();
     }
 
     @Test
     void updateRequestStatusReturnsWhetherTheRowWasUpdated() {
-        when(jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ?", "Approved", 1))
-                .thenReturn(1);
+        when(requestRepository.updateStatus(1, "Approved")).thenReturn(1);
 
         assertThat(repository.updateRequestStatus(1, "Approved")).isTrue();
     }

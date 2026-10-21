@@ -1,82 +1,90 @@
 package com.skillcheckr.repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.model.RegistrationRequest;
+import com.skillcheckr.persistence.entity.RegistrationRequestEntity;
+import com.skillcheckr.persistence.repository.RegistrationRequestJpaRepository;
 
 @Repository
 public class RegistrationRequestRepositoryImpl implements RegistrationRequestRepository {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    static final String STATUS_PENDING = "Pending";
+
+    private final RegistrationRequestJpaRepository requestRepository;
+
+    public RegistrationRequestRepositoryImpl(RegistrationRequestJpaRepository requestRepository) {
+        this.requestRepository = requestRepository;
+    }
 
     @Override
+    @Transactional
     public boolean saveRequest(RegistrationRequest request) {
-        int result = jdbcTemplate.update(
-                "INSERT INTO request (name, contact, email, requested_role, status, username, password) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                request.getName(), request.getContact(), request.getEmail(), request.getRequestedRole(),
-                "Pending", request.getUsername(), request.getPassword());
-        return result > 0;
+        RegistrationRequestEntity entity = new RegistrationRequestEntity();
+        entity.setName(request.getName());
+        entity.setContact(request.getContact());
+        entity.setEmail(request.getEmail());
+        entity.setRequestedRole(request.getRequestedRole());
+        entity.setUsername(request.getUsername());
+        entity.setPassword(request.getPassword());
+        // New requests always start Pending regardless of any status on the DTO.
+        entity.setStatus(STATUS_PENDING);
+        RegistrationRequestEntity saved = requestRepository.save(entity);
+        return saved.getRequestId() != null;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean existsByUsername(String username) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM request WHERE LOWER(username) = LOWER(?)", Integer.class, username);
-        return count != null && count > 0;
+        return username != null && requestRepository.existsByUsernameIgnoreCase(username);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RegistrationRequest> getAllRequests() {
-        return jdbcTemplate.query("SELECT * FROM request ORDER BY request_id DESC", new RowMapper<RegistrationRequest>() {
-            @Override
-            public RegistrationRequest mapRow(ResultSet rs, int rowNum) throws SQLException {
-                RegistrationRequest rqm = new RegistrationRequest();
-                rqm.setRequestId(rs.getInt("request_id"));
-                rqm.setName(rs.getString("name"));
-                rqm.setContact(rs.getString("contact"));
-                rqm.setEmail(rs.getString("email"));
-                rqm.setUsername(rs.getString("username"));
-                rqm.setRequestedRole(rs.getString("requested_role"));
-                rqm.setStatus(rs.getString("status"));
-                return rqm;
-            }
-        });
+        // Passwords are deliberately not copied: the list endpoint must not expose them.
+        return requestRepository.findAllByOrderByRequestIdDesc().stream()
+                .map(RegistrationRequestRepositoryImpl::toSummary)
+                .toList();
     }
 
     @Override
+    @Transactional
     public boolean deleteRequestById(int id) {
-        int deleted = jdbcTemplate.update("DELETE FROM request WHERE request_id = ?", id);
-        return deleted > 0;
+        return requestRepository.deleteByRequestId(id) > 0;
     }
 
     @Override
+    @Transactional
     public boolean updateRequestStatus(int id, String status) {
-        int updated = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ?", status, id);
-        return updated > 0;
+        return requestRepository.updateStatus(id, status) > 0;
     }
 
     @Override
+    @Transactional
     public boolean updateRequestStatusIfCurrent(int id, String status, String expectedStatus) {
-        int updated = jdbcTemplate.update("UPDATE request SET status = ? WHERE request_id = ? AND status = ?",
-                status, id, expectedStatus);
-        return updated > 0;
+        return requestRepository.updateStatusIfCurrent(id, status, expectedStatus) > 0;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<String> getRequestStatus(int id) {
-        return jdbcTemplate.query("SELECT status FROM request WHERE request_id = ?",
-                (rs, rowNum) -> rs.getString("status"), id)
-                .stream()
-                .findFirst();
+        return requestRepository.findById(id).map(RegistrationRequestEntity::getStatus);
+    }
+
+    private static RegistrationRequest toSummary(RegistrationRequestEntity entity) {
+        RegistrationRequest request = new RegistrationRequest();
+        request.setRequestId(entity.getRequestId());
+        request.setName(entity.getName());
+        request.setContact(entity.getContact());
+        request.setEmail(entity.getEmail());
+        request.setUsername(entity.getUsername());
+        request.setRequestedRole(entity.getRequestedRole());
+        request.setStatus(entity.getStatus());
+        return request;
     }
 }
