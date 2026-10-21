@@ -11,9 +11,10 @@ import org.springframework.stereotype.Repository;
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.ResourceNotFoundException;
-import com.skillcheckr.mapper.QuestionRowMapper;
+
 import com.skillcheckr.model.Question;
 import com.skillcheckr.model.QuestionDTO;
+import com.skillcheckr.model.Subject;
 import com.skillcheckr.persistence.entity.AnswerEntity;
 import com.skillcheckr.persistence.entity.QuestionEntity;
 import com.skillcheckr.persistence.repository.AnswerJpaRepository;
@@ -147,10 +148,20 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
     @Override
     public Optional<Question> findQuestionDetailsById(int questionId) {
-        String sql = "SELECT question_id, subject_id, question_text, question_type, marks, word_limit "
-                + "FROM question WHERE question_id = ?";
-        List<Question> questions = jdbcTemplate.query(sql, QuestionRowMapper.INSTANCE, questionId);
-        return questions.stream().findFirst();
+        return questionRepository.findById(questionId).map(entity -> {
+            Question question = new Question();
+            question.setQuestionId(entity.getQuestionId());
+            if (entity.getSubjectId() != null) {
+                Subject subject = new Subject();
+                subject.setSubjectId(entity.getSubjectId());
+                question.setSubject(subject);
+            }
+            question.setQuestionText(entity.getQuestionText());
+            question.setQuestionType(entity.getQuestionType());
+            question.setMarks(entity.getMarks() == null ? 0 : entity.getMarks());
+            question.setWordLimit(entity.getWordLimit());
+            return question;
+        });
     }
 
     @Override
