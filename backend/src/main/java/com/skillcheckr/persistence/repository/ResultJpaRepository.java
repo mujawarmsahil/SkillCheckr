@@ -20,4 +20,5 @@ public interface ResultJpaRepository extends JpaRepository<ResultEntity, Integer
     @Query("UPDATE ResultEntity r SET r.marksObtained = :marksObtained, r.totalMarks = :totalMarks, r.status = :status WHERE r.attemptId = :attemptId")
     int updateAfterEvaluation(@Param("attemptId") int attemptId, @Param("marksObtained") int marksObtained,
             @Param("totalMarks") int totalMarks, @Param("status") String status);
+    long countByStudentId(int studentId);
 }

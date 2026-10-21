@@ -33,4 +33,6 @@ public interface ExamAttemptJpaRepository extends JpaRepository<ExamAttemptEntit
             + "WHERE a.attemptId = :attemptId AND a.status = :inProgress")
     int finalizeAttempt(@Param("attemptId") int attemptId, @Param("submitted") String submitted,
             @Param("submittedAt") LocalDateTime submittedAt, @Param("inProgress") String inProgress);
+    @Query(value = "SELECT COUNT(*) FROM exam_attempt WHERE student_id = :studentId", nativeQuery = true)
+    int countByStudentId(@Param("studentId") int studentId);
 }

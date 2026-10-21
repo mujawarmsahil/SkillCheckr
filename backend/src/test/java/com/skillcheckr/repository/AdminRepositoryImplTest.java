@@ -20,7 +20,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.RegistrationRequest;
@@ -31,13 +30,15 @@ import com.skillcheckr.persistence.entity.UserAccountEntity;
 import com.skillcheckr.persistence.repository.RegistrationRequestJpaRepository;
 import com.skillcheckr.persistence.repository.StudentProfileJpaRepository;
 import com.skillcheckr.persistence.repository.TeacherProfileJpaRepository;
+import com.skillcheckr.persistence.repository.ExamAttemptJpaRepository;
+import com.skillcheckr.persistence.repository.ExamJpaRepository;
+import com.skillcheckr.persistence.repository.QuestionJpaRepository;
+import com.skillcheckr.persistence.repository.ResultJpaRepository;
+import com.skillcheckr.persistence.repository.SubjectJpaRepository;
 import com.skillcheckr.persistence.repository.UserAccountJpaRepository;
 
 @ExtendWith(MockitoExtension.class)
 class AdminRepositoryImplTest {
-
-    @Mock
-    private JdbcTemplate jdbcTemplate;
 
     @Mock
     private UserAccountJpaRepository accountRepository;
@@ -50,6 +51,16 @@ class AdminRepositoryImplTest {
 
     @Mock
     private RegistrationRequestJpaRepository requestRepository;
+    @Mock
+    private ExamJpaRepository examRepository;
+    @Mock
+    private SubjectJpaRepository subjectRepository;
+    @Mock
+    private QuestionJpaRepository questionRepository;
+    @Mock
+    private ResultJpaRepository resultRepository;
+    @Mock
+    private ExamAttemptJpaRepository attemptRepository;
 
     @InjectMocks
     private AdminRepositoryImpl repository;
@@ -201,8 +212,7 @@ class AdminRepositoryImplTest {
         student.setStudentId(6);
         student.setUser(account);
         when(studentRepository.findById(6)).thenReturn(Optional.of(student));
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM result WHERE student_id = ?",
-                Integer.class, 6)).thenReturn(1);
+        when(resultRepository.countByStudentId(6)).thenReturn(1L);
 
         assertThat(repository.deleteStudentById(6)).isTrue();
 
@@ -220,10 +230,8 @@ class AdminRepositoryImplTest {
         student.setStudentId(6);
         student.setUser(account);
         when(studentRepository.findById(6)).thenReturn(Optional.of(student));
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM result WHERE student_id = ?",
-                Integer.class, 6)).thenReturn(0);
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam_attempt WHERE student_id = ?",
-                Integer.class, 6)).thenReturn(0);
+        when(resultRepository.countByStudentId(6)).thenReturn(0L);
+        when(attemptRepository.countByStudentId(6)).thenReturn(0);
 
         assertThat(repository.deleteStudentById(6)).isTrue();
 
@@ -239,8 +247,7 @@ class AdminRepositoryImplTest {
         teacher.setTeacherId(5);
         teacher.setUser(account);
         when(teacherRepository.findById(5)).thenReturn(Optional.of(teacher));
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE teacher_id = ?",
-                Integer.class, 5)).thenReturn(2);
+        when(examRepository.findByTeacherIdOrderByExamIdDesc(5)).thenReturn(java.util.List.of(new com.skillcheckr.persistence.entity.ExamEntity()));
 
         assertThat(repository.deleteTeacherById(5)).isTrue();
 
@@ -255,7 +262,7 @@ class AdminRepositoryImplTest {
 
         assertThat(repository.deleteStudentById(6)).isFalse();
 
-        verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), eq(6));
+        verify(resultRepository, never()).countByStudentId(6);
     }
 
     @Test
@@ -276,7 +283,9 @@ class AdminRepositoryImplTest {
 
     @Test
     void adminStatsPreservesJdbcBackedAggregatesAndPropagatesFailures() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(10);
+        when(studentRepository.count()).thenReturn(10L);
+        when(teacherRepository.count()).thenReturn(10L);
+        when(examRepository.count()).thenReturn(10L);
 
         AdminStatsResponse stats = repository.getAdminStats();
 
@@ -284,8 +293,7 @@ class AdminRepositoryImplTest {
         assertThat(stats.getTotalTeachers()).isEqualTo(10);
         assertThat(stats.getTotalExams()).isEqualTo(10);
 
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM student"), eq(Integer.class)))
-                .thenThrow(new DataAccessResourceFailureException("connection reset"));
+        when(studentRepository.count()).thenThrow(new DataAccessResourceFailureException("connection reset"));
         assertThatThrownBy(repository::getAdminStats).isInstanceOf(DataAccessResourceFailureException.class);
     }
 
