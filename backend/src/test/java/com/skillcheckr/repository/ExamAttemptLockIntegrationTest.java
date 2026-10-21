@@ -15,7 +15,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -24,7 +27,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-@JdbcTest
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = Replace.NONE)
+@TestPropertySource(properties = "spring.jpa.hibernate.ddl-auto=none")
 @Import(ExamAttemptRepositoryImpl.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ExamAttemptLockIntegrationTest {
@@ -41,6 +46,9 @@ class ExamAttemptLockIntegrationTest {
     @BeforeEach
     void createAttemptTable() {
         jdbcTemplate.execute("SET NON_KEYWORDS EXAM");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS attempt_answer");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS exam_attempt");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS exam");
         jdbcTemplate.execute("DROP TABLE IF EXISTS attempt_answer");
         jdbcTemplate.execute("DROP TABLE IF EXISTS exam_attempt");
         jdbcTemplate.execute("DROP TABLE IF EXISTS exam");
