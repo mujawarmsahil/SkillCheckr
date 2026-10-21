@@ -15,6 +15,8 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.ExamResultDTO;
+import com.skillcheckr.persistence.entity.ResultEntity;
+import com.skillcheckr.persistence.repository.ResultJpaRepository;
 import com.skillcheckr.model.ExamSubmissionSummaryDTO;
 import com.skillcheckr.mapper.ExamResultRowMapper;
 
@@ -23,8 +25,13 @@ public class ResultRepositoryImpl implements ResultRepository {
 
 	private static final DateTimeFormatter SUBMITTED_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-	@Autowired
-	private JdbcTemplate jdbcTemplate;
+	private final JdbcTemplate jdbcTemplate;
+	private final ResultJpaRepository resultRepository;
+
+	public ResultRepositoryImpl(JdbcTemplate jdbcTemplate, ResultJpaRepository resultRepository) {
+		this.jdbcTemplate = jdbcTemplate;
+		this.resultRepository = resultRepository;
+	}
 
 	@Override
 	public List<ExamResultDTO> getResultsByStudentId(int studentId) {
