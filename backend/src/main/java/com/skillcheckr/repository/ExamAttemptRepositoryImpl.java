@@ -7,22 +7,25 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.constant.ExamConstants;
-import com.skillcheckr.model.ExamAttempt;
 import com.skillcheckr.mapper.ExamAttemptRowMapper;
+import com.skillcheckr.model.ExamAttempt;
+import com.skillcheckr.persistence.entity.ExamAttemptEntity;
+import com.skillcheckr.persistence.repository.ExamAttemptJpaRepository;
 
 @Repository
 public class ExamAttemptRepositoryImpl implements ExamAttemptRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final ExamAttemptJpaRepository attemptRepository;
 
-    public ExamAttemptRepositoryImpl(JdbcTemplate jdbcTemplate) {
+    public ExamAttemptRepositoryImpl(JdbcTemplate jdbcTemplate, ExamAttemptJpaRepository attemptRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.attemptRepository = attemptRepository;
     }
 
     @Override
@@ -55,40 +58,25 @@ public class ExamAttemptRepositoryImpl implements ExamAttemptRepository {
 
     @Override
     public ExamAttempt findById(int attemptId) {
-        String sql = "SELECT attempt_id, exam_id, student_id, started_at, expires_at, submitted_at, status "
-                + "FROM exam_attempt WHERE attempt_id = ?";
-        List<ExamAttempt> attempts = jdbcTemplate.query(sql, ExamAttemptRowMapper.INSTANCE, attemptId);
-        return attempts.isEmpty() ? null : attempts.get(0);
+        return attemptRepository.findById(attemptId).map(this::toAttempt).orElse(null);
     }
 
     @Override
     public int createAttempt(ExamAttempt attempt) {
-        String sql = "INSERT INTO exam_attempt (exam_id, student_id, started_at, expires_at, submitted_at, status) "
-                + "VALUES (?, ?, ?, ?, ?, ?)";
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            statement.setInt(1, attempt.getExam() != null ? attempt.getExam().getExamId() : 0);
-            statement.setInt(2, attempt.getStudent() != null ? attempt.getStudent().getStudentId() : 0);
-            // started_at, expires_at and submitted_at are MySQL DATETIME wall-clock values.
-            // setObject(LocalDateTime) stores them verbatim; java.sql.Timestamp would let
-            // the driver shift them between the connection timezone and the JVM zone.
-            statement.setObject(3, attempt.getStartedAt());
-            statement.setObject(4, attempt.getExpiresAt());
-            statement.setObject(5, attempt.getSubmittedAt());
-            statement.setString(6, attempt.getStatus());
-            return statement;
-        }, keyHolder);
-        Number key = keyHolder.getKey();
-        return key == null ? 0 : key.intValue();
+        ExamAttemptEntity entity = new ExamAttemptEntity();
+        entity.setExamId(attempt.getExam() != null ? attempt.getExam().getExamId() : 0);
+        entity.setStudentId(attempt.getStudent() != null ? attempt.getStudent().getStudentId() : 0);
+        entity.setStartedAt(attempt.getStartedAt());
+        entity.setExpiresAt(attempt.getExpiresAt());
+        entity.setSubmittedAt(attempt.getSubmittedAt());
+        entity.setStatus(attempt.getStatus());
+        ExamAttemptEntity saved = attemptRepository.saveAndFlush(entity);
+        return saved.getAttemptId();
     }
 
     @Override
     public boolean hasAttemptsForExam(int examId) {
-        Boolean exists = jdbcTemplate.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM exam_attempt WHERE exam_id = ?)",
-                Boolean.class, examId);
-        return Boolean.TRUE.equals(exists);
+        return Boolean.TRUE.equals(attemptRepository.existsForExam(examId));
     }
 
     @Override
@@ -101,14 +89,23 @@ public class ExamAttemptRepositoryImpl implements ExamAttemptRepository {
 
     @Override
     public boolean finalizeAttempt(int attemptId, LocalDateTime submittedAt) {
-        PreparedStatementSetter values = statement -> {
-            statement.setString(1, ExamConstants.ATTEMPT_STATUS_SUBMITTED);
-            // submitted_at is a MySQL DATETIME; bind the wall-clock value without conversion.
-            statement.setObject(2, submittedAt);
-            statement.setInt(3, attemptId);
-            statement.setString(4, ExamConstants.ATTEMPT_STATUS_IN_PROGRESS);
-        };
-        return jdbcTemplate.update("UPDATE exam_attempt SET status = ?, submitted_at = ? "
-                + "WHERE attempt_id = ? AND status = ?", values) > 0;
+        return attemptRepository.finalizeAttempt(attemptId, ExamConstants.ATTEMPT_STATUS_SUBMITTED,
+                submittedAt, ExamConstants.ATTEMPT_STATUS_IN_PROGRESS) > 0;
+    }
+
+    private ExamAttempt toAttempt(ExamAttemptEntity e) {
+        ExamAttempt a = new ExamAttempt();
+        a.setAttemptId(e.getAttemptId());
+        a.setStartedAt(e.getStartedAt());
+        a.setExpiresAt(e.getExpiresAt());
+        a.setSubmittedAt(e.getSubmittedAt());
+        a.setStatus(e.getStatus());
+        com.skillcheckr.model.Exam ex = new com.skillcheckr.model.Exam();
+        ex.setExamId(e.getExamId());
+        a.setExam(ex);
+        com.skillcheckr.model.Student st = new com.skillcheckr.model.Student();
+        st.setStudentId(e.getStudentId());
+        a.setStudent(st);
+        return a;
     }
 }

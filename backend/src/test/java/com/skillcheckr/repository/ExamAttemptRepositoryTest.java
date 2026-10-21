@@ -21,33 +21,29 @@ import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
 
 import com.skillcheckr.constant.ExamConstants;
+import com.skillcheckr.persistence.repository.ExamAttemptJpaRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ExamAttemptRepositoryTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private ExamAttemptJpaRepository attemptRepository;
 
     @InjectMocks
     private ExamAttemptRepositoryImpl repository;
 
     @Test
-    void finalizeAttemptOnlyTransitionsAnInProgressAttempt() throws Exception {
+    void finalizeAttemptOnlyTransitionsAnInProgressAttempt() {
         LocalDateTime submittedAt = LocalDateTime.of(2026, 10, 17, 12, 30);
-        when(jdbcTemplate.update(anyString(), any(PreparedStatementSetter.class))).thenReturn(1);
+        when(attemptRepository.finalizeAttempt(31, ExamConstants.ATTEMPT_STATUS_SUBMITTED, submittedAt,
+                ExamConstants.ATTEMPT_STATUS_IN_PROGRESS)).thenReturn(1);
 
         assertThat(repository.finalizeAttempt(31, submittedAt)).isTrue();
 
-        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<PreparedStatementSetter> values = ArgumentCaptor.forClass(PreparedStatementSetter.class);
-        verify(jdbcTemplate).update(sql.capture(), values.capture());
-        assertThat(sql.getValue()).contains("WHERE attempt_id = ? AND status = ?");
-        PreparedStatement statement = org.mockito.Mockito.mock(PreparedStatement.class);
-        values.getValue().setValues(statement);
-        verify(statement).setString(1, ExamConstants.ATTEMPT_STATUS_SUBMITTED);
-        verify(statement).setObject(2, submittedAt);
-        verify(statement).setInt(3, 31);
-        verify(statement).setString(4, ExamConstants.ATTEMPT_STATUS_IN_PROGRESS);
+        verify(attemptRepository).finalizeAttempt(31, ExamConstants.ATTEMPT_STATUS_SUBMITTED, submittedAt,
+                ExamConstants.ATTEMPT_STATUS_IN_PROGRESS);
     }
 
     @Test
