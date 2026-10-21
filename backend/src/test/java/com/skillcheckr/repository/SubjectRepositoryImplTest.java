@@ -3,41 +3,39 @@ package com.skillcheckr.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementCreator;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.KeyHolder;
 
 import com.skillcheckr.model.Subject;
+import com.skillcheckr.persistence.entity.SubjectEntity;
+import com.skillcheckr.persistence.repository.SubjectJpaRepository;
 
 @ExtendWith(MockitoExtension.class)
 class SubjectRepositoryImplTest {
 
     @Mock
-    private JdbcTemplate jdbcTemplate;
+    private SubjectJpaRepository subjectRepository;
 
     @InjectMocks
     private SubjectRepositoryImpl repository;
 
     @Test
     void getAllSubjects_propagatesDatabaseFailure() {
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class)))
+        when(subjectRepository.findAllByOrderBySubjectIdDesc())
                 .thenThrow(new DataAccessResourceFailureException("connection reset"));
 
         assertThatThrownBy(() -> repository.getAllSubjects())
@@ -45,16 +43,30 @@ class SubjectRepositoryImplTest {
     }
 
     @Test
+    void getAllSubjects_mapsEntitiesInRepositoryOrder() {
+        SubjectEntity entity = new SubjectEntity();
+        entity.setSubjectId(3);
+        entity.setSubjectName("Maths");
+        entity.setSubjectCode("MATH");
+        when(subjectRepository.findAllByOrderBySubjectIdDesc()).thenReturn(List.of(entity));
+
+        assertThat(repository.getAllSubjects()).singleElement().satisfies(subject -> {
+            assertThat(subject.getSubjectId()).isEqualTo(3);
+            assertThat(subject.getSubjectName()).isEqualTo("Maths");
+            assertThat(subject.getSubjectCode()).isEqualTo("MATH");
+        });
+    }
+
+    @Test
     void getSubjectById_returnsEmpty_whenTheSubjectDoesNotExist() {
-        when(jdbcTemplate.queryForObject(eq("SELECT * FROM subject WHERE subject_id = ?"), any(RowMapper.class), eq(9)))
-                .thenThrow(new EmptyResultDataAccessException(1));
+        when(subjectRepository.findById(9)).thenReturn(Optional.empty());
 
         assertThat(repository.getSubjectById(9)).isEmpty();
     }
 
     @Test
     void getSubjectById_propagatesDatabaseFailureInsteadOfReturningEmpty() {
-        when(jdbcTemplate.queryForObject(eq("SELECT * FROM subject WHERE subject_id = ?"), any(RowMapper.class), eq(9)))
+        when(subjectRepository.findById(9))
                 .thenThrow(new DataAccessResourceFailureException("connection reset"));
 
         assertThatThrownBy(() -> repository.getSubjectById(9))
@@ -67,6 +79,7 @@ class SubjectRepositoryImplTest {
         subject.setSubjectName("  ");
 
         assertThat(repository.addSubject(subject)).isNull();
+        verifyNoInteractions(subjectRepository);
     }
 
     @Test
@@ -74,8 +87,8 @@ class SubjectRepositoryImplTest {
         Subject subject = new Subject();
         subject.setSubjectName("Maths");
 
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM subject WHERE subject_code = ?"),
-                eq(Integer.class), anyString()))
+        when(subjectRepository.existsBySubjectCode(any())).thenReturn(false);
+        when(subjectRepository.save(any(SubjectEntity.class)))
                 .thenThrow(new DataAccessResourceFailureException("connection reset"));
 
         assertThatThrownBy(() -> repository.addSubject(subject))
@@ -83,12 +96,32 @@ class SubjectRepositoryImplTest {
     }
 
     @Test
+    void addSubject_appendsARandomSuffix_whenTheCodeAlreadyExists() {
+        Subject subject = new Subject();
+        subject.setSubjectName("Maths");
+        subject.setSubjectCode("MATH");
+        when(subjectRepository.existsBySubjectCode("MATH")).thenReturn(true);
+        when(subjectRepository.save(any(SubjectEntity.class))).thenAnswer(invocation -> {
+            SubjectEntity entity = invocation.getArgument(0);
+            entity.setSubjectId(5);
+            return entity;
+        });
+
+        Subject created = repository.addSubject(subject);
+
+        assertThat(created.getSubjectId()).isEqualTo(5);
+        assertThat(created.getSubjectCode()).matches("MATH-\\d{3}");
+        ArgumentCaptor<SubjectEntity> captor = ArgumentCaptor.forClass(SubjectEntity.class);
+        verify(subjectRepository).save(captor.capture());
+        assertThat(captor.getValue().getSubjectCode()).isEqualTo(created.getSubjectCode());
+    }
+
+    @Test
     void updateSubject_returnsFalse_whenTheSubjectDoesNotExist() {
         Subject subject = new Subject();
         subject.setSubjectName("Maths");
         subject.setSubjectCode("MATH");
-
-        when(jdbcTemplate.update(anyString(), eq("Maths"), eq("MATH"), eq(9))).thenReturn(0);
+        when(subjectRepository.findById(9)).thenReturn(Optional.empty());
 
         assertThat(repository.updateSubject(9, subject)).isFalse();
     }
@@ -98,8 +131,7 @@ class SubjectRepositoryImplTest {
         Subject subject = new Subject();
         subject.setSubjectName("Maths");
         subject.setSubjectCode("MATH");
-
-        when(jdbcTemplate.update(anyString(), eq("Maths"), eq("MATH"), eq(9)))
+        when(subjectRepository.findById(9))
                 .thenThrow(new DataAccessResourceFailureException("read only"));
 
         assertThatThrownBy(() -> repository.updateSubject(9, subject))
@@ -108,8 +140,7 @@ class SubjectRepositoryImplTest {
 
     @Test
     void getQuestionCountBySubjectId_propagatesDatabaseFailureInsteadOfReturningZero() {
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM question WHERE subject_id = ?"),
-                eq(Integer.class), eq(9)))
+        when(subjectRepository.countQuestionsBySubjectId(9))
                 .thenThrow(new DataAccessResourceFailureException("connection reset"));
 
         assertThatThrownBy(() -> repository.getQuestionCountBySubjectId(9))
@@ -118,8 +149,7 @@ class SubjectRepositoryImplTest {
 
     @Test
     void getExamCountBySubjectId_propagatesDatabaseFailureInsteadOfReturningZero() {
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam WHERE subject_id = ?"),
-                eq(Integer.class), eq(9)))
+        when(subjectRepository.countExamsBySubjectId(9))
                 .thenThrow(new DataAccessResourceFailureException("connection reset"));
 
         assertThatThrownBy(() -> repository.getExamCountBySubjectId(9))
@@ -128,15 +158,13 @@ class SubjectRepositoryImplTest {
 
     @Test
     void deleteSubjectById_refusesWhenAnExamHasRecordedAttempts() {
-        when(jdbcTemplate.query(eq("SELECT exam_id FROM exam WHERE subject_id = ?"),
-                any(org.springframework.jdbc.core.RowMapper.class), eq(9)))
-                .thenReturn(List.of(4));
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?"),
-                eq(Integer.class), eq(4)))
-                .thenReturn(2);
+        when(subjectRepository.findExamIdsBySubjectId(9)).thenReturn(List.of(4));
+        when(subjectRepository.countAttemptsByExamId(4)).thenReturn(2);
 
         assertThatThrownBy(() -> repository.deleteSubjectById(9))
                 .hasMessageContaining("cannot be deleted");
+        verify(subjectRepository, never()).deleteExamQuestionsByExamId(anyInt());
+        verify(subjectRepository, never()).deleteSubjectBySubjectId(anyInt());
     }
 
     @Test
@@ -144,20 +172,17 @@ class SubjectRepositoryImplTest {
         Subject subject = new Subject();
         subject.setSubjectName("Maths");
         subject.setSubjectCode("MATH");
-
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM subject WHERE subject_code = ?"),
-                eq(Integer.class), eq("MATH"))).thenReturn(0);
-        when(jdbcTemplate.update(any(PreparedStatementCreator.class), any(KeyHolder.class))).thenAnswer(invocation -> {
-            KeyHolder keyHolder = invocation.getArgument(1);
-            Map<String, Object> key = new HashMap<>();
-            key.put("key", 12);
-            keyHolder.getKeyList().add(key);
-            return 1;
+        when(subjectRepository.existsBySubjectCode("MATH")).thenReturn(false);
+        when(subjectRepository.save(any(SubjectEntity.class))).thenAnswer(invocation -> {
+            SubjectEntity entity = invocation.getArgument(0);
+            entity.setSubjectId(12);
+            return entity;
         });
 
-        Optional<Subject> created = Optional.ofNullable(repository.addSubject(subject));
+        Subject created = repository.addSubject(subject);
 
-        assertThat(created).isPresent();
-        assertThat(created.get().getSubjectId()).isEqualTo(12);
+        assertThat(created.getSubjectId()).isEqualTo(12);
+        assertThat(created.getSubjectCode()).isEqualTo("MATH");
+        assertThat(created.getSubjectName()).isEqualTo("Maths");
     }
 }
