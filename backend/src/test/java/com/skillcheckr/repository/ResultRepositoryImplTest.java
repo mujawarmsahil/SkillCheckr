@@ -27,12 +27,15 @@ import org.springframework.jdbc.support.KeyHolder;
 
 import com.skillcheckr.model.ExamSubmissionSummaryDTO;
 import com.skillcheckr.model.ExamResultDTO;
+import com.skillcheckr.persistence.repository.ResultJpaRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ResultRepositoryImplTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private ResultJpaRepository resultRepository;
 
     @InjectMocks
     private ResultRepositoryImpl repository;

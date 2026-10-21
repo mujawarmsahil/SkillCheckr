@@ -26,6 +26,7 @@ import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.RowMapper;
 
 import com.skillcheckr.model.AttemptAnswer;
+import com.skillcheckr.persistence.repository.AttemptAnswerJpaRepository;
 import com.skillcheckr.model.ExamAttempt;
 import com.skillcheckr.model.Question;
 
@@ -34,6 +35,8 @@ class AttemptAnswerRepositoryTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private AttemptAnswerJpaRepository attemptAnswerRepository;
 
     @InjectMocks
     private AttemptAnswerRepositoryImpl repository;

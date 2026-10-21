@@ -11,15 +11,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import com.skillcheckr.model.AttemptAnswer;
+import com.skillcheckr.persistence.repository.AttemptAnswerJpaRepository;
 import com.skillcheckr.mapper.AttemptAnswerRowMapper;
 
 @Repository
 public class AttemptAnswerRepositoryImpl implements AttemptAnswerRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final AttemptAnswerJpaRepository attemptAnswerRepository;
 
-    public AttemptAnswerRepositoryImpl(JdbcTemplate jdbcTemplate) {
+    public AttemptAnswerRepositoryImpl(JdbcTemplate jdbcTemplate, AttemptAnswerJpaRepository attemptAnswerRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.attemptAnswerRepository = attemptAnswerRepository;
     }
 
     @Override
