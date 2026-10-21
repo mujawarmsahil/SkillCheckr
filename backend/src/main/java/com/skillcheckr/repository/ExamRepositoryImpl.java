@@ -31,6 +31,10 @@ import com.skillcheckr.model.Exam;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
+import com.skillcheckr.persistence.entity.ExamEntity;
+import com.skillcheckr.persistence.repository.ExamJpaRepository;
+import com.skillcheckr.persistence.repository.ExamQuestionJpaRepository;
+import com.skillcheckr.persistence.repository.ExamRegistrationJpaRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -38,8 +42,18 @@ import lombok.extern.slf4j.Slf4j;
 @Repository
 public class ExamRepositoryImpl implements ExamRepository {
 
-	@Autowired
-	private JdbcTemplate jdbcTemplate;
+	private final JdbcTemplate jdbcTemplate;
+	private final ExamJpaRepository examRepository;
+	private final ExamRegistrationJpaRepository registrationRepository;
+	private final ExamQuestionJpaRepository examQuestionRepository;
+
+	public ExamRepositoryImpl(JdbcTemplate jdbcTemplate, ExamJpaRepository examRepository,
+			ExamRegistrationJpaRepository registrationRepository, ExamQuestionJpaRepository examQuestionRepository) {
+		this.jdbcTemplate = jdbcTemplate;
+		this.examRepository = examRepository;
+		this.registrationRepository = registrationRepository;
+		this.examQuestionRepository = examQuestionRepository;
+	}
 
 	private RowMapper<Exam> getExamRowMapper() {
 		return new RowMapper<Exam>() {
@@ -226,65 +240,45 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public boolean deleteExamById(int examId) {
-		if (!examExists(examId)) {
+		if (examRepository.countExam(examId) == 0) {
 			return false;
 		}
-		Integer attemptCount = jdbcTemplate.queryForObject(
-				"SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?", Integer.class, examId);
-		if (attemptCount != null && attemptCount > 0) {
+		if (examRepository.countAttempts(examId) > 0) {
 			throw new ExamInUseException("This exam already has student attempts and cannot be deleted. "
 					+ "Cancel the exam instead to keep the recorded results.");
 		}
-		Integer registrationCount = jdbcTemplate.queryForObject(
-				"SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?", Integer.class, examId);
-		if (registrationCount != null && registrationCount > 0) {
+		if (examRepository.countRegistrations(examId) > 0) {
 			throw new ExamInUseException("This exam has student registrations and cannot be deleted. "
 					+ "Cancel the exam instead.");
 		}
 
-		// Only the exam and its question assignments belong to this exam. Questions and
-		// answers are subject level records shared with other exams and must survive.
-		jdbcTemplate.update("DELETE FROM exam_question WHERE exam_id = ?", examId);
-		return jdbcTemplate.update("DELETE FROM exam WHERE exam_id = ?", examId) > 0;
+		examQuestionRepository.deleteByExamId(examId);
+		examRepository.deleteById(examId);
+		return true;
 	}
 
 	private boolean examExists(int examId) {
-		Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam WHERE exam_id = ?",
-				Integer.class, examId);
-		return count != null && count > 0;
+		return examRepository.countExam(examId) > 0;
 	}
 
 	@Override
 	public void syncExamStatuses() {
-		String updateQuery = "UPDATE exam SET status = 'Completed' "
-				+ "WHERE (status = 'Upcoming' OR status = 'Approved') "
-				+ "AND ("
-				+ "  DATE(exam_date) < CURDATE() "
-				+ "  OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME())"
-				+ ")";
-		jdbcTemplate.update(updateQuery);
+		examRepository.syncExamStatuses();
 	}
 
 	@Override
 	public boolean acceptExam(int examId) {
-		String sql = "UPDATE exam SET status = 'Upcoming', paper_frozen = TRUE WHERE exam_id = ?";
-		int rowsAffected = jdbcTemplate.update(sql, examId);
-		return rowsAffected > 0;
+		return examRepository.acceptExam(examId) > 0;
 	}
 
 	@Override
 	public boolean updateExamStatus(int examId, String status) {
-		String sql = "UPDATE exam SET status = ?, "
-				+ "paper_frozen = CASE WHEN LOWER(?) IN ('upcoming', 'approved') "
-				+ "THEN TRUE ELSE paper_frozen END WHERE exam_id = ?";
-		int rowsAffected = jdbcTemplate.update(sql, status, status, examId);
-		return rowsAffected > 0;
+		return examRepository.updateStatus(examId, status) > 0;
 	}
 
 	@Override
 	public void lockExamForUpdate(int examId) {
-		jdbcTemplate.queryForList("SELECT exam_id FROM exam WHERE exam_id = ? FOR UPDATE",
-				Integer.class, examId);
+		examRepository.lockExamForUpdate(examId);
 	}
 
 	@Override
@@ -301,9 +295,7 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public List<Integer> findExamIdsBySubjectId(int subjectId) {
-		return jdbcTemplate.queryForList(
-				"SELECT exam_id FROM exam WHERE subject_id = ? ORDER BY exam_id",
-				Integer.class, subjectId);
+		return examRepository.findExamIdsBySubjectId(subjectId);
 	}
 
 	@Override
@@ -360,21 +352,15 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public boolean registerStudentForExam(int studentId, int examId) {
-		if (isStudentRegisteredForExam(studentId, examId)) {
+		if (registrationRepository.existsByStudentIdAndExamId(studentId, examId)) {
 			return true;
 		}
-
-		String sql = "INSERT INTO exam_registration (student_id, exam_id, status) VALUES (?, ?, 'Registered') "
-				+ "ON DUPLICATE KEY UPDATE status = 'Registered'";
-		int rows = jdbcTemplate.update(sql, studentId, examId);
-		return rows > 0;
+		return registrationRepository.upsertRegistration(studentId, examId) > 0;
 	}
 
 	@Override
 	public boolean isStudentRegisteredForExam(int studentId, int examId) {
-		String sql = "SELECT COUNT(*) FROM exam_registration WHERE student_id = ? AND exam_id = ?";
-		Integer count = jdbcTemplate.queryForObject(sql, Integer.class, studentId, examId);
-		return count != null && count > 0;
+		return registrationRepository.existsByStudentIdAndExamId(studentId, examId);
 	}
 
 	@Override
@@ -439,15 +425,11 @@ public class ExamRepositoryImpl implements ExamRepository {
 
 	@Override
 	public int getRegistrationCountByExamId(int examId) {
-		String sql = "SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?";
-		Integer count = jdbcTemplate.queryForObject(sql, Integer.class, examId);
-		return count != null ? count : 0;
+		return registrationRepository.countByExamId(examId);
 	}
 
 	@Override
 	public boolean unregisterStudentFromExam(int studentId, int examId) {
-		String sql = "DELETE FROM exam_registration WHERE student_id = ? AND exam_id = ?";
-		int rows = jdbcTemplate.update(sql, studentId, examId);
-		return rows > 0;
+		return registrationRepository.deleteByStudentIdAndExamId(studentId, examId) > 0;
 	}
 }

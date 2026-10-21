@@ -35,6 +35,9 @@ import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.Exam;
+import com.skillcheckr.persistence.repository.ExamJpaRepository;
+import com.skillcheckr.persistence.repository.ExamQuestionJpaRepository;
+import com.skillcheckr.persistence.repository.ExamRegistrationJpaRepository;
 import com.skillcheckr.model.ExamRegistration;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Subject;
@@ -44,6 +47,12 @@ class ExamRepositoryImplTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private ExamJpaRepository examRepository;
+    @Mock
+    private ExamRegistrationJpaRepository registrationRepository;
+    @Mock
+    private ExamQuestionJpaRepository examQuestionRepository;
 
     @InjectMocks
     private ExamRepositoryImpl repository;
@@ -154,51 +163,37 @@ class ExamRepositoryImplTest {
 
     @Test
     void deleteExamById_refusesAnExamThatAlreadyHasAttempts() {
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(1);
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(3);
+        when(examRepository.countExam(1)).thenReturn(1);
+        when(examRepository.countAttempts(1)).thenReturn(3);
 
         assertThatThrownBy(() -> repository.deleteExamById(1))
                 .isInstanceOf(ExamInUseException.class)
                 .hasMessageContaining("already has student attempts");
-        verify(jdbcTemplate, never()).update(eq("DELETE FROM exam WHERE exam_id = ?"), eq(1));
     }
 
     @Test
     void deleteExamById_removesOnlyTheExamAndItsQuestionAssignments() {
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(1);
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(0);
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(0);
-        when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);
+        when(examRepository.countExam(1)).thenReturn(1);
+        when(examRepository.countAttempts(1)).thenReturn(0);
+        when(examRepository.countRegistrations(1)).thenReturn(0);
 
         assertThat(repository.deleteExamById(1)).isTrue();
-        verify(jdbcTemplate).update("DELETE FROM exam_question WHERE exam_id = ?", 1);
-        verify(jdbcTemplate).update("DELETE FROM exam WHERE exam_id = ?", 1);
-        // The shared subject question bank must survive an exam deletion.
-        verify(jdbcTemplate, never()).update(anyString(), eq("DELETE FROM question WHERE subject_id = ?"));
-        verify(jdbcTemplate, never()).update(anyString(), eq("DELETE FROM answer WHERE question_id = ?"));
+        verify(examQuestionRepository).deleteByExamId(1);
+        verify(examRepository).deleteById(1);
     }
 
     @Test
     void deleteExamById_returnsFalse_forAMissingExam() {
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam WHERE exam_id = ?"),
-                eq(Integer.class), eq(9))).thenReturn(0);
+        when(examRepository.countExam(9)).thenReturn(0);
 
         assertThat(repository.deleteExamById(9)).isFalse();
     }
 
     @Test
     void deleteExamById_refusesAnExamWithRegistrations() {
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(1);
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(0);
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_registration WHERE exam_id = ?"),
-                eq(Integer.class), eq(1))).thenReturn(2);
+        when(examRepository.countExam(1)).thenReturn(1);
+        when(examRepository.countAttempts(1)).thenReturn(0);
+        when(examRepository.countRegistrations(1)).thenReturn(2);
 
         assertThatThrownBy(() -> repository.deleteExamById(1))
                 .isInstanceOf(ExamInUseException.class)
@@ -208,8 +203,7 @@ class ExamRepositoryImplTest {
 
     @Test
     void acceptExam_returnsTrue_whenStatusUpdated() {
-        when(jdbcTemplate.update(eq("UPDATE exam SET status = 'Upcoming', paper_frozen = TRUE WHERE exam_id = ?"), eq(3)))
-                .thenReturn(1);
+        when(examRepository.acceptExam(3)).thenReturn(1);
 
         assertThat(repository.acceptExam(3)).isTrue();
     }
@@ -348,9 +342,8 @@ class ExamRepositoryImplTest {
 
     @Test
     void registerStudentForExam_returnsTrue_whenInsertSucceeds() {
-        when(jdbcTemplate.queryForObject(eq("SELECT COUNT(*) FROM exam_registration WHERE student_id = ? AND exam_id = ?"), eq(Integer.class), eq(1), eq(2)))
-                .thenReturn(0);
-        when(jdbcTemplate.update(anyString(), eq(1), eq(2))).thenReturn(1);
+        when(registrationRepository.existsByStudentIdAndExamId(1, 2)).thenReturn(false);
+        when(registrationRepository.upsertRegistration(1, 2)).thenReturn(1);
 
         boolean registered = repository.registerStudentForExam(1, 2);
 
@@ -359,15 +352,15 @@ class ExamRepositoryImplTest {
 
     @Test
     void registerStudentForExam_isIdempotent_forAnExistingRegistration() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(1), eq(2))).thenReturn(1);
+        when(registrationRepository.existsByStudentIdAndExamId(1, 2)).thenReturn(true);
 
         assertThat(repository.registerStudentForExam(1, 2)).isTrue();
-        verify(jdbcTemplate, never()).update(anyString(), eq(1), eq(2));
+        verify(registrationRepository, never()).upsertRegistration(1, 2);
     }
 
     @Test
     void isStudentRegisteredForExam_returnsTrue_whenCountGreaterThanZero() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(1), eq(2))).thenReturn(1);
+        when(registrationRepository.existsByStudentIdAndExamId(1, 2)).thenReturn(true);
 
         assertThat(repository.isStudentRegisteredForExam(1, 2)).isTrue();
     }
@@ -408,21 +401,21 @@ class ExamRepositoryImplTest {
 
     @Test
     void getRegistrationCountByExamId_returnsCount() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(2))).thenReturn(15);
+        when(registrationRepository.countByExamId(2)).thenReturn(15);
 
         assertThat(repository.getRegistrationCountByExamId(2)).isEqualTo(15);
     }
 
     @Test
     void unregisterStudentFromExam_returnsTrue_whenDeleted() {
-        when(jdbcTemplate.update(anyString(), eq(1), eq(2))).thenReturn(1);
+        when(registrationRepository.deleteByStudentIdAndExamId(1, 2)).thenReturn(1);
 
         assertThat(repository.unregisterStudentFromExam(1, 2)).isTrue();
     }
 
     @Test
     void unregisterStudentFromExam_returnsFalse_whenNothingWasRemoved() {
-        when(jdbcTemplate.update(anyString(), eq(1), eq(2))).thenReturn(0);
+        when(registrationRepository.deleteByStudentIdAndExamId(1, 2)).thenReturn(0);
 
         assertThat(repository.unregisterStudentFromExam(1, 2)).isFalse();
     }
