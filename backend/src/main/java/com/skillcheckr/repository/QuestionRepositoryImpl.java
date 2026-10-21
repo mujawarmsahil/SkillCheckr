@@ -11,11 +11,9 @@ import org.springframework.stereotype.Repository;
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.ResourceNotFoundException;
-
 import com.skillcheckr.model.Question;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.Subject;
-import com.skillcheckr.persistence.entity.AnswerEntity;
 import com.skillcheckr.persistence.entity.QuestionEntity;
 import com.skillcheckr.persistence.repository.AnswerJpaRepository;
 import com.skillcheckr.persistence.repository.QuestionJpaRepository;
@@ -86,7 +84,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 }
             } else {
                 if (dto.getSampleAnswer() != null && !dto.getSampleAnswer().trim().isEmpty()) {
-                    AnswerEntity answer = new AnswerEntity();
+                    com.skillcheckr.persistence.entity.AnswerEntity answer = new com.skillcheckr.persistence.entity.AnswerEntity();
                     answer.setQuestionId(questionId);
                     answer.setOptionText(dto.getSampleAnswer().trim());
                     answer.setCorrect(true);
@@ -97,7 +95,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
     }
 
     private void saveOption(String option, String correctOption, int questionId) {
-        AnswerEntity answer = new AnswerEntity();
+        com.skillcheckr.persistence.entity.AnswerEntity answer = new com.skillcheckr.persistence.entity.AnswerEntity();
         answer.setQuestionId(questionId);
         answer.setOptionText(option);
         boolean isCorrect = option != null && correctOption != null && option.trim().equalsIgnoreCase(correctOption.trim());
@@ -127,8 +125,15 @@ public class QuestionRepositoryImpl implements QuestionRepository {
             int subjectId = row.get("subject_id") != null ? ((Number) row.get("subject_id")).intValue() : 0;
             String questionText = (String) row.get("question_text");
             String subjectName = (String) row.get("subject_name");
-            questions.add(buildQuestionDto(questionId, subjectId, questionText, subjectName));
+            QuestionDTO dto = new QuestionDTO();
+            dto.setQuestionId(questionId);
+            dto.setSubjectId(subjectId);
+            dto.setQuestion(questionText);
+            dto.setSubjectName(subjectName);
+            loadQuestionMetadata(dto);
+            questions.add(dto);
         }
+        populateAnswersBatch(questions);
         return questions;
     }
 
@@ -143,7 +148,14 @@ public class QuestionRepositoryImpl implements QuestionRepository {
         int subjectId = row.get("subject_id") != null ? ((Number) row.get("subject_id")).intValue() : 0;
         String questionText = (String) row.get("question_text");
         String subjectName = (String) row.get("subject_name");
-        return Optional.of(buildQuestionDto(questionId, subjectId, questionText, subjectName));
+        QuestionDTO dto = new QuestionDTO();
+        dto.setQuestionId(questionId);
+        dto.setSubjectId(subjectId);
+        dto.setQuestion(questionText);
+        dto.setSubjectName(subjectName);
+        loadQuestionMetadata(dto);
+        populateAnswers(dto, questionId);
+        return Optional.of(dto);
     }
 
     @Override
@@ -213,7 +225,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
             }
         } else {
             if (dto.getSampleAnswer() != null && !dto.getSampleAnswer().trim().isEmpty()) {
-                AnswerEntity answer = new AnswerEntity();
+                com.skillcheckr.persistence.entity.AnswerEntity answer = new com.skillcheckr.persistence.entity.AnswerEntity();
                 answer.setQuestionId(questionId);
                 answer.setOptionText(dto.getSampleAnswer().trim());
                 answer.setCorrect(true);
@@ -232,8 +244,13 @@ public class QuestionRepositoryImpl implements QuestionRepository {
         for (Map<String, Object> row : questionRows) {
             int questionId = ((Number) row.get("question_id")).intValue();
             String questionText = (String) row.get("question_text");
-            questions.add(buildQuestionDto(questionId, subjectId, questionText, null));
+            QuestionDTO dto = new QuestionDTO();
+            dto.setQuestionId(questionId);
+            dto.setSubjectId(subjectId);
+            dto.setQuestion(questionText);
+            questions.add(dto);
         }
+        populateAnswersBatch(questions);
         return questions;
     }
 
@@ -244,21 +261,8 @@ public class QuestionRepositoryImpl implements QuestionRepository {
                 + "JOIN question q ON q.question_id = eq.question_id "
                 + "LEFT JOIN subject s ON s.subject_id = q.subject_id "
                 + "WHERE eq.exam_id = ? ORDER BY eq.question_order ASC";
-        return mapQuestionRows(jdbcTemplate.queryForList(assignmentSql, examId), examId);
-    }
+        List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(assignmentSql, examId);
 
-    private QuestionDTO buildQuestionDto(int questionId, int subjectId, String questionText, String subjectName) {
-        QuestionDTO dto = new QuestionDTO();
-        dto.setQuestionId(questionId);
-        dto.setSubjectId(subjectId);
-        dto.setQuestion(questionText);
-        dto.setSubjectName(subjectName);
-        loadQuestionMetadata(dto);
-        populateAnswers(dto, questionId);
-        return dto;
-    }
-
-    private List<QuestionDTO> mapQuestionRows(List<Map<String, Object>> questionRows, int examId) {
         List<QuestionDTO> questions = new ArrayList<>();
         for (Map<String, Object> row : questionRows) {
             int questionId = ((Number) row.get("question_id")).intValue();
@@ -269,15 +273,63 @@ public class QuestionRepositoryImpl implements QuestionRepository {
             dto.setQuestion((String) row.get("question_text"));
             dto.setSubjectName((String) row.get("subject_name"));
             setQuestionMetadata(dto, row);
-            populateAnswers(dto, questionId);
             questions.add(dto);
         }
+        populateAnswersBatch(questions);
         return questions;
     }
 
     private void populateAnswers(QuestionDTO dto, int questionId) {
         List<Map<String, Object>> answerRows = jdbcTemplate.queryForList(
                 "SELECT answer_id, option_text, is_correct FROM answer WHERE question_id = ? ORDER BY answer_id ASC", questionId);
+        if (answerRows.size() >= 2) {
+            dto.setQuestionType(ExamConstants.QUESTION_TYPE_MCQ);
+            if (answerRows.size() > 0) dto.setOption1((String) answerRows.get(0).get("option_text"));
+            if (answerRows.size() > 1) dto.setOption2((String) answerRows.get(1).get("option_text"));
+            if (answerRows.size() > 2) dto.setOption3((String) answerRows.get(2).get("option_text"));
+            if (answerRows.size() > 3) dto.setOption4((String) answerRows.get(3).get("option_text"));
+            setOptionIds(dto, answerRows);
+            for (Map<String, Object> answer : answerRows) {
+                Object correct = answer.get("is_correct");
+                if ((correct instanceof Boolean && (Boolean) correct)
+                        || (correct instanceof Number && ((Number) correct).intValue() == 1)) {
+                    dto.setCorrectOption((String) answer.get("option_text"));
+                }
+            }
+        } else {
+            dto.setQuestionType(ExamConstants.QUESTION_TYPE_QUESTION_ANSWER);
+            if (!answerRows.isEmpty()) {
+                dto.setSampleAnswer((String) answerRows.get(0).get("option_text"));
+            }
+        }
+    }
+
+    private void populateAnswersBatch(List<QuestionDTO> questions) {
+        if (questions == null || questions.isEmpty()) {
+            return;
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (QuestionDTO q : questions) {
+            if (q.getQuestionId() > 0) ids.add(q.getQuestionId());
+        }
+        if (ids.isEmpty()) return;
+        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+        List<Map<String, Object>> answerRows = jdbcTemplate.queryForList(
+                "SELECT answer_id, question_id, option_text, is_correct FROM answer WHERE question_id IN ("
+                        + placeholders + ") ORDER BY question_id, answer_id ASC", ids.toArray());
+        java.util.Map<Integer, List<Map<String, Object>>> byQuestion = new java.util.HashMap<>();
+        for (Map<String, Object> row : answerRows) {
+            int qid = ((Number) row.get("question_id")).intValue();
+            byQuestion.computeIfAbsent(qid, k -> new ArrayList<>()).add(row);
+        }
+        for (QuestionDTO dto : questions) {
+            List<Map<String, Object>> rows = byQuestion.get(dto.getQuestionId());
+            if (rows == null) rows = java.util.List.of();
+            applyAnswers(dto, rows);
+        }
+    }
+
+    private void applyAnswers(QuestionDTO dto, List<Map<String, Object>> answerRows) {
         if (answerRows.size() >= 2) {
             dto.setQuestionType(ExamConstants.QUESTION_TYPE_MCQ);
             if (answerRows.size() > 0) dto.setOption1((String) answerRows.get(0).get("option_text"));
