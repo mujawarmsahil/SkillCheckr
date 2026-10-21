@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,7 +37,7 @@ public class QuestionController {
 	private ExamService examService;
 
 	@PostMapping("")
-	public ResponseEntity<QuestionsAddResponse> addAllQuestion(@RequestBody List<QuestionDTO> questions,
+	public ResponseEntity<QuestionsAddResponse> addAllQuestion(@Valid @RequestBody List<QuestionDTO> questions,
 			HttpServletRequest request) {
 		AuthPrincipal principal = AuthGuard.requireStaff(request);
 		if (questions == null || questions.isEmpty()) {
@@ -75,7 +76,7 @@ public class QuestionController {
 
 	@PutMapping("/{questionId}")
 	public ResponseEntity<QuestionDTO> updateQuestion(@PathVariable("questionId") Integer questionId,
-			@RequestBody QuestionDTO question, HttpServletRequest request) {
+			@Valid @RequestBody QuestionDTO question, HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
 		if (question == null) {
 			throw new BadRequestException("Invalid question payload");

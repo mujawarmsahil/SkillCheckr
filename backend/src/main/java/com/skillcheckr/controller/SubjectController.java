@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -55,7 +56,7 @@ public class SubjectController {
     }
 
     @PostMapping("")
-    public ResponseEntity<Subject> addSubject(@RequestBody Subject subject, HttpServletRequest request) {
+    public ResponseEntity<Subject> addSubject(@Valid @RequestBody Subject subject, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         validateSubject(subject);
         Subject saved = subjectService.addSubject(subject);
@@ -67,7 +68,7 @@ public class SubjectController {
 
     @PutMapping("/{subjectId}")
     public ResponseEntity<Subject> updateSubject(@PathVariable("subjectId") Integer subjectId,
-            @RequestBody Subject subject, HttpServletRequest request) {
+            @Valid @RequestBody Subject subject, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         validateSubject(subject);
         boolean updated = subjectService.updateSubject(subjectId, subject);

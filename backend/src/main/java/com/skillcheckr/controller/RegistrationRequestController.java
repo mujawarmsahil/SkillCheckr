@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,7 +36,7 @@ public class RegistrationRequestController {
     private RegistrationRequestService registrationRequestService;
 
     @PostMapping("")
-    public ResponseEntity<ApiResponse> saveRequest(@RequestBody RegistrationRequest request) {
+    public ResponseEntity<ApiResponse> saveRequest(@Valid @RequestBody RegistrationRequest request) {
         // Public endpoint: this is how a visitor signs up for an account.
         validateRegistrationRequest(request);
         request.setStatus(STATUS_PENDING);
@@ -59,7 +60,7 @@ public class RegistrationRequestController {
     @PutMapping("/{request_id}/status")
     public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("request_id") Integer requestId,
-            @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
+            @Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
                 ? body.get("status").trim()

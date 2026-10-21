@@ -264,10 +264,11 @@ public class AdminRepositoryImpl implements AdminRepository {
 
         long totalStudents = studentRepository.count();
         long totalTeachers = teacherRepository.count();
-        long totalExams = examRepository.count();
-        int pendingExams = examRepository.countPendingExams();
-        int upcomingExams = examRepository.countUpcomingExams();
-        int completedExams = examRepository.countCompletedExams();
+        ExamJpaRepository.ExamCounts examStats = examRepository.countExamStats();
+        long totalExams = examStats.getTotal();
+        int pendingExams = (int) examStats.getPending();
+        int upcomingExams = (int) examStats.getUpcoming();
+        int completedExams = (int) examStats.getCompleted();
         int pendingRequests = requestRepository.countPendingRequests();
         long totalSubjects = subjectRepository.count();
         long totalQuestions = questionRepository.count();

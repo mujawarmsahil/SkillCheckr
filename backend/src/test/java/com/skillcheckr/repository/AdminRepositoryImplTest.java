@@ -285,7 +285,12 @@ class AdminRepositoryImplTest {
     void adminStatsPreservesJdbcBackedAggregatesAndPropagatesFailures() {
         when(studentRepository.count()).thenReturn(10L);
         when(teacherRepository.count()).thenReturn(10L);
-        when(examRepository.count()).thenReturn(10L);
+        ExamJpaRepository.ExamCounts examCounts = org.mockito.Mockito.mock(ExamJpaRepository.ExamCounts.class);
+        when(examCounts.getTotal()).thenReturn(10L);
+        when(examCounts.getPending()).thenReturn(10L);
+        when(examCounts.getUpcoming()).thenReturn(10L);
+        when(examCounts.getCompleted()).thenReturn(10L);
+        when(examRepository.countExamStats()).thenReturn(examCounts);
 
         AdminStatsResponse stats = repository.getAdminStats();
 

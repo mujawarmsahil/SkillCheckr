@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -72,7 +73,7 @@ public class ExamController {
     private QuestionBankService questionBankService;
 
     @PostMapping("")
-    public ResponseEntity<Exam> addExams(@RequestBody Exam exam, HttpServletRequest request) {
+    public ResponseEntity<Exam> addExams(@Valid @RequestBody Exam exam, HttpServletRequest request) {
         AuthPrincipal principal = AuthGuard.requireStaff(request);
         int teacherId = principal.isTeacher() ? principal.getRoleId() : 0;
         return ResponseEntity.status(HttpStatus.CREATED).body(examService.saveExam(exam, teacherId));
@@ -147,7 +148,7 @@ public class ExamController {
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
             @PathVariable("question_id") Integer questionId,
-            @RequestBody(required = false) AttemptAnswerRequest request,
+            @Valid @RequestBody(required = false) AttemptAnswerRequest request,
             HttpServletRequest servletRequest) {
         int studentId = AuthGuard.requireStudentId(servletRequest);
         AttemptAnswerResponse response = attemptAnswerService.saveAnswer(
@@ -204,7 +205,7 @@ public class ExamController {
 
     @PostMapping("/{exam_id}/questions")
     public ResponseEntity<ApiResponse> attachExistingQuestions(@PathVariable("exam_id") Integer examId,
-            @RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
+            @Valid @RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
         AuthPrincipal principal = AuthGuard.requireStaff(request);
         AuthGuard.requireExamAccess(request, requireExam(examId));
 
@@ -262,7 +263,7 @@ public class ExamController {
     @PutMapping("/{exam_id}/status")
     public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("exam_id") Integer examId,
-            @RequestBody(required = false) Map<String, String> body,
+            @Valid @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
@@ -295,7 +296,7 @@ public class ExamController {
     @PostMapping("/{exam_id}/register")
     public ResponseEntity<ApiResponse> registerForExam(
             @PathVariable(value = "exam_id", required = false) Integer pathExamId,
-            @RequestBody(required = false) Map<String, Object> body,
+            @Valid @RequestBody(required = false) Map<String, Object> body,
             HttpServletRequest request) {
 
         // A student always registers for themselves. The optional path and body values
@@ -400,7 +401,7 @@ public class ExamController {
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
             @PathVariable("question_id") Integer questionId,
-            @RequestBody(required = false) Map<String, Object> body,
+            @Valid @RequestBody(required = false) Map<String, Object> body,
             HttpServletRequest request) {
         AuthGuard.requireRole(request, RoleConstants.ROLE_TEACHER, RoleConstants.ROLE_ADMIN);
         AuthGuard.requireExamAccess(request, requireExam(examId));

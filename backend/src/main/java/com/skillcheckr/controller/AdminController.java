@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -95,7 +96,7 @@ public class AdminController {
 	@PutMapping("/students/{student_id}/status")
 	public ResponseEntity<ApiResponse> toggleStudentStatus(
 			@PathVariable("student_id") Integer studentId,
-			@RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
+			@Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
 		String status = requiredStatus(body);
 		boolean updated = adminService.toggleStudentStatus(studentId, status);
@@ -109,7 +110,7 @@ public class AdminController {
 	@PutMapping("/teachers/{teacher_id}/status")
 	public ResponseEntity<ApiResponse> toggleTeacherStatus(
 			@PathVariable("teacher_id") Integer teacherId,
-			@RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
+			@Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
 		String status = requiredStatus(body);
 		boolean updated = adminService.toggleTeacherStatus(teacherId, status);
