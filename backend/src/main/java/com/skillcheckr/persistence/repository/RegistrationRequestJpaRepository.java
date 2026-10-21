@@ -40,4 +40,6 @@ public interface RegistrationRequestJpaRepository
     @Modifying
     @Query("DELETE FROM RegistrationRequestEntity r WHERE r.requestId = :requestId")
     int deleteByRequestId(@Param("requestId") int requestId);
+    @Query(value = "SELECT COUNT(*) FROM request WHERE status = 'Pending' OR status IS NULL", nativeQuery = true)
+    int countPendingRequests();
 }

@@ -3,7 +3,6 @@ package com.skillcheckr.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +14,12 @@ import com.skillcheckr.persistence.entity.RegistrationRequestEntity;
 import com.skillcheckr.persistence.entity.StudentProfileEntity;
 import com.skillcheckr.persistence.entity.TeacherProfileEntity;
 import com.skillcheckr.persistence.entity.UserAccountEntity;
+import com.skillcheckr.persistence.repository.ExamAttemptJpaRepository;
+import com.skillcheckr.persistence.repository.ExamJpaRepository;
+import com.skillcheckr.persistence.repository.QuestionJpaRepository;
 import com.skillcheckr.persistence.repository.RegistrationRequestJpaRepository;
+import com.skillcheckr.persistence.repository.ResultJpaRepository;
+import com.skillcheckr.persistence.repository.SubjectJpaRepository;
 import com.skillcheckr.persistence.repository.StudentProfileJpaRepository;
 import com.skillcheckr.persistence.repository.TeacherProfileJpaRepository;
 import com.skillcheckr.persistence.repository.UserAccountJpaRepository;
@@ -23,20 +27,30 @@ import com.skillcheckr.persistence.repository.UserAccountJpaRepository;
 @Repository
 public class AdminRepositoryImpl implements AdminRepository {
 
-    private final JdbcTemplate jdbcTemplate;
     private final UserAccountJpaRepository accountRepository;
     private final StudentProfileJpaRepository studentRepository;
     private final TeacherProfileJpaRepository teacherRepository;
     private final RegistrationRequestJpaRepository requestRepository;
+    private final ExamJpaRepository examRepository;
+    private final SubjectJpaRepository subjectRepository;
+    private final QuestionJpaRepository questionRepository;
+    private final ResultJpaRepository resultRepository;
+    private final ExamAttemptJpaRepository attemptRepository;
 
-    public AdminRepositoryImpl(JdbcTemplate jdbcTemplate, UserAccountJpaRepository accountRepository,
+    public AdminRepositoryImpl(UserAccountJpaRepository accountRepository,
             StudentProfileJpaRepository studentRepository, TeacherProfileJpaRepository teacherRepository,
-            RegistrationRequestJpaRepository requestRepository) {
-        this.jdbcTemplate = jdbcTemplate;
+            RegistrationRequestJpaRepository requestRepository, ExamJpaRepository examRepository,
+            SubjectJpaRepository subjectRepository, QuestionJpaRepository questionRepository,
+            ResultJpaRepository resultRepository, ExamAttemptJpaRepository attemptRepository) {
         this.accountRepository = accountRepository;
         this.studentRepository = studentRepository;
         this.teacherRepository = teacherRepository;
         this.requestRepository = requestRepository;
+        this.examRepository = examRepository;
+        this.subjectRepository = subjectRepository;
+        this.questionRepository = questionRepository;
+        this.resultRepository = resultRepository;
+        this.attemptRepository = attemptRepository;
     }
 
     @Override
@@ -177,7 +191,7 @@ public class AdminRepositoryImpl implements AdminRepository {
         TeacherProfileEntity teacher = result.get();
         UserAccountEntity account = teacher.getUser();
 
-        if (count("SELECT COUNT(*) FROM exam WHERE teacher_id = ?", teacherId) > 0) {
+        if (!examRepository.findByTeacherIdOrderByExamIdDesc(teacherId).isEmpty()) {
             teacher.setStatus("Inactive");
             account.setStatus("Inactive");
             teacherRepository.save(teacher);
@@ -216,13 +230,8 @@ public class AdminRepositoryImpl implements AdminRepository {
     }
 
     private boolean hasAcademicHistory(int studentId) {
-        return count("SELECT COUNT(*) FROM result WHERE student_id = ?", studentId) > 0
-                || count("SELECT COUNT(*) FROM exam_attempt WHERE student_id = ?", studentId) > 0;
-    }
-
-    private int count(String sql, int id) {
-        Integer result = jdbcTemplate.queryForObject(sql, Integer.class, id);
-        return result == null ? 0 : result;
+        return resultRepository.countByStudentId(studentId) > 0
+                || attemptRepository.countByStudentId(studentId) > 0;
     }
 
     @Override
@@ -253,36 +262,27 @@ public class AdminRepositoryImpl implements AdminRepository {
     public AdminStatsResponse getAdminStats() {
         AdminStatsResponse stats = new AdminStatsResponse();
 
-        Integer totalStudents = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM student", Integer.class);
-        Integer totalTeachers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM teacher", Integer.class);
-        Integer totalExams = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam", Integer.class);
-        Integer pendingExams = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM exam WHERE status = 'Pending' OR status IS NULL", Integer.class);
-        Integer upcomingExams = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM exam WHERE (status = 'Upcoming' OR status = 'Approved') "
-                        + "AND (DATE(exam_date) > CURDATE() OR (DATE(exam_date) = CURDATE() "
-                        + "AND (end_time IS NULL OR end_time >= CURTIME())))",
-                Integer.class);
-        Integer completedExams = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM exam WHERE status = 'Completed' OR (DATE(exam_date) < CURDATE() "
-                        + "OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME()))",
-                Integer.class);
-        Integer pendingRequests = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM request WHERE status = 'Pending' OR status IS NULL", Integer.class);
-        Integer totalSubjects = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM subject", Integer.class);
-        Integer totalQuestions = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM question", Integer.class);
-        Integer totalResults = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM result", Integer.class);
+        long totalStudents = studentRepository.count();
+        long totalTeachers = teacherRepository.count();
+        long totalExams = examRepository.count();
+        int pendingExams = examRepository.countPendingExams();
+        int upcomingExams = examRepository.countUpcomingExams();
+        int completedExams = examRepository.countCompletedExams();
+        int pendingRequests = requestRepository.countPendingRequests();
+        long totalSubjects = subjectRepository.count();
+        long totalQuestions = questionRepository.count();
+        long totalResults = resultRepository.count();
 
-        stats.setTotalStudents(totalStudents != null ? totalStudents : 0);
-        stats.setTotalTeachers(totalTeachers != null ? totalTeachers : 0);
-        stats.setTotalExams(totalExams != null ? totalExams : 0);
-        stats.setPendingExams(pendingExams != null ? pendingExams : 0);
-        stats.setUpcomingExams(upcomingExams != null ? upcomingExams : 0);
-        stats.setCompletedExams(completedExams != null ? completedExams : 0);
-        stats.setPendingRequests(pendingRequests != null ? pendingRequests : 0);
-        stats.setTotalSubjects(totalSubjects != null ? totalSubjects : 0);
-        stats.setTotalQuestions(totalQuestions != null ? totalQuestions : 0);
-        stats.setTotalResults(totalResults != null ? totalResults : 0);
+        stats.setTotalStudents((int) totalStudents);
+        stats.setTotalTeachers((int) totalTeachers);
+        stats.setTotalExams((int) totalExams);
+        stats.setPendingExams(pendingExams);
+        stats.setUpcomingExams(upcomingExams);
+        stats.setCompletedExams(completedExams);
+        stats.setPendingRequests(pendingRequests);
+        stats.setTotalSubjects((int) totalSubjects);
+        stats.setTotalQuestions((int) totalQuestions);
+        stats.setTotalResults((int) totalResults);
         return stats;
     }
 }

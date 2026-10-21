@@ -48,4 +48,13 @@ public interface ExamJpaRepository extends JpaRepository<ExamEntity, Integer> {
 
     @Query(value = "SELECT subject_id FROM exam WHERE exam_id = :examId", nativeQuery = true)
     List<Integer> findExamSubjectId(@Param("examId") int examId);
+
+    @Query(value = "SELECT COUNT(*) FROM exam WHERE status = 'Pending' OR status IS NULL", nativeQuery = true)
+    int countPendingExams();
+
+    @Query(value = "SELECT COUNT(*) FROM exam WHERE (status = 'Upcoming' OR status = 'Approved') AND (DATE(exam_date) > CURDATE() OR (DATE(exam_date) = CURDATE() AND (end_time IS NULL OR end_time >= CURTIME())))", nativeQuery = true)
+    int countUpcomingExams();
+
+    @Query(value = "SELECT COUNT(*) FROM exam WHERE status = 'Completed' OR (DATE(exam_date) < CURDATE() OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME()))", nativeQuery = true)
+    int countCompletedExams();
 }
