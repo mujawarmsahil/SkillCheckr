@@ -6,7 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -20,7 +23,9 @@ import com.skillcheckr.repository.QuestionRepositoryImpl;
 import com.skillcheckr.repository.AttemptAnswerRepositoryImpl;
 import com.skillcheckr.repository.SubjectRepositoryImpl;
 
-@JdbcTest
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = Replace.NONE)
+@TestPropertySource(properties = "spring.jpa.hibernate.ddl-auto=none")
 @Import({ ExamRepositoryImpl.class, ExamAttemptRepositoryImpl.class, ExamQuestionRepositoryImpl.class,
         QuestionRepositoryImpl.class, AttemptAnswerRepositoryImpl.class,
         ExamServiceImpl.class, QuestionServiceImpl.class, AttemptExpiryPolicy.class,
@@ -47,28 +52,36 @@ class ExamApprovalReadinessIntegrationTest {
 
     @BeforeEach
     void createSchemaAndPendingExam() {
-        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS subject ("
+        jdbcTemplate.execute("SET NON_KEYWORDS EXAM");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS attempt_answer");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS exam_attempt");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS exam_question");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS answer");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS question");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS exam");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS subject");
+        jdbcTemplate.execute("CREATE TABLE subject ("
                 + "subject_id INT PRIMARY KEY, subject_name VARCHAR(100), subject_code VARCHAR(30))");
-        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS exam ("
+        jdbcTemplate.execute("CREATE TABLE exam ("
                 + "exam_id INT PRIMARY KEY, subject_id INT NOT NULL, teacher_id INT, "
                 + "exam_name VARCHAR(150) NOT NULL, exam_type VARCHAR(50) NOT NULL, "
                 + "exam_date TIMESTAMP NOT NULL, start_time TIME NOT NULL, end_time TIME NOT NULL, "
                 + "duration_minutes INT NOT NULL, total_marks INT NOT NULL, pass_marks INT NOT NULL, "
                 + "paper_frozen BOOLEAN NOT NULL DEFAULT FALSE, "
                 + "status VARCHAR(50) NOT NULL)");
-        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS question ("
+        jdbcTemplate.execute("CREATE TABLE question ("
                 + "question_id INT AUTO_INCREMENT PRIMARY KEY, subject_id INT NOT NULL, question_text VARCHAR(5000), "
                 + "question_type VARCHAR(20), marks INT, word_limit INT)");
-        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS answer ("
+        jdbcTemplate.execute("CREATE TABLE answer ("
                 + "answer_id INT AUTO_INCREMENT PRIMARY KEY, question_id INT NOT NULL, option_text VARCHAR(6000), "
                 + "is_correct TINYINT NOT NULL)");
-        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS exam_question ("
+        jdbcTemplate.execute("CREATE TABLE exam_question ("
                 + "exam_question_id INT AUTO_INCREMENT PRIMARY KEY, exam_id INT NOT NULL, question_id INT NOT NULL, "
                 + "question_order INT NOT NULL)");
-        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS exam_attempt ("
+        jdbcTemplate.execute("CREATE TABLE exam_attempt ("
                 + "attempt_id INT PRIMARY KEY, exam_id INT NOT NULL, student_id INT NOT NULL, "
                 + "started_at TIMESTAMP, expires_at TIMESTAMP, submitted_at TIMESTAMP, status VARCHAR(30))");
-        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS attempt_answer ("
+        jdbcTemplate.execute("CREATE TABLE attempt_answer ("
                 + "attempt_answer_id INT PRIMARY KEY, attempt_id INT NOT NULL, question_id INT NOT NULL)");
 
         jdbcTemplate.update("DELETE FROM exam_question");

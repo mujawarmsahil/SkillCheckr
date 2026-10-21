@@ -1,56 +1,41 @@
 package com.skillcheckr.repository;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.skillcheckr.exception.ExamInUseException;
 import com.skillcheckr.model.Subject;
-
+import com.skillcheckr.persistence.entity.SubjectEntity;
+import com.skillcheckr.persistence.repository.SubjectJpaRepository;
 
 @Repository
 public class SubjectRepositoryImpl implements SubjectRepository {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final SubjectJpaRepository subjectRepository;
 
-    private final RowMapper<Subject> subjectRowMapper = new RowMapper<Subject>() {
-        @Override
-        public Subject mapRow(ResultSet rs, int rowNum) throws SQLException {
-            Subject s = new Subject();
-            s.setSubjectId(rs.getInt("subject_id"));
-            s.setSubjectName(rs.getString("subject_name"));
-            s.setSubjectCode(rs.getString("subject_code"));
-            return s;
-        }
-    };
+    public SubjectRepositoryImpl(SubjectJpaRepository subjectRepository) {
+        this.subjectRepository = subjectRepository;
+    }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Subject> getAllSubjects() {
-        return jdbcTemplate.query("SELECT * FROM subject ORDER BY subject_id DESC", subjectRowMapper);
+        return subjectRepository.findAllByOrderBySubjectIdDesc().stream()
+                .map(SubjectRepositoryImpl::toSubject)
+                .toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Subject> getSubjectById(int subjectId) {
-        try {
-            String sql = "SELECT * FROM subject WHERE subject_id = ?";
-            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, subjectRowMapper, subjectId));
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
+        return subjectRepository.findById(subjectId).map(SubjectRepositoryImpl::toSubject);
     }
 
     @Override
+    @Transactional
     public Subject addSubject(Subject subject) {
         if (subject == null || subject.getSubjectName() == null || subject.getSubjectName().trim().isEmpty()) {
             return null;
@@ -61,32 +46,27 @@ public class SubjectRepositoryImpl implements SubjectRepository {
                 ? subject.getSubjectCode().trim().toUpperCase()
                 : generateSubjectCode(name);
 
-        Integer existingCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM subject WHERE subject_code = ?", Integer.class, code);
-        if (existingCount != null && existingCount > 0) {
-            // Generate a unique suffix
+        if (subjectRepository.existsBySubjectCode(code)) {
+            // Generate a unique suffix; a second collision still fails on the
+            // uq_subject_code unique constraint, as it did with the JDBC insert.
             code = code + "-" + (int) (Math.random() * 900 + 100);
         }
 
-        String insertSql = "INSERT INTO subject (subject_name, subject_code) VALUES (?, ?)";
-        final String finalCode = code;
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, name);
-            ps.setString(2, finalCode);
-            return ps;
-        }, keyHolder);
-
-        Number id = keyHolder.getKey();
-        int newId = id != null ? id.intValue() : 0;
-        return new Subject(newId, name, finalCode);
+        SubjectEntity entity = new SubjectEntity();
+        entity.setSubjectName(name);
+        entity.setSubjectCode(code);
+        SubjectEntity saved = subjectRepository.save(entity);
+        return new Subject(saved.getSubjectId(), name, code);
     }
 
     @Override
+    @Transactional
     public boolean updateSubject(int subjectId, Subject subject) {
         if (subject == null || subject.getSubjectName() == null || subject.getSubjectName().trim().isEmpty()) {
+            return false;
+        }
+        Optional<SubjectEntity> existing = subjectRepository.findById(subjectId);
+        if (existing.isEmpty()) {
             return false;
         }
 
@@ -95,53 +75,58 @@ public class SubjectRepositoryImpl implements SubjectRepository {
                 ? subject.getSubjectCode().trim().toUpperCase()
                 : generateSubjectCode(name);
 
-        String updateSql = "UPDATE subject SET subject_name = ?, subject_code = ? WHERE subject_id = ?";
-        int rows = jdbcTemplate.update(updateSql, name, code, subjectId);
-        return rows > 0;
+        SubjectEntity entity = existing.get();
+        entity.setSubjectName(name);
+        entity.setSubjectCode(code);
+        subjectRepository.save(entity);
+        return true;
     }
 
+    /**
+     * FK-safe cascade in the exact order the previous JDBC implementation used:
+     * guard on recorded attempts, then exam_question, answer, question, exam, subject.
+     * The statements themselves stay native SQL on the repository because the child
+     * tables have no entities yet.
+     */
     @Override
+    @Transactional
     public boolean deleteSubjectById(int subjectId) {
-        List<Integer> examIds = jdbcTemplate.query("SELECT exam_id FROM exam WHERE subject_id = ?",
-                (rs, rowNum) -> rs.getInt("exam_id"), subjectId);
+        List<Integer> examIds = subjectRepository.findExamIdsBySubjectId(subjectId);
         for (Integer examId : examIds) {
-            Integer attemptCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM exam_attempt WHERE exam_id = ?", Integer.class, examId);
-            if (attemptCount != null && attemptCount > 0) {
-                throw new com.skillcheckr.exception.ExamInUseException(
+            if (subjectRepository.countAttemptsByExamId(examId) > 0) {
+                throw new ExamInUseException(
                         "This subject has exams with recorded attempts and cannot be deleted.");
             }
         }
 
         for (Integer examId : examIds) {
-            jdbcTemplate.update("DELETE FROM exam_question WHERE exam_id = ?", examId);
+            subjectRepository.deleteExamQuestionsByExamId(examId);
         }
 
-        List<Integer> questionIds = jdbcTemplate.query(
-                "SELECT question_id FROM question WHERE subject_id = ?",
-                (rs, rowNum) -> rs.getInt("question_id"), subjectId);
-
-        for (Integer qId : questionIds) {
-            jdbcTemplate.update("DELETE FROM answer WHERE question_id = ?", qId);
+        List<Integer> questionIds = subjectRepository.findQuestionIdsBySubjectId(subjectId);
+        for (Integer questionId : questionIds) {
+            subjectRepository.deleteAnswersByQuestionId(questionId);
         }
-        jdbcTemplate.update("DELETE FROM question WHERE subject_id = ?", subjectId);
-        jdbcTemplate.update("DELETE FROM exam WHERE subject_id = ?", subjectId);
+        subjectRepository.deleteQuestionsBySubjectId(subjectId);
+        subjectRepository.deleteExamsBySubjectId(subjectId);
 
-        return jdbcTemplate.update("DELETE FROM subject WHERE subject_id = ?", subjectId) > 0;
+        return subjectRepository.deleteSubjectBySubjectId(subjectId) > 0;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getQuestionCountBySubjectId(int subjectId) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM question WHERE subject_id = ?", Integer.class, subjectId);
-        return count != null ? count : 0;
+        return subjectRepository.countQuestionsBySubjectId(subjectId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getExamCountBySubjectId(int subjectId) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM exam WHERE subject_id = ?", Integer.class, subjectId);
-        return count != null ? count : 0;
+        return subjectRepository.countExamsBySubjectId(subjectId);
+    }
+
+    private static Subject toSubject(SubjectEntity entity) {
+        return new Subject(entity.getSubjectId(), entity.getSubjectName(), entity.getSubjectCode());
     }
 
     private String generateSubjectCode(String name) {
