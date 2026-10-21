@@ -2,34 +2,35 @@ package com.skillcheckr.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 
 import com.skillcheckr.model.RegistrationRequest;
+import com.skillcheckr.persistence.entity.RegistrationRequestEntity;
+import com.skillcheckr.persistence.repository.RegistrationRequestJpaRepository;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationRequestRepositoryImplTest {
 
     @Mock
-    private JdbcTemplate jdbcTemplate;
+    private RegistrationRequestJpaRepository requestRepository;
 
     @InjectMocks
     private RegistrationRequestRepositoryImpl repository;
 
     @Test
-    void saveRequest_returnsTrue_whenInsertSucceeds() {
+    void saveRequest_persistsPendingRequestWithHashedPasswordAndGeneratedId() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Sam");
         req.setContact("1234567890");
@@ -37,91 +38,110 @@ class RegistrationRequestRepositoryImplTest {
         req.setRequestedRole("Student");
         req.setUsername("sam");
         req.setPassword("$2a$10$hashedPass");
+        req.setStatus("Approved");
 
-        when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(1);
+        when(requestRepository.save(any(RegistrationRequestEntity.class))).thenAnswer(invocation -> {
+            RegistrationRequestEntity entity = invocation.getArgument(0);
+            entity.setRequestId(7);
+            return entity;
+        });
 
-        boolean saved = repository.saveRequest(req);
+        assertThat(repository.saveRequest(req)).isTrue();
 
-        assertThat(saved).isTrue();
-        verify(jdbcTemplate).update(anyString(), eq("Sam"), eq("1234567890"), eq("sam@test.com"),
-                eq("Student"), eq("Pending"), eq("sam"), eq("$2a$10$hashedPass"));
+        ArgumentCaptor<RegistrationRequestEntity> captor = ArgumentCaptor.forClass(RegistrationRequestEntity.class);
+        verify(requestRepository).save(captor.capture());
+        RegistrationRequestEntity saved = captor.getValue();
+        assertThat(saved.getName()).isEqualTo("Sam");
+        assertThat(saved.getContact()).isEqualTo("1234567890");
+        assertThat(saved.getEmail()).isEqualTo("sam@test.com");
+        assertThat(saved.getRequestedRole()).isEqualTo("Student");
+        assertThat(saved.getUsername()).isEqualTo("sam");
+        assertThat(saved.getPassword()).isEqualTo("$2a$10$hashedPass");
+        assertThat(saved.getStatus()).isEqualTo("Pending");
     }
 
     @Test
-    void saveRequest_returnsFalse_whenNoRowsInserted() {
+    void saveRequest_returnsFalse_whenNoGeneratedId() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Sam");
-        req.setPassword("$2a$10$hashedPass");
-
-        when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(0);
+        when(requestRepository.save(any(RegistrationRequestEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThat(repository.saveRequest(req)).isFalse();
     }
 
     @Test
-    void existsByUsername_returnsTrue_whenRequestExists() {
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE LOWER(username) = LOWER(?)", Integer.class, "sam"))
-                .thenReturn(1);
+    void existsByUsername_isCaseInsensitiveAndNullSafe() {
+        when(requestRepository.existsByUsernameIgnoreCase("sam")).thenReturn(true);
 
         assertThat(repository.existsByUsername("sam")).isTrue();
+        assertThat(repository.existsByUsername(null)).isFalse();
+        verify(requestRepository, never()).existsByUsernameIgnoreCase(null);
     }
 
     @Test
-    void existsByUsername_returnsFalse_whenFree() {
-        when(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM request WHERE LOWER(username) = LOWER(?)", Integer.class, "free"))
-                .thenReturn(0);
-
-        assertThat(repository.existsByUsername("free")).isFalse();
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getAllRequests_returnsMappedRequests() throws Exception {
-        RegistrationRequest req = new RegistrationRequest();
-        req.setRequestId(1);
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of(req));
+    void getAllRequests_mapsRowsWithoutExposingPasswords() {
+        RegistrationRequestEntity entity = new RegistrationRequestEntity();
+        entity.setRequestId(9);
+        entity.setName("Sam");
+        entity.setEmail("sam@test.com");
+        entity.setUsername("sam");
+        entity.setPassword("$2a$10$hashedPass");
+        entity.setRequestedRole("Student");
+        entity.setContact("123");
+        entity.setStatus("Pending");
+        when(requestRepository.findAllByOrderByRequestIdDesc()).thenReturn(List.of(entity));
 
         List<RegistrationRequest> list = repository.getAllRequests();
 
-        assertThat(list).containsExactly(req);
-    }
-
-    /**
-     * The SQL must name the table exactly as the schema declares it. MySQL resolves an
-     * identifier case-sensitively on Linux hosts, so "Request" fails against the "request"
-     * table created by schema.sql, which surfaced as an HTTP 500 on GET /api/requests.
-     */
-    @Test
-    @SuppressWarnings("unchecked")
-    void getAllRequests_queriesTheSchemaTableNameExactly() throws Exception {
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class))).thenReturn(List.of());
-
-        repository.getAllRequests();
-
-        verify(jdbcTemplate).query(eq("SELECT * FROM request ORDER BY request_id DESC"),
-                any(RowMapper.class));
+        assertThat(list).singleElement().satisfies(request -> {
+            assertThat(request.getRequestId()).isEqualTo(9);
+            assertThat(request.getName()).isEqualTo("Sam");
+            assertThat(request.getUsername()).isEqualTo("sam");
+            assertThat(request.getStatus()).isEqualTo("Pending");
+            assertThat(request.getPassword()).isNull();
+        });
     }
 
     @Test
-    void deleteRequestById_returnsTrue_whenRowsUpdated() {
-        when(jdbcTemplate.update(anyString(), eq(5))).thenReturn(1);
+    void deleteRequestById_returnsWhetherARowWasDeleted() {
+        when(requestRepository.deleteByRequestId(5)).thenReturn(1);
+        when(requestRepository.deleteByRequestId(6)).thenReturn(0);
 
         assertThat(repository.deleteRequestById(5)).isTrue();
+        assertThat(repository.deleteRequestById(6)).isFalse();
     }
 
     @Test
-    void deleteRequestById_returnsFalse_whenNoRowsUpdated() {
-        when(jdbcTemplate.update(anyString(), eq(5))).thenReturn(0);
-
-        assertThat(repository.deleteRequestById(5)).isFalse();
-    }
-
-    @Test
-    void updateRequestStatus_returnsTrue_whenRowsUpdated() {
-        when(jdbcTemplate.update(anyString(), eq("Approved"), eq(5))).thenReturn(1);
+    void updateRequestStatus_returnsWhetherARowWasUpdated() {
+        when(requestRepository.updateStatus(5, "Approved")).thenReturn(1);
 
         assertThat(repository.updateRequestStatus(5, "Approved")).isTrue();
+    }
+
+    @Test
+    void updateRequestStatusIfCurrent_delegatesTheCompareAndSet() {
+        when(requestRepository.updateStatusIfCurrent(5, "Rejected", "Pending")).thenReturn(1);
+        when(requestRepository.updateStatusIfCurrent(6, "Rejected", "Pending")).thenReturn(0);
+
+        assertThat(repository.updateRequestStatusIfCurrent(5, "Rejected", "Pending")).isTrue();
+        assertThat(repository.updateRequestStatusIfCurrent(6, "Rejected", "Pending")).isFalse();
+    }
+
+    @Test
+    void getRequestStatus_readsTheStoredStatus() {
+        RegistrationRequestEntity entity = new RegistrationRequestEntity();
+        entity.setRequestId(5);
+        entity.setStatus("Pending");
+        when(requestRepository.findById(5)).thenReturn(Optional.of(entity));
+
+        assertThat(repository.getRequestStatus(5)).contains("Pending");
+    }
+
+    @Test
+    void getRequestStatus_isEmptyForMissingRequest() {
+        when(requestRepository.findById(5)).thenReturn(Optional.empty());
+
+        assertThat(repository.getRequestStatus(5)).isEmpty();
     }
 }
