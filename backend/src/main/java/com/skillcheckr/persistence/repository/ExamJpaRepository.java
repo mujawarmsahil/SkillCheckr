@@ -57,4 +57,18 @@ public interface ExamJpaRepository extends JpaRepository<ExamEntity, Integer> {
 
     @Query(value = "SELECT COUNT(*) FROM exam WHERE status = 'Completed' OR (DATE(exam_date) < CURDATE() OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME()))", nativeQuery = true)
     int countCompletedExams();
+    interface ExamCounts {
+        long getTotal();
+        long getPending();
+        long getUpcoming();
+        long getCompleted();
+    }
+
+    @Query(value = "SELECT COUNT(*) AS total, "
+            + "COALESCE(SUM(CASE WHEN status = 'Pending' OR status IS NULL THEN 1 ELSE 0 END), 0) AS pending, "
+            + "COALESCE(SUM(CASE WHEN (status = 'Upcoming' OR status = 'Approved') AND (DATE(exam_date) > CURDATE() OR (DATE(exam_date) = CURDATE() AND (end_time IS NULL OR end_time >= CURTIME()))) THEN 1 ELSE 0 END), 0) AS upcoming, "
+            + "COALESCE(SUM(CASE WHEN status = 'Completed' OR (DATE(exam_date) < CURDATE() OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME())) THEN 1 ELSE 0 END), 0) AS completed "
+            + "FROM exam", nativeQuery = true)
+    ExamCounts countExamStats();
+
 }

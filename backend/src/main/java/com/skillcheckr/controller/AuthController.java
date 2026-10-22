@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,7 +36,7 @@ public class AuthController {
     private TokenService tokenService;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         if (request == null || request.getUsername() == null || request.getUsername().trim().isEmpty()
                 || request.getPassword() == null || request.getPassword().isEmpty()) {
             throw new BadRequestException("Username and password are required");
@@ -94,7 +95,7 @@ public class AuthController {
 
     @PutMapping("/profile/{userId}")
     public ResponseEntity<ProfileUpdateResponse> updateProfile(@PathVariable("userId") Integer userId,
-            @RequestBody UserProfileDTO profileRequest, HttpServletRequest request) {
+            @Valid @RequestBody UserProfileDTO profileRequest, HttpServletRequest request) {
         if (userId == null || userId <= 0 || profileRequest == null) {
             throw new BadRequestException("Invalid profile update data");
         }
