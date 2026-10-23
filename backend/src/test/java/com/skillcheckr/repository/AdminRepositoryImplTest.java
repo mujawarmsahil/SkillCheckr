@@ -283,14 +283,18 @@ class AdminRepositoryImplTest {
 
     @Test
     void adminStatsPreservesJdbcBackedAggregatesAndPropagatesFailures() {
-        when(studentRepository.count()).thenReturn(10L);
-        when(teacherRepository.count()).thenReturn(10L);
-        ExamJpaRepository.ExamCounts examCounts = org.mockito.Mockito.mock(ExamJpaRepository.ExamCounts.class);
-        when(examCounts.getTotal()).thenReturn(10L);
-        when(examCounts.getPending()).thenReturn(10L);
-        when(examCounts.getUpcoming()).thenReturn(10L);
-        when(examCounts.getCompleted()).thenReturn(10L);
-        when(examRepository.countExamStats()).thenReturn(examCounts);
+        ExamJpaRepository.AdminStats adminStats = org.mockito.Mockito.mock(ExamJpaRepository.AdminStats.class);
+        when(adminStats.getTotalStudents()).thenReturn(10L);
+        when(adminStats.getTotalTeachers()).thenReturn(10L);
+        when(adminStats.getTotalExams()).thenReturn(10L);
+        when(adminStats.getPendingExams()).thenReturn(10);
+        when(adminStats.getUpcomingExams()).thenReturn(10);
+        when(adminStats.getCompletedExams()).thenReturn(10);
+        when(adminStats.getPendingRequests()).thenReturn(10);
+        when(adminStats.getTotalSubjects()).thenReturn(10L);
+        when(adminStats.getTotalQuestions()).thenReturn(10L);
+        when(adminStats.getTotalResults()).thenReturn(10L);
+        when(examRepository.countAdminStats()).thenReturn(adminStats);
 
         AdminStatsResponse stats = repository.getAdminStats();
 
@@ -298,7 +302,7 @@ class AdminRepositoryImplTest {
         assertThat(stats.getTotalTeachers()).isEqualTo(10);
         assertThat(stats.getTotalExams()).isEqualTo(10);
 
-        when(studentRepository.count()).thenThrow(new DataAccessResourceFailureException("connection reset"));
+        when(examRepository.countAdminStats()).thenThrow(new DataAccessResourceFailureException("connection reset"));
         assertThatThrownBy(repository::getAdminStats).isInstanceOf(DataAccessResourceFailureException.class);
     }
 

@@ -71,4 +71,30 @@ public interface ExamJpaRepository extends JpaRepository<ExamEntity, Integer> {
             + "FROM exam", nativeQuery = true)
     ExamCounts countExamStats();
 
+    interface AdminStats {
+        long getTotalStudents();
+        long getTotalTeachers();
+        long getTotalExams();
+        int getPendingExams();
+        int getUpcomingExams();
+        int getCompletedExams();
+        int getPendingRequests();
+        long getTotalSubjects();
+        long getTotalQuestions();
+        long getTotalResults();
+    }
+
+    @Query(value = "SELECT "
+            + "(SELECT COUNT(*) FROM student) AS totalStudents, "
+            + "(SELECT COUNT(*) FROM teacher) AS totalTeachers, "
+            + "(SELECT COUNT(*) FROM exam) AS totalExams, "
+            + "(SELECT COUNT(*) FROM exam WHERE status = 'Pending' OR status IS NULL) AS pendingExams, "
+            + "(SELECT COUNT(*) FROM exam WHERE (status = 'Upcoming' OR status = 'Approved') AND (DATE(exam_date) > CURDATE() OR (DATE(exam_date) = CURDATE() AND (end_time IS NULL OR end_time >= CURTIME())))) AS upcomingExams, "
+            + "(SELECT COUNT(*) FROM exam WHERE status = 'Completed' OR (DATE(exam_date) < CURDATE() OR (DATE(exam_date) = CURDATE() AND end_time IS NOT NULL AND end_time < CURTIME()))) AS completedExams, "
+            + "(SELECT COUNT(*) FROM request WHERE status = 'Pending' OR status IS NULL) AS pendingRequests, "
+            + "(SELECT COUNT(*) FROM subject) AS totalSubjects, "
+            + "(SELECT COUNT(*) FROM question) AS totalQuestions, "
+            + "(SELECT COUNT(*) FROM result) AS totalResults", nativeQuery = true)
+    AdminStats countAdminStats();
+
 }

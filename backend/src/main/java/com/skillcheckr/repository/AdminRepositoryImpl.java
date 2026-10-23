@@ -262,28 +262,18 @@ public class AdminRepositoryImpl implements AdminRepository {
     public AdminStatsResponse getAdminStats() {
         AdminStatsResponse stats = new AdminStatsResponse();
 
-        long totalStudents = studentRepository.count();
-        long totalTeachers = teacherRepository.count();
-        ExamJpaRepository.ExamCounts examStats = examRepository.countExamStats();
-        long totalExams = examStats.getTotal();
-        int pendingExams = (int) examStats.getPending();
-        int upcomingExams = (int) examStats.getUpcoming();
-        int completedExams = (int) examStats.getCompleted();
-        int pendingRequests = requestRepository.countPendingRequests();
-        long totalSubjects = subjectRepository.count();
-        long totalQuestions = questionRepository.count();
-        long totalResults = resultRepository.count();
+        ExamJpaRepository.AdminStats adminStats = examRepository.countAdminStats();
 
-        stats.setTotalStudents((int) totalStudents);
-        stats.setTotalTeachers((int) totalTeachers);
-        stats.setTotalExams((int) totalExams);
-        stats.setPendingExams(pendingExams);
-        stats.setUpcomingExams(upcomingExams);
-        stats.setCompletedExams(completedExams);
-        stats.setPendingRequests(pendingRequests);
-        stats.setTotalSubjects((int) totalSubjects);
-        stats.setTotalQuestions((int) totalQuestions);
-        stats.setTotalResults((int) totalResults);
+        stats.setTotalStudents((int) adminStats.getTotalStudents());
+        stats.setTotalTeachers((int) adminStats.getTotalTeachers());
+        stats.setTotalExams((int) adminStats.getTotalExams());
+        stats.setPendingExams(adminStats.getPendingExams());
+        stats.setUpcomingExams(adminStats.getUpcomingExams());
+        stats.setCompletedExams(adminStats.getCompletedExams());
+        stats.setPendingRequests(adminStats.getPendingRequests());
+        stats.setTotalSubjects((int) adminStats.getTotalSubjects());
+        stats.setTotalQuestions((int) adminStats.getTotalQuestions());
+        stats.setTotalResults((int) adminStats.getTotalResults());
         return stats;
     }
 }
