@@ -428,7 +428,6 @@ public class ExamController {
             @PathVariable("question_id") Integer questionId,
             @Valid @RequestBody(required = false) Map<String, Object> body,
             HttpServletRequest request) {
-        AuthGuard.requireRole(request, RoleConstants.ROLE_TEACHER, RoleConstants.ROLE_ADMIN);
         AuthGuard.requireExamAccess(request, requireExam(examId));
 
         // Marks are whole numbers everywhere: `question.marks`, `attempt_answer.marks_obtained`
