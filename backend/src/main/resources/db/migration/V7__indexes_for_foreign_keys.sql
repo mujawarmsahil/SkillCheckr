@@ -17,8 +17,6 @@ CREATE INDEX `idx_exam_attempt_student` ON `exam_attempt` (`student_id`);
 CREATE INDEX `idx_attempt_answer_attempt` ON `attempt_answer` (`attempt_id`);
 CREATE INDEX `idx_attempt_answer_question` ON `attempt_answer` (`question_id`);
 
-CREATE INDEX `idx_result_exam` ON `result` (`exam_id`);
-CREATE INDEX `idx_result_student` ON `result` (`student_id`);
 CREATE INDEX `idx_result_attempt` ON `result` (`attempt_id`);
 
 CREATE INDEX `idx_request_status` ON `request` (`status`);

@@ -102,6 +102,7 @@ public class ExamController {
         return ResponseEntity.ok(exam);
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @PostMapping(path = "/{exam_id}/question-bank", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse> uploadQuestionBank(
             @PathVariable("exam_id") Integer examId,
@@ -233,6 +234,7 @@ public class ExamController {
                 attached + " question(s) added to the exam. Attached by " + principal.getUsername() + "."));
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @DeleteMapping("/{exam_id}")
     public ResponseEntity<String> deleteExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
         AuthGuard.requireExamAccess(request, requireExam(examId));
@@ -364,6 +366,7 @@ public class ExamController {
                 .build());
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @GetMapping("/{exam_id}/registeredStudents")
     public ResponseEntity<List<Student>> getRegisteredStudents(@PathVariable("exam_id") Integer examId,
             HttpServletRequest request) {
@@ -372,6 +375,7 @@ public class ExamController {
         return ResponseEntity.ok(students != null ? students : List.of());
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @GetMapping("/{exam_id}/registrationCount")
     public ResponseEntity<RegistrationCountResponse> getRegistrationCount(@PathVariable("exam_id") Integer examId,
             HttpServletRequest request) {
@@ -383,6 +387,7 @@ public class ExamController {
                 .build());
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @DeleteMapping("/{exam_id}/unregister/{student_id}")
     public ResponseEntity<ApiResponse> unregisterStudent(
             @PathVariable("exam_id") Integer examId,
@@ -393,6 +398,7 @@ public class ExamController {
         return ResponseEntity.ok(new ApiResponse(true, "Unregistered from exam successfully."));
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @GetMapping("/{exam_id}/submissions")
     public ResponseEntity<List<ExamSubmissionSummaryDTO>> listSubmissions(@PathVariable("exam_id") Integer examId,
             HttpServletRequest request) {
@@ -401,6 +407,7 @@ public class ExamController {
         return ResponseEntity.ok(submissions != null ? submissions : List.of());
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @GetMapping("/{exam_id}/attempts/{attempt_id}/evaluation")
     public ResponseEntity<List<EvaluationItemDTO>> getEvaluationItems(
             @PathVariable("exam_id") Integer examId,
@@ -410,6 +417,7 @@ public class ExamController {
         return ResponseEntity.ok(examSubmissionService.getEvaluationItems(examId, attemptId));
     }
 
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @PutMapping("/{exam_id}/attempts/{attempt_id}/answers/{question_id}/marks")
     public ResponseEntity<ExamResultDTO> awardAnswerMarks(
             @PathVariable("exam_id") Integer examId,
