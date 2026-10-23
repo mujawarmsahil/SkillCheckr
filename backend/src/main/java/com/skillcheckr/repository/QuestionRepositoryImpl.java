@@ -115,7 +115,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
     @Override
     public List<QuestionDTO> getAllQuestions() {
-        String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, s.subject_name "
+        String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, q.question_type, q.marks, q.word_limit, s.subject_name "
                 + "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id ORDER BY q.question_id DESC";
         List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql);
 
@@ -130,7 +130,12 @@ public class QuestionRepositoryImpl implements QuestionRepository {
             dto.setSubjectId(subjectId);
             dto.setQuestion(questionText);
             dto.setSubjectName(subjectName);
-            loadQuestionMetadata(dto);
+            Object type = row.get("question_type");
+            if (type != null) dto.setQuestionType(type.toString());
+            Object marks = row.get("marks");
+            if (marks instanceof Number) dto.setMarks(((Number) marks).intValue());
+            Object wl = row.get("word_limit");
+            if (wl instanceof Number) dto.setWordLimit(((Number) wl).intValue());
             questions.add(dto);
         }
         populateAnswersBatch(questions);
@@ -139,7 +144,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
     @Override
     public Optional<QuestionDTO> getQuestionById(int questionId) {
-        String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, s.subject_name "
+        String selectQuestionSql = "SELECT q.question_id, q.subject_id, q.question_text, q.question_type, q.marks, q.word_limit, s.subject_name "
                 + "FROM question q LEFT JOIN subject s ON q.subject_id = s.subject_id WHERE q.question_id = ?";
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(selectQuestionSql, questionId);
         if (rows.isEmpty()) return Optional.empty();
@@ -153,7 +158,12 @@ public class QuestionRepositoryImpl implements QuestionRepository {
         dto.setSubjectId(subjectId);
         dto.setQuestion(questionText);
         dto.setSubjectName(subjectName);
-        loadQuestionMetadata(dto);
+        Object type = row.get("question_type");
+        if (type != null) dto.setQuestionType(type.toString());
+        Object marks = row.get("marks");
+        if (marks instanceof Number) dto.setMarks(((Number) marks).intValue());
+        Object wl = row.get("word_limit");
+        if (wl instanceof Number) dto.setWordLimit(((Number) wl).intValue());
         populateAnswers(dto, questionId);
         return Optional.of(dto);
     }
@@ -237,7 +247,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
 
     @Override
     public List<QuestionDTO> getQuestionsBySubjectId(int subjectId) {
-        String selectQuestionSql = "SELECT question_id, subject_id, question_text FROM question WHERE subject_id = ?";
+        String selectQuestionSql = "SELECT question_id, subject_id, question_text, question_type, marks, word_limit FROM question WHERE subject_id = ?";
         List<Map<String, Object>> questionRows = jdbcTemplate.queryForList(selectQuestionSql, subjectId);
 
         List<QuestionDTO> questions = new ArrayList<>();
@@ -248,6 +258,12 @@ public class QuestionRepositoryImpl implements QuestionRepository {
             dto.setQuestionId(questionId);
             dto.setSubjectId(subjectId);
             dto.setQuestion(questionText);
+            Object type = row.get("question_type");
+            if (type != null) dto.setQuestionType(type.toString());
+            Object marks = row.get("marks");
+            if (marks instanceof Number) dto.setMarks(((Number) marks).intValue());
+            Object wl = row.get("word_limit");
+            if (wl instanceof Number) dto.setWordLimit(((Number) wl).intValue());
             questions.add(dto);
         }
         populateAnswersBatch(questions);
@@ -366,12 +382,6 @@ public class QuestionRepositoryImpl implements QuestionRepository {
         if (answerRows.size() > 1) dto.setOption2Id(((Number) answerRows.get(1).get("answer_id")).intValue());
         if (answerRows.size() > 2) dto.setOption3Id(((Number) answerRows.get(2).get("answer_id")).intValue());
         if (answerRows.size() > 3) dto.setOption4Id(((Number) answerRows.get(3).get("answer_id")).intValue());
-    }
-
-    private void loadQuestionMetadata(QuestionDTO dto) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT question_type, marks, word_limit FROM question WHERE question_id = ?", dto.getQuestionId());
-        if (rows != null && !rows.isEmpty()) setQuestionMetadata(dto, rows.get(0));
     }
 
     private String normalizedQuestionType(QuestionDTO dto) {
