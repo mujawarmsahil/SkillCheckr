@@ -149,7 +149,7 @@ public class ExamController {
     }
 
     @PutMapping("/{exam_id}/attempts/{attempt_id}/answers/{question_id}")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') and @studentAuthorization.canAccessAttempt(authentication, #attemptId)")
     public ResponseEntity<AttemptAnswerResponse> saveAttemptAnswer(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
@@ -163,7 +163,7 @@ public class ExamController {
     }
 
     @GetMapping("/{exam_id}/attempts/{attempt_id}/answers")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') and @studentAuthorization.canAccessAttempt(authentication, #attemptId)")
     public ResponseEntity<List<AttemptAnswerResponse>> getAttemptAnswers(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
@@ -173,7 +173,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/attempts/{attempt_id}/submit")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') and @studentAuthorization.canAccessAttempt(authentication, #attemptId)")
     public ResponseEntity<ExamResultDTO> submitAttempt(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
@@ -336,6 +336,7 @@ public class ExamController {
                 "Registered for " + exam.getExamName() + ". You may attend when the exam window starts."));
     }
 
+    @PreAuthorize("@studentAuthorization.canAccessStudentData(authentication, #studentId)")
     @GetMapping("/registrations/student/{student_id}")
     public ResponseEntity<List<Integer>> getRegistrationsForStudent(@PathVariable("student_id") Integer studentId,
             HttpServletRequest request) {
@@ -344,6 +345,7 @@ public class ExamController {
         return ResponseEntity.ok(registeredExamIds != null ? registeredExamIds : List.of());
     }
 
+    @PreAuthorize("@studentAuthorization.canAccessStudentData(authentication, #studentId)")
     @GetMapping("/registrations/student/{student_id}/detailed")
     public ResponseEntity<List<ExamRegistration>> getDetailedRegistrationsForStudent(
             @PathVariable("student_id") Integer studentId, HttpServletRequest request) {
@@ -352,6 +354,7 @@ public class ExamController {
         return ResponseEntity.ok(registrations != null ? registrations : List.of());
     }
 
+    @PreAuthorize("@studentAuthorization.canAccessStudentData(authentication, #studentId)")
     @GetMapping("/{exam_id}/isRegistered/{student_id}")
     public ResponseEntity<RegistrationStatusResponse> isRegistered(
             @PathVariable("exam_id") Integer examId,
@@ -387,8 +390,8 @@ public class ExamController {
                 .build());
     }
 
-    @PreAuthorize("@examAuthorization.canManage(authentication, #examId)")
     @DeleteMapping("/{exam_id}/unregister/{student_id}")
+    @PreAuthorize("@examAuthorization.canManage(authentication, #examId) or @studentAuthorization.canAccessStudentData(authentication, #studentId)")
     public ResponseEntity<ApiResponse> unregisterStudent(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("student_id") Integer studentId,
