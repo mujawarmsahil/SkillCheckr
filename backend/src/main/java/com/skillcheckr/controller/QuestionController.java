@@ -21,7 +21,6 @@ import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.QuestionDTO;
 import com.skillcheckr.model.QuestionsAddResponse;
 import com.skillcheckr.security.AuthGuard;
-import com.skillcheckr.security.AuthPrincipal;
 import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.QuestionService;
 
@@ -41,7 +40,6 @@ public class QuestionController {
 	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<QuestionsAddResponse> addAllQuestion(@Valid @RequestBody List<QuestionDTO> questions,
 			HttpServletRequest request) {
-		AuthPrincipal principal = AuthGuard.requireStaff(request);
 		if (questions == null || questions.isEmpty()) {
 			throw new BadRequestException("At least one question is required");
 		}
@@ -63,7 +61,6 @@ public class QuestionController {
 	@GetMapping("")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<List<QuestionDTO>> getAllQuestions(HttpServletRequest request) {
-		AuthGuard.requireStaff(request);
 		List<QuestionDTO> questions = questionService.getAllQuestions();
 		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
@@ -72,7 +69,6 @@ public class QuestionController {
 	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<QuestionDTO> getQuestionById(@PathVariable("questionId") Integer questionId,
 			HttpServletRequest request) {
-		AuthGuard.requireStaff(request);
 		QuestionDTO q = questionService.getQuestionById(questionId)
 				.orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 		return ResponseEntity.ok(q);
@@ -82,7 +78,6 @@ public class QuestionController {
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<QuestionDTO> updateQuestion(@PathVariable("questionId") Integer questionId,
 			@Valid @RequestBody QuestionDTO question, HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		if (question == null) {
 			throw new BadRequestException("Invalid question payload");
 		}
@@ -98,7 +93,6 @@ public class QuestionController {
 	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<List<QuestionDTO>> getQuestionsBySubject(@PathVariable("subjectId") Integer subjectId,
 			HttpServletRequest request) {
-		AuthGuard.requireStaff(request);
 		List<QuestionDTO> questions = questionService.getQuestionsBySubjectId(subjectId);
 		return ResponseEntity.ok(questions != null ? questions : List.of());
 	}
@@ -107,7 +101,6 @@ public class QuestionController {
 	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<List<QuestionDTO>> getQuestionsByExam(@PathVariable("examId") Integer examId,
 			HttpServletRequest request) {
-		AuthGuard.requireStaff(request);
 		AuthGuard.requireExamAccess(request,
 				examService.getExamById(examId)
 						.orElseThrow(() -> new ResourceNotFoundException("Exam not found")));
@@ -119,7 +112,6 @@ public class QuestionController {
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> deleteQuestion(@PathVariable("questionId") Integer questionId,
 			HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		boolean deleted = questionService.deleteQuestionById(questionId);
 		if (deleted) {
 			return ResponseEntity.ok(new ApiResponse(true, "Question deleted successfully"));

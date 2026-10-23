@@ -21,13 +21,12 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.skillcheckr.exception.GlobalExceptionHandler;
 import com.skillcheckr.exception.ExamInUseException;
@@ -37,29 +36,28 @@ import com.skillcheckr.service.ExamService;
 import com.skillcheckr.service.QuestionService;
 import com.skillcheckr.support.TestAuth;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest(properties = "app.exam.attempt-finalizer-initial-delay-ms=3600000")
+@AutoConfigureMockMvc
 class QuestionControllerTest {
 
     private static final int TEACHER_ID = 10;
     private static final int OTHER_TEACHER_ID = 11;
 
-    @Mock
+    @MockBean
     private QuestionService questionService;
 
-    @Mock
+    @MockBean
     private ExamService examService;
 
-    @InjectMocks
-    private QuestionController questionController;
+    @MockBean
+    private com.skillcheckr.service.AuthService authService;
 
+    @Autowired
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(questionController)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .addInterceptors(TestAuth.authInterceptor())
-                .build();
+        org.mockito.Mockito.when(authService.isUserActive(org.mockito.ArgumentMatchers.anyInt())).thenReturn(true);
     }
 
     private Exam ownedExam(int examId) {
