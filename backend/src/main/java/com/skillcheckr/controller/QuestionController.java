@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +38,7 @@ public class QuestionController {
 	private ExamService examService;
 
 	@PostMapping("")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<QuestionsAddResponse> addAllQuestion(@Valid @RequestBody List<QuestionDTO> questions,
 			HttpServletRequest request) {
 		AuthPrincipal principal = AuthGuard.requireStaff(request);
@@ -59,6 +61,7 @@ public class QuestionController {
 	}
 
 	@GetMapping("")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<List<QuestionDTO>> getAllQuestions(HttpServletRequest request) {
 		AuthGuard.requireStaff(request);
 		List<QuestionDTO> questions = questionService.getAllQuestions();
@@ -66,6 +69,7 @@ public class QuestionController {
 	}
 
 	@GetMapping("/{questionId}")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<QuestionDTO> getQuestionById(@PathVariable("questionId") Integer questionId,
 			HttpServletRequest request) {
 		AuthGuard.requireStaff(request);
@@ -75,6 +79,7 @@ public class QuestionController {
 	}
 
 	@PutMapping("/{questionId}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<QuestionDTO> updateQuestion(@PathVariable("questionId") Integer questionId,
 			@Valid @RequestBody QuestionDTO question, HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
@@ -90,6 +95,7 @@ public class QuestionController {
 	}
 
 	@GetMapping("/subject/{subjectId}")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<List<QuestionDTO>> getQuestionsBySubject(@PathVariable("subjectId") Integer subjectId,
 			HttpServletRequest request) {
 		AuthGuard.requireStaff(request);
@@ -98,6 +104,7 @@ public class QuestionController {
 	}
 
 	@GetMapping("/exam/{examId}")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
 	public ResponseEntity<List<QuestionDTO>> getQuestionsByExam(@PathVariable("examId") Integer examId,
 			HttpServletRequest request) {
 		AuthGuard.requireStaff(request);
@@ -109,6 +116,7 @@ public class QuestionController {
 	}
 
 	@DeleteMapping("/{questionId}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> deleteQuestion(@PathVariable("questionId") Integer questionId,
 			HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);

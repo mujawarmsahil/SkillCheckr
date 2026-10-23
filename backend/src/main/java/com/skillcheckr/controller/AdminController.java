@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,6 +35,7 @@ public class AdminController {
 	private AdminService adminService;
 
 	@GetMapping("/teachers")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<List<Teacher>> getAllTeachers(HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
 		List<Teacher> teachers = adminService.getAllTeacher();
@@ -41,6 +43,7 @@ public class AdminController {
 	}
 
 	@GetMapping("/students")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<List<Student>> getAllStudents(HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
 		List<Student> students = adminService.getAllStudent();
@@ -48,6 +51,7 @@ public class AdminController {
 	}
 
 	@PostMapping("/students/from-request/{request_id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> addStudentFromRequest(@PathVariable("request_id") Integer requestId,
 			HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
@@ -59,6 +63,7 @@ public class AdminController {
 	}
 
 	@PostMapping("/teachers/from-request/{request_id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> addTeacherFromRequest(@PathVariable("request_id") Integer requestId,
 			HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
@@ -70,6 +75,7 @@ public class AdminController {
 	}
 
 	@DeleteMapping("/teachers/{teacher_id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> deleteTeacher(@PathVariable("teacher_id") Integer teacherId,
 			HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
@@ -82,6 +88,7 @@ public class AdminController {
 	}
 
 	@DeleteMapping("/students/{student_id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> deleteStudent(@PathVariable("student_id") Integer studentId,
 			HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
@@ -94,6 +101,7 @@ public class AdminController {
 	}
 
 	@PutMapping("/students/{student_id}/status")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> toggleStudentStatus(
 			@PathVariable("student_id") Integer studentId,
 			@Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
@@ -108,6 +116,7 @@ public class AdminController {
 	}
 
 	@PutMapping("/teachers/{teacher_id}/status")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> toggleTeacherStatus(
 			@PathVariable("teacher_id") Integer teacherId,
 			@Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
@@ -122,6 +131,7 @@ public class AdminController {
 	}
 
 	@GetMapping("/stats")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<AdminStatsResponse> getAdminStats(HttpServletRequest request) {
 		AuthGuard.requireAdmin(request);
 		return ResponseEntity.ok(adminService.getAdminStats());

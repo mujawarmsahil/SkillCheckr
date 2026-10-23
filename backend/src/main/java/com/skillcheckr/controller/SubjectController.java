@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +41,7 @@ public class SubjectController {
     }
 
     @GetMapping("/with-stats")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
     public ResponseEntity<List<SubjectStatsResponse>> getAllSubjectsWithStats(HttpServletRequest request) {
         AuthGuard.requireStaff(request);
         List<SubjectStatsResponse> subjectStats = subjectService.getAllSubjectsWithStats();
@@ -56,6 +58,7 @@ public class SubjectController {
     }
 
     @PostMapping("")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Subject> addSubject(@Valid @RequestBody Subject subject, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         validateSubject(subject);
@@ -67,6 +70,7 @@ public class SubjectController {
     }
 
     @PutMapping("/{subjectId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Subject> updateSubject(@PathVariable("subjectId") Integer subjectId,
             @Valid @RequestBody Subject subject, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
@@ -79,6 +83,7 @@ public class SubjectController {
     }
 
     @DeleteMapping("/{subjectId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> deleteSubject(@PathVariable("subjectId") Integer subjectId,
             HttpServletRequest request) {
         AuthGuard.requireAdmin(request);

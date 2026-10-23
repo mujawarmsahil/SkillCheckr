@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,6 +49,7 @@ public class RegistrationRequestController {
     }
 
     @GetMapping("")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<RegistrationRequest>> getAllRequests(HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         List<RegistrationRequest> requests = registrationRequestService.getAllRequests();
@@ -58,6 +60,7 @@ public class RegistrationRequestController {
     }
 
     @PutMapping("/{request_id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("request_id") Integer requestId,
             @Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
@@ -73,6 +76,7 @@ public class RegistrationRequestController {
     }
 
     @PostMapping("/reject/{request_id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> rejectRequest(@PathVariable("request_id") Integer requestId,
             HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
@@ -83,6 +87,7 @@ public class RegistrationRequestController {
     }
 
     @DeleteMapping("/{request_id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> deleteRequest(@PathVariable("request_id") Integer requestId,
             HttpServletRequest request) {
         AuthGuard.requireAdmin(request);

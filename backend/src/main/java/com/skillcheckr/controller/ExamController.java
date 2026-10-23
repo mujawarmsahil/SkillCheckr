@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,6 +74,7 @@ public class ExamController {
     private QuestionBankService questionBankService;
 
     @PostMapping("")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
     public ResponseEntity<Exam> addExams(@Valid @RequestBody Exam exam, HttpServletRequest request) {
         AuthPrincipal principal = AuthGuard.requireStaff(request);
         int teacherId = principal.isTeacher() ? principal.getRoleId() : 0;
@@ -80,6 +82,7 @@ public class ExamController {
     }
 
     @GetMapping("")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
     public ResponseEntity<List<Exam>> getAllExams(HttpServletRequest request) {
         AuthGuard.requireStaff(request);
         List<Exam> exams = examService.getAllExams();
@@ -133,6 +136,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/attempts")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ExamAttemptResponse> startAttempt(
             @PathVariable("exam_id") Integer examId,
             HttpServletRequest request) {
@@ -144,6 +148,7 @@ public class ExamController {
     }
 
     @PutMapping("/{exam_id}/attempts/{attempt_id}/answers/{question_id}")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<AttemptAnswerResponse> saveAttemptAnswer(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
@@ -157,6 +162,7 @@ public class ExamController {
     }
 
     @GetMapping("/{exam_id}/attempts/{attempt_id}/answers")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<List<AttemptAnswerResponse>> getAttemptAnswers(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
@@ -166,6 +172,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/attempts/{attempt_id}/submit")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ExamResultDTO> submitAttempt(
             @PathVariable("exam_id") Integer examId,
             @PathVariable("attempt_id") Integer attemptId,
@@ -176,6 +183,7 @@ public class ExamController {
     }
 
     @GetMapping("/teacher/{teacher_id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
     public ResponseEntity<List<Exam>> getExamsByTeacherId(@PathVariable("teacher_id") Integer teacherId,
             HttpServletRequest request) {
         AuthPrincipal principal = AuthGuard.requireStaff(request);
@@ -204,6 +212,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/questions")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('TEACHER')")
     public ResponseEntity<ApiResponse> attachExistingQuestions(@PathVariable("exam_id") Integer examId,
             @Valid @RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
         AuthPrincipal principal = AuthGuard.requireStaff(request);
@@ -234,6 +243,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> acceptExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         if (!examService.acceptExam(examId)) {
@@ -243,6 +253,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> rejectExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         if (!examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_REJECTED)) {
@@ -252,6 +263,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/cancel")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> cancelExam(@PathVariable("exam_id") Integer examId, HttpServletRequest request) {
         AuthGuard.requireAdmin(request);
         if (!examService.updateExamStatus(examId, ExamConstants.EXAM_STATUS_CANCELLED)) {
@@ -261,6 +273,7 @@ public class ExamController {
     }
 
     @PutMapping("/{exam_id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("exam_id") Integer examId,
             @Valid @RequestBody(required = false) Map<String, String> body,
@@ -294,6 +307,7 @@ public class ExamController {
     }
 
     @PostMapping("/{exam_id}/register")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApiResponse> registerForExam(
             @PathVariable(value = "exam_id", required = false) Integer pathExamId,
             @Valid @RequestBody(required = false) Map<String, Object> body,
