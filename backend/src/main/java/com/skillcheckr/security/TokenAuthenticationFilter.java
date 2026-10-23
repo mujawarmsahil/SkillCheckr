@@ -35,7 +35,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             if (principal.isPresent() && authService.isUserActive(principal.get().getUserId())) {
                 AuthPrincipal p = principal.get();
                 var auth = new UsernamePasswordAuthenticationToken(p, null,
-                        java.util.List.of(new SimpleGrantedAuthority("ROLE_" + p.getRole())));
+                        java.util.List.of(new SimpleGrantedAuthority("ROLE_" + p.getRole().toUpperCase())));
                 SecurityContextHolder.getContext().setAuthentication(auth);
                 request.setAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE, p);
             }
