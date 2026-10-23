@@ -22,7 +22,6 @@ import com.skillcheckr.model.AdminStatsResponse;
 import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.Student;
 import com.skillcheckr.model.Teacher;
-import com.skillcheckr.security.AuthGuard;
 import com.skillcheckr.service.AdminService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,7 +36,6 @@ public class AdminController {
 	@GetMapping("/teachers")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<List<Teacher>> getAllTeachers(HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		List<Teacher> teachers = adminService.getAllTeacher();
 		return ResponseEntity.ok(teachers != null ? teachers : List.of());
 	}
@@ -45,7 +43,6 @@ public class AdminController {
 	@GetMapping("/students")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<List<Student>> getAllStudents(HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		List<Student> students = adminService.getAllStudent();
 		return ResponseEntity.ok(students != null ? students : List.of());
 	}
@@ -54,7 +51,6 @@ public class AdminController {
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> addStudentFromRequest(@PathVariable("request_id") Integer requestId,
 			HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		boolean success = adminService.addStudentFromRequest(requestId);
 		if (success) {
 			return ResponseEntity.ok(new ApiResponse(true, "Student added successfully"));
@@ -66,7 +62,6 @@ public class AdminController {
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> addTeacherFromRequest(@PathVariable("request_id") Integer requestId,
 			HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		boolean success = adminService.addTeacherFromRequest(requestId);
 		if (success) {
 			return ResponseEntity.ok(new ApiResponse(true, "Teacher added successfully"));
@@ -78,7 +73,6 @@ public class AdminController {
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> deleteTeacher(@PathVariable("teacher_id") Integer teacherId,
 			HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		boolean deleted = adminService.deleteTeacherById(teacherId);
 		if (deleted) {
 			return ResponseEntity.ok(new ApiResponse(true, "Teacher deleted successfully"));
@@ -91,7 +85,6 @@ public class AdminController {
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse> deleteStudent(@PathVariable("student_id") Integer studentId,
 			HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		boolean deleted = adminService.deleteStudentById(studentId);
 		if (deleted) {
 			return ResponseEntity.ok(new ApiResponse(true, "Student account updated/removed successfully"));
@@ -105,7 +98,6 @@ public class AdminController {
 	public ResponseEntity<ApiResponse> toggleStudentStatus(
 			@PathVariable("student_id") Integer studentId,
 			@Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		String status = requiredStatus(body);
 		boolean updated = adminService.toggleStudentStatus(studentId, status);
 		if (updated) {
@@ -120,7 +112,6 @@ public class AdminController {
 	public ResponseEntity<ApiResponse> toggleTeacherStatus(
 			@PathVariable("teacher_id") Integer teacherId,
 			@Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		String status = requiredStatus(body);
 		boolean updated = adminService.toggleTeacherStatus(teacherId, status);
 		if (updated) {
@@ -133,7 +124,6 @@ public class AdminController {
 	@GetMapping("/stats")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<AdminStatsResponse> getAdminStats(HttpServletRequest request) {
-		AuthGuard.requireAdmin(request);
 		return ResponseEntity.ok(adminService.getAdminStats());
 	}
 
