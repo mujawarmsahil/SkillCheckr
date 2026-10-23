@@ -62,6 +62,7 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Exam> getAllExams() {
 		return projectStatuses(examRepository.getAllExams());
 	}
@@ -115,16 +116,19 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Exam> getAllUpcomingExams() {
 		return projectStatuses(examRepository.getAllUpcomingExams());
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Exam> getAllCompletedExams() {
 		return projectStatuses(examRepository.getAllCompletedExams());
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Optional<Exam> getExamById(int examId) {
 		return examRepository.getExamById(examId).map(exam -> ExamStatusProjector.project(exam, now()));
 	}
@@ -229,6 +233,7 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Exam> getExamsByTeacherId(int teacherId) {
 		return projectStatuses(examRepository.getExamsByTeacherId(teacherId));
 	}
@@ -250,16 +255,19 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public boolean isStudentRegisteredForExam(int studentId, int examId) {
 		return examRepository.isStudentRegisteredForExam(studentId, examId);
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Integer> getRegisteredExamIdsForStudent(int studentId) {
 		return examRepository.getRegisteredExamIdsForStudent(studentId);
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<ExamRegistration> getRegistrationsByStudentId(int studentId) {
 		List<ExamRegistration> registrations = examRepository.getRegistrationsByStudentId(studentId);
 		LocalDateTime now = now();
@@ -269,11 +277,13 @@ public class ExamServiceImpl implements ExamService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Student> getRegisteredStudentsByExamId(int examId) {
 		return examRepository.getRegisteredStudentsByExamId(examId);
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public int getRegistrationCountByExamId(int examId) {
 		return examRepository.getRegistrationCountByExamId(examId);
 	}

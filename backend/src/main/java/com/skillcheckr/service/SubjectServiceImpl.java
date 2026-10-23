@@ -31,11 +31,13 @@ public class SubjectServiceImpl implements SubjectService {
     private QuestionPaperMutationPolicy questionPaperMutationPolicy;
 
     @Override
+    @Transactional(readOnly = true)
     public List<Subject> getAllSubjects() {
         return subjectRepository.getAllSubjects();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Subject> getSubjectById(int subjectId) {
         return subjectRepository.getSubjectById(subjectId);
     }
@@ -47,6 +49,7 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    @Transactional
     public boolean updateSubject(int subjectId, Subject subject) {
         return subjectRepository.updateSubject(subjectId, subject);
     }
@@ -64,6 +67,7 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SubjectStatsResponse> getAllSubjectsWithStats() {
         List<Subject> subjects = subjectRepository.getAllSubjects();
         List<SubjectStatsResponse> subjectStats = new ArrayList<>();

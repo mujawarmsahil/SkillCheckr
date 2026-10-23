@@ -66,26 +66,31 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuestionDTO> getAllQuestions() {
         return questionRepository.getAllQuestions();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<QuestionDTO> getQuestionById(int questionId) {
         return questionRepository.getQuestionById(questionId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuestionDTO> getQuestionsBySubjectId(int subjectId) {
         return questionRepository.getQuestionsBySubjectId(subjectId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuestionDTO> getQuestionsByExamId(int examId) {
         return questionRepository.getQuestionsByExamId(examId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuestionDTO> getStudentQuestionsByExamId(int examId) {
         List<QuestionDTO> questions = new ArrayList<>();
         for (QuestionDTO question : questionRepository.getQuestionsByExamId(examId)) {

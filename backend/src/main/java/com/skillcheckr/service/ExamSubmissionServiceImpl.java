@@ -128,6 +128,7 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ExamSubmissionSummaryDTO> listSubmissions(int examId) {
         requireExam(examId);
         List<ExamSubmissionSummaryDTO> submissions = resultRepository.findSubmissionSummariesByExamId(examId);
@@ -146,6 +147,7 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<EvaluationItemDTO> getEvaluationItems(int examId, int attemptId) {
         requireExam(examId);
         ExamAttempt attempt = examAttemptRepository.findById(attemptId);
