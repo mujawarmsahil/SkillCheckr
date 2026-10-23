@@ -16,14 +16,13 @@ import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.GlobalExceptionHandler;
@@ -31,25 +30,24 @@ import com.skillcheckr.model.RegistrationRequest;
 import com.skillcheckr.service.RegistrationRequestService;
 import com.skillcheckr.support.TestAuth;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest(properties = {"app.exam.attempt-finalizer-initial-delay-ms=3600000", "app.security.rate-limit.registration.requests=100000"})
+@AutoConfigureMockMvc
 class RegistrationRequestControllerTest {
 
     private static final RequestPostProcessor ADMIN = TestAuth.asAdminAccount(30, 1);
 
-    @Mock
+    @MockBean
     private RegistrationRequestService registrationRequestService;
 
-    @InjectMocks
-    private RegistrationRequestController registrationRequestController;
+    @MockBean
+    private com.skillcheckr.service.AuthService authService;
 
+    @Autowired
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(registrationRequestController)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .addInterceptors(TestAuth.authInterceptor())
-                .build();
+        org.mockito.Mockito.when(authService.isUserActive(org.mockito.ArgumentMatchers.anyInt())).thenReturn(true);
     }
 
     private static final String VALID_BODY = "{\"name\":\"Sam\",\"contact\":\"9876543210\",\"email\":\"sam@x.com\","

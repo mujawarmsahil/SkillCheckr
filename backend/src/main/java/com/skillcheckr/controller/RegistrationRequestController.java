@@ -20,7 +20,6 @@ import com.skillcheckr.exception.BadRequestException;
 import com.skillcheckr.exception.ResourceNotFoundException;
 import com.skillcheckr.model.ApiResponse;
 import com.skillcheckr.model.RegistrationRequest;
-import com.skillcheckr.security.AuthGuard;
 import com.skillcheckr.service.RegistrationRequestService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,7 +50,6 @@ public class RegistrationRequestController {
     @GetMapping("")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<RegistrationRequest>> getAllRequests(HttpServletRequest request) {
-        AuthGuard.requireAdmin(request);
         List<RegistrationRequest> requests = registrationRequestService.getAllRequests();
         if (requests == null || requests.isEmpty()) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).body(List.of());
@@ -64,7 +62,6 @@ public class RegistrationRequestController {
     public ResponseEntity<ApiResponse> updateStatus(
             @PathVariable("request_id") Integer requestId,
             @Valid @RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
-        AuthGuard.requireAdmin(request);
         String status = (body != null && body.get("status") != null && !body.get("status").trim().isEmpty())
                 ? body.get("status").trim()
                 : STATUS_REJECTED;
@@ -79,7 +76,6 @@ public class RegistrationRequestController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> rejectRequest(@PathVariable("request_id") Integer requestId,
             HttpServletRequest request) {
-        AuthGuard.requireAdmin(request);
         if (!registrationRequestService.updateRequestStatus(requestId, STATUS_REJECTED)) {
             throw new ResourceNotFoundException("Request not found or could not be rejected");
         }
@@ -90,7 +86,6 @@ public class RegistrationRequestController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse> deleteRequest(@PathVariable("request_id") Integer requestId,
             HttpServletRequest request) {
-        AuthGuard.requireAdmin(request);
         if (!registrationRequestService.deleteRequest(requestId)) {
             throw new ResourceNotFoundException("Request not found or could not be deleted");
         }
