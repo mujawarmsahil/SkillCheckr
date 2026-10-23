@@ -62,11 +62,13 @@ public class RegistrationRequestServiceImpl implements RegistrationRequestServic
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RegistrationRequest> getAllRequests() {
         return requestRepository.getAllRequests();
     }
 
     @Override
+    @Transactional
     public boolean deleteRequest(int id) {
         return requestRepository.deleteRequestById(id);
     }

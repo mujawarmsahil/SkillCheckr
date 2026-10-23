@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.model.ExamResultDTO;
 import com.skillcheckr.repository.ResultRepository;
@@ -20,17 +21,20 @@ public class ResultServiceImpl implements ResultService {
 	private QuestionBreakdownService questionBreakdownService;
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<ExamResultDTO> getResultsByStudentId(int studentId) {
 		return withBreakdown(resultRepository.getResultsByStudentId(studentId));
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Optional<ExamResultDTO> getResultByExamAndStudent(int examId, int studentId) {
 		return resultRepository.getResultByExamAndStudent(examId, studentId)
 				.map(result -> withBreakdown(result));
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<ExamResultDTO> getAllResults() {
 		return withBreakdown(resultRepository.getAllResults());
 	}

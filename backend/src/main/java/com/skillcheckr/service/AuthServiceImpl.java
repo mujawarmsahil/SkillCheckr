@@ -63,21 +63,25 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getStudentIdByUserId(int userId) {
         return authRepository.getStudentIdByUserId(userId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getTeacherIdByUserId(int userId) {
         return authRepository.getTeacherIdByUserId(userId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getAdminIdByUserId(int userId) {
         return authRepository.getAdminIdByUserId(userId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<UserProfileDTO> getUserProfile(int userId) {
         return authRepository.getUserProfile(userId);
     }
@@ -92,21 +96,25 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isUsernameInUse(String username, int excludeUserId) {
         return authRepository.isUsernameInUse(username, excludeUserId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isEmailInUse(String email, int excludeUserId) {
         return authRepository.isEmailInUse(email, excludeUserId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isUserActive(int userId) {
         return authRepository.isUserActive(userId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean verifyCurrentPassword(int userId, String oldPassword) {
         if (oldPassword == null || oldPassword.isEmpty() || userId <= 0) {
             return false;

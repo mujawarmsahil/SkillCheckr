@@ -85,11 +85,13 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Teacher> getAllTeacher() {
         return adminRepository.getAllTeacher();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Student> getAllStudent() {
         return adminRepository.getAllStudent();
     }
@@ -119,6 +121,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AdminStatsResponse getAdminStats() {
         return adminRepository.getAdminStats();
     }

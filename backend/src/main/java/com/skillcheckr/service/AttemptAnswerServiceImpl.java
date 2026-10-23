@@ -123,6 +123,7 @@ public class AttemptAnswerServiceImpl implements AttemptAnswerService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AttemptAnswerResponse> getAnswers(int examId, int attemptId, int studentId) {
         ExamAttempt attempt = examAttemptRepository.findById(attemptId);
         ExamAttemptValidator.validateViewAttempt(attempt, examId, studentId);
