@@ -37,7 +37,7 @@ public final class TestAuth {
 
     public static AuthInterceptor authInterceptor(AuthService authService) {
         return new AuthInterceptor(tokenService(), authService,
-                new PublicEndpointRateLimiter(10, 60, 5, 3600));
+                new PublicEndpointRateLimiter(10, 60, 5, 3600), "");
     }
 
     public static String tokenFor(int userId, int roleId, String role) {
