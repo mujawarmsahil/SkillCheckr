@@ -2,7 +2,9 @@ package com.skillcheckr.security;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
@@ -48,12 +50,22 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final TokenService tokenService;
     private final AuthService authService;
     private final PublicEndpointRateLimiter rateLimiter;
+    private final Set<String> trustedProxies;
 
     public AuthInterceptor(TokenService tokenService, AuthService authService,
-            PublicEndpointRateLimiter rateLimiter) {
+            PublicEndpointRateLimiter rateLimiter,
+            @org.springframework.beans.factory.annotation.Value("${app.security.rate-limit.trusted-proxies:}") String trustedProxies) {
         this.tokenService = tokenService;
         this.authService = authService;
         this.rateLimiter = rateLimiter;
+        java.util.Set<String> parsed = new java.util.LinkedHashSet<>();
+        if (trustedProxies != null) {
+            for (String part : trustedProxies.split(",")) {
+                String v = part.trim();
+                if (!v.isEmpty()) parsed.add(v);
+            }
+        }
+        this.trustedProxies = parsed.isEmpty() ? java.util.Set.of() : parsed;
     }
 
     @Override
@@ -65,7 +77,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         PublicRoute publicRoute = findPublicRoute(request);
         if (publicRoute != null) {
             if (publicRoute.path().startsWith("/api/")) {
-                long retryAfter = rateLimiter.tryConsume(publicRoute.path(), request.getRemoteAddr());
+                long retryAfter = rateLimiter.tryConsume(publicRoute.path(), resolveClientIp(request));
                 if (retryAfter > 0) {
                     response.setHeader("Retry-After", Long.toString(retryAfter));
                     response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
@@ -92,6 +104,28 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         request.setAttribute(PRINCIPAL_ATTRIBUTE, principal.get());
         return true;
+    }
+
+    /**
+     * Resolves the client IP, honouring {@code X-Forwarded-For} only when the immediate peer is a
+     * trusted proxy. Untrusted peers cannot spoof their address through the header.
+     */
+    private String resolveClientIp(HttpServletRequest request) {
+        String remote = request.getRemoteAddr();
+        if (remote == null || !trustedProxies.contains(remote)) {
+            return remote;
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded == null || forwarded.isBlank()) {
+            return remote;
+        }
+        for (String part : forwarded.split(",")) {
+            String candidate = part.trim();
+            if (!candidate.isEmpty() && !trustedProxies.contains(candidate)) {
+                return candidate;
+            }
+        }
+        return remote;
     }
 
     private PublicRoute findPublicRoute(HttpServletRequest request) {
