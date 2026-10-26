@@ -133,6 +133,9 @@ public class TokenService {
             if (userId <= 0 || expiresAt <= 0 || issuedAt <= 0) {
                 return Optional.empty();
             }
+            if (issuedAt > Instant.now().getEpochSecond() + 60) {
+                return Optional.empty();
+            }
             if (!RoleConstants.isAdmin(role) && !RoleConstants.isTeacher(role) && !RoleConstants.isStudent(role)) {
                 return Optional.empty();
             }

@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.BadRequestException;
@@ -33,6 +34,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
     }
 
     @Override
+    @Transactional
     public void saveQuestionWithAnswers(List<QuestionDTO> questions) {
         if (questions == null || questions.isEmpty()) {
             return;
@@ -198,6 +200,7 @@ public class QuestionRepositoryImpl implements QuestionRepository {
     }
 
     @Override
+    @Transactional
     public boolean updateQuestion(QuestionDTO dto) {
         if (dto == null || dto.getQuestionId() <= 0) return false;
         int questionId = dto.getQuestionId();

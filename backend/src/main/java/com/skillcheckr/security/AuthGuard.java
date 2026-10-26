@@ -57,17 +57,6 @@ public final class AuthGuard {
         return principal.getRoleId();
     }
 
-    public static AuthPrincipal requireSelfOrStaff(HttpServletRequest request, int ownerId) {
-        AuthPrincipal principal = requirePrincipal(request);
-        if (principal.isAdmin() || principal.isTeacher()) {
-            return principal;
-        }
-        if (principal.getRoleId() != ownerId) {
-            throw new ForbiddenException("You are not authorized to access another user's data.");
-        }
-        return principal;
-    }
-
     /**
      * Account level ownership: the owner identifier is a {@code user.user_id}, so it must be
      * compared with the authenticated account id and never with the role table id.

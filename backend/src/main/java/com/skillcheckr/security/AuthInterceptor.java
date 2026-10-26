@@ -28,6 +28,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     public static final String AUTHORIZATION_HEADER = "Authorization";
 
     private static final String POST = "POST";
+    private static final String GET = "GET";
 
     /**
      * Public routes are matched on path <em>and</em> HTTP method. A path is only anonymous for
@@ -40,9 +41,9 @@ public class AuthInterceptor implements HandlerInterceptor {
     private static final List<PublicRoute> PUBLIC_ROUTES = List.of(
             new PublicRoute("/api/auth/login", POST),
             new PublicRoute("/api/requests", POST),
-            new PublicRoute("/actuator/health", null),
-            new PublicRoute("/actuator/health/**", null),
-            new PublicRoute("/actuator/info", null));
+            new PublicRoute("/actuator/health", GET),
+            new PublicRoute("/actuator/health/**", GET),
+            new PublicRoute("/actuator/info", GET));
 
     private record PublicRoute(String path, String method) {
     }
@@ -154,7 +155,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             if (!normalizedPath.startsWith(prefix + "/")) {
                 return false;
             }
-        } else if (!normalizedPath.equalsIgnoreCase(route.path())) {
+        } else if (!normalizedPath.equals(route.path())) {
             return false;
         }
         return route.method() == null || route.method().equalsIgnoreCase(method);

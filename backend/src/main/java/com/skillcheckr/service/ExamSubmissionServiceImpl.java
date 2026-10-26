@@ -14,6 +14,7 @@ import java.util.HashSet;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.skillcheckr.constant.ExamConstants;
 import com.skillcheckr.exception.ExamSubmissionException;
@@ -105,7 +106,18 @@ public class ExamSubmissionServiceImpl implements ExamSubmissionService {
                 .submittedAt(submittedAt.format(SUBMITTED_AT_FORMAT))
                 .build();
 
-        ExamResultDTO savedResult = resultRepository.insertSubmissionResult(result);
+        ExamResultDTO savedResult;
+        try {
+            savedResult = resultRepository.insertSubmissionResult(result);
+        } catch (DataIntegrityViolationException ex) {
+            // Only treat the violation as a concurrent duplicate submission when a
+            // stored result actually exists; otherwise surface the original failure.
+            Optional<ExamResultDTO> stored = resultRepository.findByAttemptId(attemptId);
+            if (stored.isPresent()) {
+                return withBreakdown(stored.get(), exam);
+            }
+            throw ex;
+        }
         if (savedResult == null || savedResult.getResultId() <= 0) {
             throw new ExamSubmissionException(500, "Unable to save exam result");
         }

@@ -23,7 +23,7 @@ public class StudentAuthorizationService {
         if (!(principal instanceof AuthPrincipal p)) {
             return false;
         }
-        if (p.isAdmin() || p.isTeacher()) {
+        if (p.isAdmin()) {
             return true;
         }
         return p.isStudent() && p.getRoleId() == studentId;
@@ -37,7 +37,7 @@ public class StudentAuthorizationService {
         if (!(principal instanceof AuthPrincipal p)) {
             return false;
         }
-        if (p.isAdmin() || p.isTeacher()) {
+        if (p.isAdmin()) {
             return true;
         }
         if (!p.isStudent()) {
