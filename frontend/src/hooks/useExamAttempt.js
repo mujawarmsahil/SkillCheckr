@@ -31,12 +31,14 @@ export function useExamAttempt({ examId, locationState, showError }) {
         return;
       }
 
-      // Router state is only a display cache; it is never treated as authoritative.
-      let loadedExam = locationState;
-      if (!loadedExam?.examName && !loadedExam?.exam_name) {
-        try {
-          loadedExam = await getExamById(examId);
-        } catch (err) {
+      // Always revalidate exam metadata from the server; router state is only a display cache.
+      let loadedExam = null;
+      try {
+        loadedExam = await getExamById(examId);
+      } catch (err) {
+        if (locationState?.examName || locationState?.exam_name) {
+          loadedExam = locationState;
+        } else {
           throw new Error(err.message || "This exam could not be loaded");
         }
       }

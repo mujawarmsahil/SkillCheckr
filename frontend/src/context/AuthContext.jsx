@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import apiClient from "../api/client";
 
 const AuthContext = createContext(null);
@@ -197,7 +197,7 @@ export function AuthProvider({ children }) {
     setRole(userRole);
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem("username");
     localStorage.removeItem("name");
     localStorage.removeItem("email");
@@ -213,7 +213,15 @@ export function AuthProvider({ children }) {
 
     setUser(null);
     setRole(null);
-  };
+  }, []);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      logout();
+    };
+    window.addEventListener("auth:logout", handleLogout);
+    return () => window.removeEventListener("auth:logout", handleLogout);
+  }, [logout]);
 
   return (
     <AuthContext.Provider

@@ -39,6 +39,7 @@ import com.skillcheckr.repository.ExamAttemptRepository;
 import com.skillcheckr.repository.ExamQuestionRepository;
 import com.skillcheckr.repository.ExamRepository;
 import com.skillcheckr.repository.ResultRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -336,6 +337,29 @@ class ExamSubmissionServiceTest {
         assertThatThrownBy(() -> service.awardAnswerMarks(EXAM_ID, ATTEMPT_ID, 777, 1))
                 .isInstanceOf(ExamSubmissionException.class)
                 .hasMessage("Question 777 is not assigned to this exam");
+    }
+
+    @Test
+    void submit_returnsStoredResultWhenInsertHitsDuplicateConstraint() {
+        ExamResultDTO existing = ExamResultDTO.builder()
+                .resultId(77).attemptId(ATTEMPT_ID).status(ExamConstants.RESULT_STATUS_PASS).build();
+        when(resultRepository.insertSubmissionResult(any(ExamResultDTO.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(resultRepository.findByAttemptId(ATTEMPT_ID)).thenReturn(Optional.of(existing));
+
+        ExamResultDTO result = service.submit(EXAM_ID, ATTEMPT_ID, STUDENT_ID);
+
+        assertThat(result.getResultId()).isEqualTo(77);
+    }
+
+    @Test
+    void submit_propagatesOtherConstraintViolations() {
+        when(resultRepository.insertSubmissionResult(any(ExamResultDTO.class)))
+                .thenThrow(new DataIntegrityViolationException("fk"));
+        when(resultRepository.findByAttemptId(ATTEMPT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.submit(EXAM_ID, ATTEMPT_ID, STUDENT_ID))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private ExamQuestion assignment(int questionId, String type, int marks) {

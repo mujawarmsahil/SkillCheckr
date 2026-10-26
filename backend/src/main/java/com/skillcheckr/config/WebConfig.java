@@ -21,10 +21,10 @@ import com.skillcheckr.security.AuthInterceptor;
 
 /**
  * Registers the {@code CorsFilter} applied to every route and maps the authentication
- * interceptor onto the API. There is no Spring Security filter chain in this application
- * (only {@code spring-security-crypto} is on the classpath), so this filter is the only CORS
- * mechanism. Origins come from the {@code cors.*} properties via {@link CorsProperties};
- * there is no hardcoded fallback origin.
+ * interceptor onto the API. Spring Security ({@link com.skillcheckr.security.SecurityConfig})
+ * also installs a stateless filter chain that enforces authentication and security headers;
+ * this interceptor remains the API-level access gate. Origins come from the {@code cors.*}
+ * properties via {@link CorsProperties}; there is no hardcoded fallback origin.
  */
 @Configuration
 @EnableConfigurationProperties(CorsProperties.class)

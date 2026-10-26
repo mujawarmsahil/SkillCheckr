@@ -23,15 +23,31 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
       localStorage.removeItem("user_id");
+      window.dispatchEvent(new Event("auth:logout"));
     }
+
+    let data = error.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const text = await data.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
+      } catch {
+        data = null;
+      }
+    }
+
     const message =
-      error.response?.data?.message ||
-      error.response?.data ||
+      (typeof data === "object" && data !== null ? data.message : null) ||
+      (typeof data === "string" ? data : null) ||
       error.message ||
       "An unexpected error occurred";
     const customError = new Error(typeof message === "string" ? message : JSON.stringify(message));

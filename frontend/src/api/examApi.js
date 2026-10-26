@@ -1,7 +1,7 @@
 import apiClient from "./client";
 
 const toCamelCase = (key) =>
-  key.replace(/_([a-z])/g, (match, char) => char.toUpperCase());
+  key.replace(/_([a-zA-Z0-9])/g, (match, char) => char.toUpperCase());
 
 /**
  * The teacher evaluation DTOs are serialized with snake_case properties, while the rest of

@@ -128,7 +128,7 @@ export function useAttemptAnswers({
 
   const handleSelectOption = useCallback(
     (question, optionKey, optionText) => {
-      if (isAttemptExpired) return;
+      if (isAttemptExpired || savesSuspendedRef.current) return;
 
       const questionId = question?.question_id || question?.questionId;
       if (!questionId) return;
