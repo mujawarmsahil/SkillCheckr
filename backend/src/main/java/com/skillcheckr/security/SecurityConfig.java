@@ -28,7 +28,8 @@ public class SecurityConfig {
                 .contentTypeOptions(cto -> {})
                 .frameOptions(fo -> fo.deny())
                 .referrerPolicy(rp -> rp.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
-                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'").reportOnly()))
             .exceptionHandling(eh -> eh
                 .authenticationEntryPoint(exceptionHandler)
                 .accessDeniedHandler(exceptionHandler))
