@@ -25,15 +25,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Drop any stale credentials so a rejected session cannot be reused.
-      try {
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        localStorage.removeItem("user_id");
-      } catch {
-
-        // ignore storage errors
-      }
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_id");
     }
     const message =
       error.response?.data?.message ||
