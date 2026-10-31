@@ -6,6 +6,7 @@ import TeacherDashboard from "../components/teacher/TeacherDashboard";
 import StudentDashboard from "../components/student/StudentDashboard";
 import EditProfileModal from "../components/auth/EditProfileModal";
 import { Icon } from "../components/common/Icons";
+import Chatbot from "../components/common/Chatbot";
 
 export default function DashboardPage() {
   const { role: urlRole } = useParams();
@@ -82,6 +83,8 @@ export default function DashboardPage() {
         {activeRole === "teacher" && <TeacherDashboard />}
         {activeRole === "student" && <StudentDashboard />}
       </div>
+
+      <Chatbot />
 
       <EditProfileModal
         isOpen={isEditProfileOpen}
