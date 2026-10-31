@@ -46,7 +46,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ addToast, removeToast, showSuccess, showError, showWarning, showInfo }}>
       {children}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+      <div className="fixed bottom-24 right-5 z-[70] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map((toast) => {
           let bgColor = "bg-slate-900 text-white";
           let borderAccent = "border-slate-700";

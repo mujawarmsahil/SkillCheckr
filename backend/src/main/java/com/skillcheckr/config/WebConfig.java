@@ -27,7 +27,7 @@ import com.skillcheckr.security.AuthInterceptor;
  * properties via {@link CorsProperties}; there is no hardcoded fallback origin.
  */
 @Configuration
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({CorsProperties.class, AiChatProperties.class})
 public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
