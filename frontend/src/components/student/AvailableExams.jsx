@@ -380,7 +380,7 @@ export default function AvailableExams() {
                         className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-50/90 via-rose-50/60 to-slate-50 border border-rose-200 text-rose-700 font-semibold rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2 shadow-xs select-none transition-all"
                         title="Registration for this exam has closed."
                       >
-                        <span className="w-5 h-5 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                        <span className="w-5 h-5 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-2xs">
                           <Icon name="lock" className="w-3.5 h-3.5" />
                         </span>
                         <span className="font-bold">Registration Closed</span>

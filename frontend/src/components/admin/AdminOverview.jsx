@@ -204,7 +204,7 @@ export default function AdminOverview({ setActiveTab }) {
                     <p className="text-[11px] text-slate-400">{card.desc}</p>
                   </div>
                   <div
-                    className={`w-12 h-12 rounded-2xl ${styles.bg} ${styles.text} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}
+                    className={`w-12 h-12 rounded-2xl ${styles.bg} ${styles.text} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}
                   >
                     <Icon name={card.icon} className="w-6 h-6" />
                   </div>

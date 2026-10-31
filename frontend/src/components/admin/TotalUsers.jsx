@@ -115,7 +115,7 @@ export default function TotalUsers() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 min-h-[120px]">
-          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
             <Icon name="book" className="w-6 h-6" />
           </div>
           <div>
@@ -125,7 +125,7 @@ export default function TotalUsers() {
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 min-h-[120px]">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
             <Icon name="award" className="w-6 h-6" />
           </div>
           <div>
@@ -142,7 +142,7 @@ export default function TotalUsers() {
             </div>
           ) : (
             <div className="w-full flex items-center justify-between gap-3">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 relative">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                     <Pie
@@ -186,10 +186,10 @@ export default function TotalUsers() {
                   return (
                     <div key={item.name} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[idx] }} />
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx] }} />
                         <span className="text-slate-600 font-medium truncate text-xs">{item.name}</span>
                       </div>
-                      <div className="flex items-center gap-1 pl-1 flex-shrink-0">
+                      <div className="flex items-center gap-1 pl-1 shrink-0">
                         <span className="font-bold text-slate-900">{item.value}</span>
                         <span className="text-[10px] text-slate-400 font-medium">({pct}%)</span>
                       </div>
@@ -289,7 +289,7 @@ export default function TotalUsers() {
                       <td className="py-3.5 px-4 font-mono text-xs text-slate-400">#{id}</td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs shrink-0">
                             {name ? name.charAt(0).toUpperCase() : "U"}
                           </div>
                           <div>
