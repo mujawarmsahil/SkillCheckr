@@ -19,8 +19,7 @@ export default function AddExam({ onExamCreated }) {
 
   const [examData, setExamData] = useState({
     examName: "",
-    subjectName: "",
-    subjectCode: "",
+    subjectId: "",
     examType: "MCQ", // "MCQ" or "QUESTION_ANSWER"
     startDate: getMinimumExamDate(),
     startTime: "10:00",
@@ -29,6 +28,10 @@ export default function AddExam({ onExamCreated }) {
     totalMarks: 50,
     passingMarks: 20,
   });
+
+  const [subjects, setSubjects] = useState([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [subjectsError, setSubjectsError] = useState("");
 
   const [currentQuestion, setCurrentQuestion] = useState({
     question: "",
@@ -48,6 +51,36 @@ export default function AddExam({ onExamCreated }) {
   const [loading, setLoading] = useState(false);
   const [savedSubjectId, setSavedSubjectId] = useState(null);
   const [savedExamId, setSavedExamId] = useState(null);
+
+  // Subjects are managed by administrators; teachers may only choose from that list.
+  useEffect(() => {
+    let active = true;
+    const loadSubjects = async () => {
+      try {
+        const res = await apiClient.get("/api/subjects");
+        if (active) {
+          setSubjects(Array.isArray(res.data) ? res.data : []);
+        }
+      } catch (err) {
+        if (active) {
+          setSubjectsError(err.message || "Could not load subjects.");
+        }
+      } finally {
+        if (active) {
+          setSubjectsLoading(false);
+        }
+      }
+    };
+    loadSubjects();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedSubject = subjects.find(
+    (subject) =>
+      String(subject.subject_id ?? subject.subjectId) === String(examData.subjectId)
+  );
 
   // Auto calculate duration when start or end time changes
   useEffect(() => {
@@ -95,8 +128,8 @@ export default function AddExam({ onExamCreated }) {
       showWarning("Exam name can contain only letters, single spaces, and hyphens.");
       return false;
     }
-    if (!examData.subjectName.trim() || !examData.subjectCode.trim()) {
-      showWarning("Subject name and code are required.");
+    if (!examData.subjectId || !selectedSubject) {
+      showWarning("Select a subject added by an administrator.");
       return false;
     }
     if (!examData.startDate) {
@@ -135,8 +168,9 @@ export default function AddExam({ onExamCreated }) {
         exam_name: examData.examName,
         exam_type: examData.examType,
         subject: {
-          subject_name: examData.subjectName,
-          subject_code: examData.subjectCode,
+          subject_id: selectedSubject.subject_id ?? selectedSubject.subjectId,
+          subject_name: selectedSubject.subject_name ?? selectedSubject.subjectName,
+          subject_code: selectedSubject.subject_code ?? selectedSubject.subjectCode,
         },
         date: dateTime,
         start_time: examData.startTime,
@@ -153,6 +187,8 @@ export default function AddExam({ onExamCreated }) {
         createdExam?.subject?.subject_id ??
         createdExam?.subject?.subjectId ??
         createdExam?.subject_id ??
+        selectedSubject.subject_id ??
+        selectedSubject.subjectId ??
         null;
 
       if (examId && subjectId) {
@@ -404,34 +440,42 @@ export default function AddExam({ onExamCreated }) {
               />
             </div>
 
-            <div>
+            <div className="sm:col-span-3">
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Subject Name
+                Subject
               </label>
-              <input
-                type="text"
-                name="subjectName"
-                value={examData.subjectName}
+              <select
+                name="subjectId"
+                value={examData.subjectId}
                 onChange={handleExamChange}
-                placeholder="e.g. Computer Science"
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-xl text-slate-800 text-sm outline-none transition-all"
+                disabled={subjectsLoading}
                 required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Subject Code
-              </label>
-              <input
-                type="text"
-                name="subjectCode"
-                value={examData.subjectCode}
-                onChange={handleExamChange}
-                placeholder="e.g. CS-301"
-                className="w-full px-4 py-2.5 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-xl text-slate-800 text-sm outline-none transition-all"
-                required
-              />
+              >
+                <option value="">
+                  {subjectsLoading ? "Loading subjects..." : "Select a subject"}
+                </option>
+                {subjects.map((subject) => {
+                  const id = subject.subject_id ?? subject.subjectId;
+                  const name = subject.subject_name ?? subject.subjectName;
+                  const code = subject.subject_code ?? subject.subjectCode;
+                  return (
+                    <option key={id} value={id}>
+                      {name} ({code})
+                    </option>
+                  );
+                })}
+              </select>
+              <p className="mt-1 text-xs text-slate-500">
+                Subjects are added by an administrator. Ask an admin to add one if it is missing.
+              </p>
+              {subjectsError && <p className="mt-1 text-xs text-rose-600">{subjectsError}</p>}
+              {!subjectsLoading && !subjectsError && subjects.length === 0 && (
+                <p className="mt-1 text-xs text-rose-600">
+                  No subjects are available. An administrator must add a subject before you can
+                  create an exam.
+                </p>
+              )}
             </div>
 
             <div>
